@@ -344,6 +344,25 @@ export function extractBolt11(invoice: PpqTopupInvoice): string | undefined {
 }
 
 /**
+ * Convert ppq.ai's `crypto_amount_due` (BTC) into satoshis. Returns
+ * undefined when the field is missing or unparseable. Used by the wallet
+ * auto-topup policy to pre-flight a Spark balance check before paying.
+ */
+export function extractRequiredSats(
+  invoice: PpqTopupInvoice,
+): number | undefined {
+  const raw = invoice.crypto_amount_due;
+  const btc =
+    typeof raw === "number"
+      ? raw
+      : typeof raw === "string" && raw.trim() && Number.isFinite(Number(raw))
+        ? Number(raw)
+        : undefined;
+  if (btc === undefined || btc <= 0) return undefined;
+  return Math.ceil(btc * 1e8);
+}
+
+/**
  * ppq.ai's topup status enum (observed): "New" while pending, "Settled" once
  * paid, and presumably "Expired" / "Invalid" for failure modes. Earlier docs
  * referenced lowercase "pending"/"completed"/"expired". We compare

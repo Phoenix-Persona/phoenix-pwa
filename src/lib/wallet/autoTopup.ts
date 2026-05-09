@@ -28,12 +28,13 @@
 import {
   createTopupInvoice,
   extractBolt11,
+  extractRequiredSats,
   getTopupStatus,
   isTopupExpired,
   isTopupSettled,
 } from "@/lib/ppq/client";
 
-import { sendBolt11 } from "./client";
+import { loadWalletInfo, sendBolt11 } from "./client";
 import {
   WalletError,
   type AutoTopupConfig,
@@ -111,10 +112,36 @@ export async function runAutoTopupOnce(
     );
   }
 
-  // 2. Pay it from the Spark wallet.
+  // 2a. Pre-flight: make sure the Spark wallet can actually cover the
+  // invoice. ppq.ai surfaces the exact sats required as `crypto_amount_due`
+  // (BTC). Bailing here gives a precise error instead of letting the SDK
+  // spit a generic "Tree service error: insufficient funds".
+  const requiredSats = extractRequiredSats(invoice);
+  if (requiredSats !== undefined) {
+    const info = await loadWalletInfo(wallet);
+    if (info.balanceSats < requiredSats) {
+      throw new WalletError(
+        `Spark wallet has ${info.balanceSats} sats but the topup invoice for ` +
+          `${needUsd} ${invoice.currency} requires ${requiredSats} sats. ` +
+          `Fund the wallet with at least ${requiredSats - info.balanceSats} ` +
+          `more sats and retry.`,
+      );
+    }
+  }
+
+  // 2b. Pay it from the Spark wallet.
   try {
     await sendBolt11(wallet, { paymentRequest: bolt11 });
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/insufficient\s+funds/i.test(msg)) {
+      throw new WalletError(
+        `Spark wallet rejected the payment: insufficient funds for the ` +
+          `${requiredSats ?? "(unknown)"}-sat topup invoice. Fund the wallet ` +
+          `first via tests/wallet/bootstrap-spark-wallet-e2e.ts → Receive.`,
+        err,
+      );
+    }
     throw new WalletError(
       "Spark wallet failed to pay ppq.ai topup invoice",
       err,

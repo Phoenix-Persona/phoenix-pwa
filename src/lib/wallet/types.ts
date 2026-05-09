@@ -120,9 +120,14 @@ export interface AutoTopupConfig {
   targetUsd: number;
 }
 
+/**
+ * Default policy: if the ppq.ai credit balance dips below $5, top it back
+ * up to $5. The threshold and target match by design — "if below $5, get
+ * to $5" — so the resulting balance is exactly $5 right after settlement.
+ */
 export const DEFAULT_AUTO_TOPUP_CONFIG: AutoTopupConfig = {
   enabled: true,
-  thresholdUsd: 1,
+  thresholdUsd: 5,
   targetUsd: 5,
 };
 

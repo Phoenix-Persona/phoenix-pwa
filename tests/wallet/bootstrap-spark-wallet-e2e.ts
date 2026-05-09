@@ -30,7 +30,8 @@
  *   --reset                   Wipe persona + operator on startup
  *   --skip-receive            Don't wait for an inbound BOLT11 payment
  *   --topup-target <usd>      Override auto-topup target (default 5)
- *   --topup-threshold <usd>   Override threshold (default 1)
+ *   --topup-threshold <usd>   Override threshold (default 5 — top up to $5
+ *                             whenever balance falls below $5)
  *   --register-address        Register a Lightning Address if none exists
  */
 
@@ -96,8 +97,9 @@ const flags = {
   reset: argv.includes("--reset"),
   skipReceive: argv.includes("--skip-receive"),
   registerAddress: argv.includes("--register-address"),
+  // Default policy: if ppq balance drops below $5, top it back up to $5.
   topupTarget: Number(flagValue("topup-target") ?? "5"),
-  topupThreshold: Number(flagValue("topup-threshold") ?? "1"),
+  topupThreshold: Number(flagValue("topup-threshold") ?? "5"),
 };
 
 const rl = makeReadline();

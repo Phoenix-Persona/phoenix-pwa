@@ -219,6 +219,12 @@ export interface PpqTopupInvoice {
   checkout_url?: string;
   /** On-chain address for non-Lightning methods. */
   address?: string;
+  /**
+   * Exact crypto amount the payer must send, denominated in the underlying
+   * coin (BTC for `btc-lightning` and `btc`; LTC for `ltc`; etc). Used to
+   * pre-check the wallet has enough balance before attempting payment.
+   */
+  crypto_amount_due?: number | string;
   /** Pass-through escape hatch — keep additional fields visible to callers. */
   [extra: string]: unknown;
 }

@@ -36,7 +36,7 @@ npx tsx tests/wallet/test-auto-topup-and-inference.ts
 | `--skip-receive` | Don't wait for an inbound BOLT11 payment |
 | `--register-address` | Register a Lightning Address if the wallet has none |
 | `--topup-target <usd>` | Auto-topup target (default 5) |
-| `--topup-threshold <usd>` | Auto-topup threshold (default 1) |
+| `--topup-threshold <usd>` | Auto-topup threshold (default 5 — top up to $5 whenever balance falls below $5) |
 
 `test-auto-topup-and-inference.ts`
 
