@@ -3,6 +3,7 @@ import { useSeoMeta } from "@unhead/react";
 
 import { PhoenixHeader } from "@/components/PhoenixHeader";
 import { ImigongoBand, ImigongoSeal } from "@/components/ImigongoBand";
+import { HowItWorks } from "@/components/HowItWorks";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
@@ -111,49 +112,7 @@ const Index = () => {
 
         <ImigongoBand variant="muted" />
 
-        {/* HOW IT WORKS */}
-        <section className="container py-20 space-y-10">
-          <h2 className="font-display text-4xl md:text-5xl font-medium tracking-tight max-w-2xl">
-            How it works.
-          </h2>
-
-          <div className="grid md:grid-cols-3 gap-5">
-            {[
-              {
-                n: "01",
-                title: "Build",
-                body: "Pick a cause. Curate sources. Define the voice. Phoenix generates the persona's keypair.",
-                accentClass: "bg-imigongo-ochre",
-              },
-              {
-                n: "02",
-                title: "Speak",
-                body: "Type a thought. AI styles it in voice. Preview, edit, publish — signed by the persona, not you.",
-                accentClass: "bg-rw-green",
-              },
-              {
-                n: "03",
-                title: "Outlive",
-                body: "Posts live on relays everywhere. Kill the operator. Content survives. Anyone can resume the voice.",
-                accentClass: "bg-imigongo-clay",
-              },
-            ].map((s) => (
-              <div
-                key={s.n}
-                className="relative rounded-2xl border border-border bg-card p-7 pt-8 space-y-3 hover:border-imigongo-clay/60 transition-colors overflow-hidden"
-              >
-                <div
-                  className={`absolute top-0 left-0 right-0 h-1 ${s.accentClass}`}
-                />
-                <div className="font-mono text-xs text-imigongo-clay tracking-widest">
-                  {s.n}
-                </div>
-                <h3 className="font-display text-2xl font-medium">{s.title}</h3>
-                <p className="text-muted-foreground leading-relaxed">{s.body}</p>
-              </div>
-            ))}
-          </div>
-        </section>
+        <HowItWorks />
 
         <ImigongoBand variant="muted" />
 
@@ -218,33 +177,76 @@ const Index = () => {
 
         <ImigongoBand variant="muted" />
 
-        {/* ORIGIN — built in 36 hours */}
-        <section className="container py-20 max-w-5xl space-y-10">
-          <div className="space-y-3 max-w-2xl">
+        {/* QUIET PROMISES — trust section, Proton-pattern: each promise
+            answers a real activist concern with a concrete capability. */}
+        <section className="container py-20 md:py-28 max-w-5xl space-y-14">
+          <div className="space-y-4 max-w-2xl">
             <p className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
-              Built by hand
+              Quiet promises
             </p>
-            <h2 className="font-display text-4xl md:text-5xl font-medium tracking-tight">
-              Sketched on a whiteboard. Shipped in 36 hours.
+            <h2 className="font-display text-4xl md:text-5xl font-medium tracking-tight leading-[1.05]">
+              Built to be earned,{" "}
+              <span className="italic text-imigongo-clay">
+                not assumed.
+              </span>
             </h2>
-            <p className="text-lg text-muted-foreground leading-relaxed">
-              Phoenix was built at the HRF AI Hack for Freedom by a small team
-              who believe the people most worth hearing should never be the
-              easiest to silence.
+            <p className="text-lg text-muted-foreground leading-relaxed max-w-xl">
+              Three commitments. Every one of them enforced by cryptography,
+              not by us asking you to trust us.
             </p>
           </div>
 
-          <div className="relative rounded-[1.75rem] overflow-hidden shadow-2xl shadow-imigongo-charcoal/40 ring-1 ring-imigongo-clay/20 max-w-3xl mx-auto">
-            <img
-              src="/images/whiteboard-origin.webp"
-              srcSet="/images/whiteboard-origin-sm.webp 800w, /images/whiteboard-origin.webp 1400w"
-              sizes="(max-width: 768px) 100vw, 800px"
-              alt="A whiteboard with a five-step wizard flow and dashboard sketch in orange marker."
-              width={1400}
-              height={1217}
-              loading="lazy"
-              className="w-full h-auto block"
-            />
+          <div className="grid md:grid-cols-3 gap-x-10 gap-y-12 md:gap-x-14">
+            {[
+              {
+                n: "01",
+                headline: "Drafts never leave your device.",
+                body: (
+                  <>
+                    Encrypted to your Nostr key in your browser, before
+                    anything crosses the wire. Phoenix never sees what
+                    you&rsquo;re thinking — even if compelled to.
+                  </>
+                ),
+              },
+              {
+                n: "02",
+                headline: "No single relay can silence you.",
+                body: (
+                  <>
+                    Posts replicate to a quorum of relays you choose. Coercing
+                    one isn&rsquo;t enough. Coercing them all isn&rsquo;t
+                    possible.
+                  </>
+                ),
+              },
+              {
+                n: "03",
+                headline: "The voice can be inherited.",
+                body: (
+                  <>
+                    Hand the persona to a successor with one signed event.
+                    Same key. Same conviction. The voice continues — even if
+                    you can&rsquo;t.
+                  </>
+                ),
+              },
+            ].map((p) => (
+              <div
+                key={p.n}
+                className="space-y-3 md:border-l md:border-imigongo-clay/20 md:pl-6 first:md:border-l-0 first:md:pl-0"
+              >
+                <div className="font-mono text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
+                  {p.n}
+                </div>
+                <h3 className="font-display text-2xl font-medium tracking-tight leading-tight">
+                  {p.headline}
+                </h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  {p.body}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
 
