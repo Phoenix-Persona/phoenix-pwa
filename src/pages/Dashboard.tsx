@@ -94,19 +94,24 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         ) : persona.isLoading ? (
-          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-28 w-full" />
         ) : config ? (
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <div className="text-xs uppercase tracking-wider text-imigongo-clay font-medium mb-1">
-                {config.region} · {config.cause}
+          <div className="rounded-2xl border border-border bg-card p-6 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-imigongo-clay via-rw-gold to-rw-green" />
+            <div className="flex items-start justify-between gap-4 flex-wrap relative">
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold mb-1">
+                  {config.region} · {config.cause}
+                </div>
+                <h1 className="font-display text-3xl md:text-4xl font-medium tracking-tight">
+                  {config.name}
+                </h1>
+                <p className="text-muted-foreground mt-3 max-w-2xl">{config.bio}</p>
               </div>
-              <h1 className="text-3xl font-bold tracking-tight">{config.name}</h1>
-              <p className="text-muted-foreground mt-2 max-w-2xl">{config.bio}</p>
+              <Button asChild variant="outline" size="sm">
+                <Link to={`/p/${npub}`}>View public feed →</Link>
+              </Button>
             </div>
-            <Button asChild variant="outline" size="sm">
-              <Link to={`/p/${npub}`}>View public feed →</Link>
-            </Button>
           </div>
         ) : persona.isError ? (
           <Card className="border-dashed">

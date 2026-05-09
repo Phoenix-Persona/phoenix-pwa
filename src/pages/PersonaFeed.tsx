@@ -54,11 +54,12 @@ const PersonaFeed = () => {
             </CardContent>
           </Card>
         ) : (
-          <div className="rounded-2xl border border-border bg-card p-6 relative overflow-hidden">
-            <div className="absolute inset-0 imigongo-pattern text-imigongo-clay opacity-[0.05] pointer-events-none" />
-            <div className="relative space-y-4">
+          <div className="rounded-2xl border border-border bg-card p-7 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-imigongo-clay via-rw-gold to-rw-green" />
+            <div className="absolute inset-0 imigongo-pattern text-imigongo-clay opacity-[0.04] pointer-events-none" />
+            <div className="relative space-y-4 pt-2">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+                <h1 className="font-display text-3xl md:text-5xl font-medium tracking-tight">
                   {displayName}
                 </h1>
                 <Button asChild variant="outline" size="sm">
@@ -69,7 +70,7 @@ const PersonaFeed = () => {
                 </Button>
               </div>
               {bio && (
-                <p className="text-muted-foreground max-w-2xl">{bio}</p>
+                <p className="text-muted-foreground max-w-2xl leading-relaxed">{bio}</p>
               )}
               <div className="flex flex-wrap gap-2">
                 <Badge variant="secondary" className="font-mono text-[10px]">

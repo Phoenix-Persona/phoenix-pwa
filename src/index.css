@@ -1,6 +1,13 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Rwandan-rooted typography:
+ *   Fraunces — expressive editorial serif for display & headings
+ *   Inter    — clean readable sans for body & UI
+ */
+@import "@fontsource-variable/fraunces/standard.css";
+@import "@fontsource-variable/inter/standard.css";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -55,6 +62,27 @@
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
 
+  /* Typography tokens for Tailwind utilities */
+  --font-display: "Fraunces Variable", "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Phoenix brand tokens — the full Rwandan-rooted palette
+   * Imigongo earth tones are the base; flag colors are confident accents.
+   */
+  --color-imigongo-cream: var(--imigongo-cream);
+  --color-imigongo-ochre: var(--imigongo-ochre);
+  --color-imigongo-clay: var(--imigongo-clay);
+  --color-imigongo-charcoal: var(--imigongo-charcoal);
+  --color-imigongo-ash: var(--imigongo-ash);
+
+  /* Rwandan flag accents */
+  --color-rw-green: var(--rw-green);
+  --color-rw-green-deep: var(--rw-green-deep);
+  --color-rw-gold: var(--rw-gold);
+  --color-rw-gold-soft: var(--rw-gold-soft);
+  --color-rw-sky: var(--rw-sky);
+
   @keyframes accordion-down {
     from {
       height: 0;
@@ -84,46 +112,46 @@
 }
 
 /*
- * Phoenix — Imigongo palette
- * Inspired by traditional Rwandan Imigongo geometric art.
- * Core colors: ikondera (ochre), umukara (black), umuhondo (cream), umutuku (red clay).
+ * Phoenix — Rwandan-rooted palette
+ *
+ * Imigongo earth tones (umuhondo cream, ikondera ochre, umutuku clay,
+ * umukara charcoal) form the brand base. The Rwandan flag's green
+ * (the land of a thousand hills), gold (the sun), and sky-blue accent
+ * the palette where confidence or hope is needed.
  */
-
-@theme inline {
-  /* Imigongo brand tokens — usable as bg-imigongo-ochre, text-imigongo-clay, etc. */
-  --color-imigongo-cream: var(--imigongo-cream);
-  --color-imigongo-ochre: var(--imigongo-ochre);
-  --color-imigongo-clay: var(--imigongo-clay);
-  --color-imigongo-charcoal: var(--imigongo-charcoal);
-  --color-imigongo-ash: var(--imigongo-ash);
-}
-
 :root {
   --radius: 0.75rem;
 
-  /* Imigongo palette */
+  /* Imigongo earth tones */
   --imigongo-cream: hsl(38 35% 92%);     /* umuhondo - warm cream */
   --imigongo-ochre: hsl(28 70% 48%);     /* ikondera - earthen ochre */
   --imigongo-clay: hsl(8 65% 38%);       /* umutuku - red clay */
   --imigongo-charcoal: hsl(20 15% 10%);  /* umukara - smoke black */
-  --imigongo-ash: hsl(25 8% 35%);        /* warm ash */
+  --imigongo-ash: hsl(25 8% 35%);
+
+  /* Rwandan flag — used as confident accents */
+  --rw-green: hsl(150 50% 32%);          /* the thousand hills */
+  --rw-green-deep: hsl(150 55% 22%);
+  --rw-gold: hsl(46 92% 52%);            /* the sun */
+  --rw-gold-soft: hsl(42 80% 78%);
+  --rw-sky: hsl(199 100% 43%);           /* sky accent (sparing) */
 
   --background: hsl(38 35% 96%);
   --foreground: hsl(20 15% 10%);
 
-  --card: hsl(38 35% 99%);
+  --card: hsl(38 38% 99%);
   --card-foreground: hsl(20 15% 10%);
 
-  --popover: hsl(38 35% 99%);
+  --popover: hsl(38 38% 99%);
   --popover-foreground: hsl(20 15% 10%);
 
   --primary: hsl(28 70% 42%);
   --primary-foreground: hsl(38 35% 96%);
 
-  --secondary: hsl(38 25% 88%);
-  --secondary-foreground: hsl(20 15% 10%);
+  --secondary: hsl(150 35% 88%);
+  --secondary-foreground: hsl(150 55% 22%);
 
-  --muted: hsl(38 20% 90%);
+  --muted: hsl(38 22% 90%);
   --muted-foreground: hsl(25 12% 38%);
 
   --accent: hsl(8 65% 38%);
@@ -136,11 +164,11 @@
   --input: hsl(38 20% 86%);
   --ring: hsl(28 70% 42%);
 
-  --chart-1: hsl(28 70% 48%);
-  --chart-2: hsl(8 65% 38%);
-  --chart-3: hsl(20 15% 10%);
-  --chart-4: hsl(38 35% 92%);
-  --chart-5: hsl(25 8% 35%);
+  --chart-1: hsl(28 70% 48%);   /* ochre */
+  --chart-2: hsl(8 65% 38%);    /* clay */
+  --chart-3: hsl(150 50% 32%);  /* hills green */
+  --chart-4: hsl(46 92% 52%);   /* sun gold */
+  --chart-5: hsl(20 15% 10%);   /* charcoal */
 
   --sidebar: hsl(38 35% 94%);
   --sidebar-foreground: hsl(20 15% 10%);
@@ -154,60 +182,74 @@
 
 .dark {
   --imigongo-cream: hsl(38 35% 92%);
-  --imigongo-ochre: hsl(28 75% 55%);
-  --imigongo-clay: hsl(8 70% 50%);
+  --imigongo-ochre: hsl(28 75% 58%);
+  --imigongo-clay: hsl(8 70% 52%);
   --imigongo-charcoal: hsl(20 15% 7%);
   --imigongo-ash: hsl(25 8% 65%);
+
+  --rw-green: hsl(150 50% 50%);
+  --rw-green-deep: hsl(150 55% 32%);
+  --rw-gold: hsl(46 92% 60%);
+  --rw-gold-soft: hsl(42 60% 30%);
+  --rw-sky: hsl(199 90% 55%);
 
   --background: hsl(20 15% 7%);
   --foreground: hsl(38 35% 92%);
 
-  --card: hsl(20 15% 10%);
+  --card: hsl(20 14% 11%);
   --card-foreground: hsl(38 35% 92%);
 
-  --popover: hsl(20 15% 10%);
+  --popover: hsl(20 14% 11%);
   --popover-foreground: hsl(38 35% 92%);
 
-  --primary: hsl(28 75% 55%);
+  --primary: hsl(28 75% 58%);
   --primary-foreground: hsl(20 15% 7%);
 
-  --secondary: hsl(20 12% 16%);
-  --secondary-foreground: hsl(38 35% 92%);
+  --secondary: hsl(150 25% 18%);
+  --secondary-foreground: hsl(150 50% 75%);
 
-  --muted: hsl(20 10% 14%);
+  --muted: hsl(20 10% 15%);
   --muted-foreground: hsl(25 12% 65%);
 
-  --accent: hsl(8 70% 50%);
+  --accent: hsl(8 70% 52%);
   --accent-foreground: hsl(38 35% 92%);
 
   --destructive: hsl(8 75% 50%);
   --destructive-foreground: hsl(38 35% 92%);
 
-  --border: hsl(20 12% 18%);
-  --input: hsl(20 12% 18%);
-  --ring: hsl(28 75% 55%);
+  --border: hsl(20 12% 19%);
+  --input: hsl(20 12% 19%);
+  --ring: hsl(28 75% 58%);
 
-  --chart-1: hsl(28 75% 55%);
-  --chart-2: hsl(8 70% 50%);
-  --chart-3: hsl(38 35% 80%);
-  --chart-4: hsl(38 35% 92%);
-  --chart-5: hsl(25 12% 65%);
+  --chart-1: hsl(28 75% 58%);
+  --chart-2: hsl(8 70% 52%);
+  --chart-3: hsl(150 50% 50%);
+  --chart-4: hsl(46 92% 60%);
+  --chart-5: hsl(38 35% 80%);
 
   --sidebar: hsl(20 15% 9%);
   --sidebar-foreground: hsl(38 35% 92%);
-  --sidebar-primary: hsl(28 75% 55%);
+  --sidebar-primary: hsl(28 75% 58%);
   --sidebar-primary-foreground: hsl(20 15% 7%);
   --sidebar-accent: hsl(20 12% 14%);
   --sidebar-accent-foreground: hsl(38 35% 92%);
-  --sidebar-border: hsl(20 12% 18%);
-  --sidebar-ring: hsl(28 75% 55%);
+  --sidebar-border: hsl(20 12% 19%);
+  --sidebar-ring: hsl(28 75% 58%);
 }
 
-/* Imigongo background pattern utility — apply to hero sections, dividers */
+/* Imigongo background pattern — apply to hero sections, dividers */
 @utility imigongo-pattern {
   background-image: url("/imigongo-pattern.svg");
   background-repeat: repeat;
-  background-size: 96px 96px;
+  background-size: 112px 112px;
+}
+
+/* Subtler version for backgrounds */
+@utility imigongo-pattern-soft {
+  background-image: url("/imigongo-pattern.svg");
+  background-repeat: repeat;
+  background-size: 144px 144px;
+  opacity: 0.55;
 }
 
 @layer base {
@@ -220,6 +262,23 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01", "ss03";
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-feature-settings: "ss01", "ss02";
+    letter-spacing: -0.015em;
+  }
+
+  /* Selection color picks up the brand */
+  ::selection {
+    background-color: var(--rw-gold-soft);
+    color: var(--imigongo-charcoal);
   }
 }

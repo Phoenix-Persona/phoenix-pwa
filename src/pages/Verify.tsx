@@ -43,15 +43,20 @@ const Verify = () => {
       <PhoenixHeader />
 
       <main className="flex-1 container py-10 max-w-3xl space-y-6">
-        <div className="flex items-center gap-3">
-          <ShieldCheck className="size-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Persona verification
-            </h1>
-            <p className="text-muted-foreground text-sm">
-              Public-facing identity for {displayName}.
-            </p>
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
+            Phoenix attestation
+          </p>
+          <div className="flex items-center gap-3">
+            <ShieldCheck className="size-9 text-primary" />
+            <div>
+              <h1 className="font-display text-3xl md:text-4xl font-medium tracking-tight">
+                Persona verification
+              </h1>
+              <p className="text-muted-foreground text-sm">
+                Public-facing identity for {displayName}.
+              </p>
+            </div>
           </div>
         </div>
 
