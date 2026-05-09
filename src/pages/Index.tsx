@@ -414,13 +414,10 @@ const Index = () => {
           </div>
 
           <div className="border-t border-imigongo-cream/10">
-            <div className="container py-5 flex flex-wrap items-center justify-between gap-3 text-xs text-imigongo-cream/50">
+            <div className="container py-5 text-xs text-imigongo-cream/50">
               <span>
                 © {new Date().getFullYear()} Phoenix. Built for voices that
                 can&rsquo;t be silenced.
-              </span>
-              <span className="font-mono">
-                Encrypted · Signed · Replicated
               </span>
             </div>
           </div>
