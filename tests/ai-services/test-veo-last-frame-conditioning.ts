@@ -343,11 +343,24 @@ async function generateClip(args: ClipSubmitArgs): Promise<{
 
   const deadline = Date.now() + 12 * 60 * 1000;
   let last = "";
+  let pollCount = 0;
+  const startTime = Date.now();
   while (Date.now() < deadline) {
     const status = await getVideoStatus(args.apiKey, submitted.id);
+    pollCount++;
     if (status.status !== last) {
+      // newline before any prior heartbeat dots, then the status
+      if (pollCount > 1) process.stdout.write("\n");
       console.log(`  status: ${status.status}`);
       last = status.status;
+    } else {
+      // heartbeat: a dot every poll, with elapsed time every 6 polls (30s)
+      if (pollCount % 6 === 0) {
+        const secs = Math.round((Date.now() - startTime) / 1000);
+        process.stdout.write(`  · still ${status.status} (${secs}s elapsed)\n`);
+      } else {
+        process.stdout.write(".");
+      }
     }
     if (status.status === "completed") {
       const url = status.data?.url;
