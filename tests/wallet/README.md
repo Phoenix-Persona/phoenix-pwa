@@ -3,11 +3,12 @@
 Manual end-to-end checks that the Phoenix wallet primitives work against
 the real Breez Spark SDK.
 
-## Two scripts
+## Three scripts
 
 | Script | What it does |
 | --- | --- |
 | [`bootstrap-spark-wallet-e2e.ts`](./bootstrap-spark-wallet-e2e.ts) | First run. Mints an operator nsec, encrypts a fresh persona envelope (with BIP-39 mnemonic embedded), connects the Spark wallet, optionally registers a Lightning Address, prompts you to fund it via BOLT11, then runs one default-on auto-topup pass against ppq.ai. |
+| [`fund-spark-wallet-with-sats.ts`](./fund-spark-wallet-with-sats.ts) | Top-up only. Reconnects the existing wallet and prints a single BOLT11 invoice for whatever amount you specify, then polls until it settles. Use this when the wallet is too lean to cover the next auto-topup. |
 | [`test-auto-topup-and-inference.ts`](./test-auto-topup-and-inference.ts) | Follow-up. Reuses the persisted state from `bootstrap-spark-wallet-e2e.ts` and exercises three flows: a "hello world" inference call against ppq.ai, the disabled-policy short-circuit, and a forced auto-topup that fires no matter the current balance. |
 
 Both scripts load `dev/.env` automatically; just put your API key there:
@@ -22,7 +23,10 @@ echo 'VITE_BREEZ_API_KEY=your_key' >> dev/.env
 # First time on a machine — mints wallet + persona + first topup
 npx tsx tests/wallet/bootstrap-spark-wallet-e2e.ts
 
-# Subsequently — reuses the persisted state
+# Top up the existing wallet by an arbitrary amount
+npx tsx tests/wallet/fund-spark-wallet-with-sats.ts --amount-sats 10000
+
+# Reuses the persisted state — hello world + off-switch + forced topup
 npx tsx tests/wallet/test-auto-topup-and-inference.ts
 ```
 
@@ -37,6 +41,14 @@ npx tsx tests/wallet/test-auto-topup-and-inference.ts
 | `--register-address` | Register a Lightning Address if the wallet has none |
 | `--topup-target <usd>` | Auto-topup target (default 5) |
 | `--topup-threshold <usd>` | Auto-topup threshold (default 5 — top up to $5 whenever balance falls below $5) |
+
+`fund-spark-wallet-with-sats.ts`
+
+| Flag | Effect |
+| --- | --- |
+| `--amount-sats <n>` | Skip the prompt and request this many sats |
+| `--memo <text>` | Invoice memo (default `"Phoenix wallet top-up"`) |
+| `--timeout-mins <n>` | How long to wait for inbound payment (default 10) |
 
 `test-auto-topup-and-inference.ts`
 
