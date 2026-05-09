@@ -382,19 +382,7 @@ async function imageStep(acct: PpqAccount): Promise<void> {
 async function videoStep(acct: PpqAccount): Promise<void> {
   if (!(await askYesNo("Run video generation (Veo 3)?", "n"))) return;
 
-  let model = process.env.PPQ_VIDEO_MODEL;
-  if (!model) {
-    const videoModels = await listModels("video", baseOpts);
-    const veo = videoModels.find((m) => m.id.startsWith("veo3"));
-    model = (veo ?? videoModels[0])?.id;
-    if (!model) {
-      console.warn("No video models advertised — skipping.");
-      return;
-    }
-    console.log(
-      `  available video models: ${videoModels.map((m) => m.id).join(", ")}`,
-    );
-  }
+  const model = process.env.PPQ_VIDEO_MODEL ?? "veo3-fast";
   console.log(`  model: ${model}`);
 
   const prompt =

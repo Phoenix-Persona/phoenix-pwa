@@ -14,9 +14,8 @@ real `https://api.ppq.ai` service. Walks every service goal one at a time:
 5. **Image generation** — picks the first model from
    `GET /v1/models?type=image` (override via `PPQ_IMAGE_MODEL`) and
    generates a 1:1 image.
-6. **Video generation** — finds the first `veo3*` model from
-   `GET /v1/models?type=video` (override via `PPQ_VIDEO_MODEL`), submits an
-   8-second 720p job, and polls until it completes (max 6 min).
+6. **Video generation** — submits an 8-second 720p job against `veo3-fast`
+   (override via `PPQ_VIDEO_MODEL`) and polls until it completes (max 6 min).
 
 Each step is gated on `(y/n)` so you can skip anything you don't want to
 spend on this run.
