@@ -11,7 +11,7 @@ import {
   Loader2,
   ExternalLink,
 } from 'lucide-react';
-import { encryptNsec, storeUserNcryptsec } from '@/lib/nip49Storage';
+import { decryptNcryptsec, encryptNsec, storeUserNcryptsec } from '@/lib/nip49Storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -41,7 +41,7 @@ interface AuthDialogProps {
   onClose: () => void;
 }
 
-type Step = 'welcome' | 'generate' | 'secure' | 'passphrase' | 'profile' | 'login' | 'connect';
+type Step = 'welcome' | 'generate' | 'secure' | 'passphrase' | 'profile' | 'login' | 'connect' | 'import-backup';
 
 const validateNsec = (nsec: string) => /^nsec1[a-zA-Z0-9]{58}$/.test(nsec);
 const validateBunkerUri = (uri: string) => uri.startsWith('bunker://');
@@ -97,6 +97,15 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
   const [passphraseConfirm, setPassphraseConfirm] = useState('');
   const [passphraseError, setPassphraseError] = useState('');
   const [encryptingPassphrase, setEncryptingPassphrase] = useState(false);
+
+  // NIP-49 import — when the user drops in an .ncryptsec file from a
+  // backup, we read it, ask for the export passphrase, decrypt to an
+  // nsec, and use the same ncryptsec as the at-rest backup on this
+  // device (so the user only ever remembers one passphrase).
+  const [importedNcryptsec, setImportedNcryptsec] = useState('');
+  const [importPassphrase, setImportPassphrase] = useState('');
+  const [importError, setImportError] = useState('');
+  const [importing, setImporting] = useState(false);
 
   // Login state
   const [loginNsec, setLoginNsec] = useState('');
@@ -369,18 +378,70 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Allow re-selecting the same file later.
+    e.target.value = '';
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (content && validateNsec(content.trim())) {
-        setLoginNsec(content.trim());
-      } else {
-        setLoginError('File does not contain a valid secret key.');
+      const content = (event.target?.result as string | undefined)?.trim() ?? '';
+      if (!content) {
+        setLoginError('File is empty.');
+        return;
       }
+      // Encrypted backup → branch into the import-with-passphrase flow.
+      if (content.startsWith('ncryptsec1')) {
+        setImportedNcryptsec(content);
+        setImportPassphrase('');
+        setImportError('');
+        setLoginError('');
+        setStep('import-backup');
+        return;
+      }
+      // Plaintext nsec → existing behavior, paste into the login form.
+      if (validateNsec(content)) {
+        setLoginNsec(content);
+        return;
+      }
+      setLoginError(
+        'File does not contain a valid secret key or encrypted backup.'
+      );
     };
     reader.onerror = () => setLoginError('Failed to read file.');
     reader.readAsText(file);
+  };
+
+  // Decrypt the imported ncryptsec, install it as the at-rest backup
+  // on this device (same ncryptsec, same passphrase — the user only
+  // remembers one secret), and start the Nostrify session.
+  const handleImportSubmit = async () => {
+    setImportError('');
+    if (!importPassphrase) {
+      setImportError('Enter the passphrase you set when you exported the backup.');
+      return;
+    }
+    setImporting(true);
+    // Yield so the spinner paints before scrypt grabs the main thread.
+    await new Promise((r) => setTimeout(r, 0));
+    try {
+      const skBytes = decryptNcryptsec(importedNcryptsec, importPassphrase);
+      const recoveredNsec = nip19.nsecEncode(skBytes);
+      // The imported ncryptsec is already a NIP-49 wrapper at the same
+      // log_n we use at-rest — install it directly so this device has
+      // an at-rest backup without re-encrypting.
+      storeUserNcryptsec(importedNcryptsec);
+      login.nsec(recoveredNsec);
+      setImportedNcryptsec('');
+      setImportPassphrase('');
+      onClose();
+    } catch (e) {
+      setImportError(
+        e instanceof Error && e.message.includes('passphrase')
+          ? e.message
+          : 'Incorrect passphrase, or the file is not a valid backup.'
+      );
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleExtensionLogin = async () => {
@@ -454,6 +515,8 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
         return 'Log in';
       case 'connect':
         return 'Connect signer';
+      case 'import-backup':
+        return 'Import key backup';
     }
   };
 
@@ -843,6 +906,79 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
             </div>
           )}
 
+          {/* Import-backup step — decrypt a .ncryptsec file and log in. */}
+          {step === 'import-backup' && (
+            <div className="space-y-4">
+              <div className="flex size-14 bg-primary/10 rounded-full items-center justify-center mx-auto">
+                <Lock className="w-7 h-7 text-primary" />
+              </div>
+
+              <p className="text-sm text-muted-foreground text-center leading-relaxed">
+                Enter the passphrase you set when you saved this backup.
+                Feniksi will decrypt your key and use the same encrypted
+                file as the at-rest backup on this device.
+              </p>
+
+              <div className="space-y-1.5">
+                <label htmlFor="import-passphrase" className="text-sm font-medium">
+                  Backup passphrase
+                </label>
+                <Input
+                  id="import-passphrase"
+                  type="password"
+                  value={importPassphrase}
+                  onChange={(e) => {
+                    setImportPassphrase(e.target.value);
+                    if (importError) setImportError('');
+                  }}
+                  autoComplete="current-password"
+                  disabled={importing}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !importing) {
+                      e.preventDefault();
+                      handleImportSubmit();
+                    }
+                  }}
+                />
+              </div>
+
+              {importError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{importError}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button
+                onClick={handleImportSubmit}
+                disabled={importing || !importPassphrase}
+                className="w-full h-12"
+              >
+                {importing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Decrypting…
+                  </>
+                ) : (
+                  'Import &amp; log in'
+                )}
+              </Button>
+
+              <button
+                onClick={() => {
+                  setImportedNcryptsec('');
+                  setImportPassphrase('');
+                  setImportError('');
+                  setStep('login');
+                }}
+                disabled={importing}
+                className="w-full text-sm text-muted-foreground hover:text-foreground"
+              >
+                Back
+              </button>
+            </div>
+          )}
+
           {/* Connect step — nostrconnect QR + bunker URI fallback. */}
           {step === 'connect' && (
             <div className="space-y-4">
@@ -995,7 +1131,7 @@ const NsecLoginForm: React.FC<NsecLoginFormProps> = ({
       </Button>
       <input
         type="file"
-        accept=".txt"
+        accept=".txt,.ncryptsec,text/plain"
         className="hidden"
         ref={fileInputRef}
         onChange={onFileChange}
