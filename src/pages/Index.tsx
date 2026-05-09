@@ -39,8 +39,8 @@ const Index = () => {
               </h1>
 
               <p className="text-xl text-muted-foreground max-w-xl leading-relaxed">
-                AI-assisted personas on Nostr. Privately operated, publicly
-                heard, impossible to take down.
+                Activists get arrested, exiled, killed. Their voice dies with
+                them. Phoenix keeps it alive.
               </p>
 
               <div className="flex flex-wrap gap-3">
