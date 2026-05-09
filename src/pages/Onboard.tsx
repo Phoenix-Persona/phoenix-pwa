@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 import { Loader2, Sparkles } from "lucide-react";
 import { useNostr } from "@nostrify/react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
@@ -30,7 +31,10 @@ import {
   buildEncryptedPersonaTemplate,
   DEFAULT_MODEL_PREFS,
   generatePersonaDTag,
+  PHOENIX_PAYLOAD_APP,
+  PHOENIX_PAYLOAD_VERSION,
   type Persona,
+  type PhoenixEnvelope,
 } from "@/lib/persona";
 import {
   encryptPhoenixEnvelope,
@@ -47,6 +51,7 @@ const Onboard = () => {
   const { user } = useCurrentUser();
   const { nostr } = useNostr();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [name, setName] = useState("Voice of Rwanda");
   const [bio, setBio] = useState(
@@ -121,6 +126,44 @@ const Onboard = () => {
         kp
       );
       await nostr.event(profileEvent, { signal: AbortSignal.timeout(8000) });
+
+      // Optimistic cache update — relay propagation can lag a couple
+      // seconds, so without this the user navigates back to
+      // /my-personas and sees the old list. Inject the new persona
+      // record into the same shape useMyPersonas returns.
+      const envelope: PhoenixEnvelope = {
+        app: PHOENIX_PAYLOAD_APP,
+        version: PHOENIX_PAYLOAD_VERSION,
+        persona,
+        model_prefs: DEFAULT_MODEL_PREFS,
+      };
+      const newRecord = {
+        event: signed,
+        envelope,
+        npub: kp.npub,
+      };
+      queryClient.setQueryData(
+        ["phoenix-my-personas", user.pubkey],
+        (old: typeof newRecord[] | undefined) => {
+          // Avoid a duplicate if a refetch already raced ahead.
+          const existing = old ?? [];
+          if (existing.some((r) => r.event.id === signed.id)) return existing;
+          return [newRecord, ...existing];
+        }
+      );
+
+      // Seed useAuthor cache so the dashboard renders the kind 0
+      // immediately instead of waiting for relays to round-trip back.
+      queryClient.setQueryData(["nostr", "author", kp.hex.pk], {
+        event: profileEvent,
+        metadata: {
+          name: persona.name,
+          display_name: persona.name,
+          about: bio,
+          picture: "",
+          bot: true,
+        },
+      });
 
       toast({
         title: "Persona published",
