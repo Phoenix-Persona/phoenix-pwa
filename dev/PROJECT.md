@@ -370,17 +370,19 @@ encryption is needed on Blossom.
 ## 6. AI capabilities
 
 All inference goes through **PPQ** (`https://api.ppq.ai`, OpenAI-compatible)
-via `pi-ai`. PPQ accepts Lightning payment per request, paid by the
-persona's Breeze wallet.
+via `pi-ai`. PPQ accepts Lightning payment via L402
+(`Authorization: L402 <token>:<preimage>` with `WWW-Authenticate:
+Payment` challenge-pay-replay) and via account-credit bearer tokens.
+Either way, payment ultimately flows from the persona's Spark wallet
+(L402 directly per request; bearer-token credit topped up via NWC from
+the wallet). See `docs/guides/ppq.md` for the PPQ surface and
+`docs/guides/pi-mono.md` for how `pi-ai` is configured against it.
 
 | Task                    | Default model    | Notes                                                       |
 | ----------------------- | ---------------- | ----------------------------------------------------------- |
-| Character-creator agent | claude-sonnet-4.5 | Multi-turn tool calling; runs the wizard interview         |
 | Persona text styling    | claude-sonnet-4.5 | Raw thought → polished post in persona's voice             |
-| Profile image           | gpt-image-1      | One-shot during creation; saved as canonical reference     |
+| Profile picture         | upload OR `gpt-image-1` | User uploads an image OR generates one via PPQ during the wizard. The chosen image is saved to Blossom and referenced as the canonical likeness for subsequent post-image generation. |
 | Post images             | gpt-image-1      | Always pass the reference image as input for likeness      |
-| Voice sample            | tts-1-hd         | One generation during creation, ~10–20 s, saved to Blossom |
-| Post audio (V1.5)       | tts-1-hd         | TTS each published post in the persona's voice             |
 | Video (V2 stretch)      | TBD              | Decide once we know what PPQ proxies                       |
 
 **Likeness consistency.** During wizard step 4 we generate the profile
@@ -395,18 +397,18 @@ are persisted in the persona's encrypted kind 30078 event under
 `model_prefs`. The settings page reads the list of available models from
 PPQ's `/v1/models` endpoint at runtime so we don't have to hard-code it.
 
-**Agent harness.** `pi-agent-core` runs the wizard's interview loop with
-a small tool set:
+**Agent harness — deferred to V2.** V1 ships a **form-based**
+character-creator wizard. The operator fills in name, region, cause,
+languages, system prompt, and source URLs through ordinary form
+inputs; Phoenix calls `pi-ai` for sample-post styling and image
+generation on demand, but does not run an LLM-driven interview.
 
-- `propose_name(name, rationale)` — agent proposes; user approves/edits
-- `propose_bio(bio)` — agent proposes a one-paragraph bio
-- `propose_system_prompt(prompt)` — agent generates the persona's voice spec
-- `generate_profile_image(prompt)` — calls the image model
-- `generate_voice_sample(text, voice_id)` — calls the TTS model
-- `finalize_persona()` — persists everything
-
-`pi-web-ui` chat components render the conversation. The user can interrupt
-at any tool call, edit the proposal, and continue.
+The agent harness below is the V2 design: `pi-agent-core` would run
+the wizard with a small tool set (`propose_name(name, rationale)`,
+`propose_bio(bio)`, `propose_system_prompt(prompt)`,
+`generate_profile_image(prompt)`, `finalize_persona()`), with
+`pi-web-ui` rendering the conversation surface. See
+`docs/guides/pi-mono.md` for the integration shape when we revisit.
 
 ---
 
@@ -414,23 +416,34 @@ at any tool call, edit the proposal, and continue.
 
 ### 7.1 Wallet model
 
-One Breeze Lightning wallet **per persona**. Wallet seed is generated at
-persona creation time and stored only inside the encrypted kind 30078
-backup (and ephemerally in memory while the persona is active).
+One Spark Lightning wallet **per persona**, via the Breez Spark SDK
+(`@breeztech/breez-sdk-spark`). The wallet seed is a BIP-39 mnemonic
+generated at persona creation time and stored only inside the
+encrypted kind 30078 backup (and ephemerally in memory while the
+persona is active). The SDK runs in the browser as WebAssembly —
+`await init()` is required once at app boot, after which each
+persona's wallet is reconstituted by passing its seed to the SDK's
+`SdkBuilder` config.
 
 ### 7.2 Receive
 
 Each persona surfaces:
 
-- A **Lightning Address** (`<persona-handle>@phoenix.example` — implementation
-  via LNURL-pay endpoint resolving to the Breeze wallet; mechanism TBD in §10)
-- An **LNURL** QR for direct invoice generation
-- **NIP-57 zaps** — kind 0 advertises `lud16`, so existing Nostr clients
-  can zap the persona natively
+- A **Lightning Address** (e.g. `imani@spark.money`) — provided
+  natively by the Spark SDK via Breez's hosted LNURL server. **No
+  self-hosted LNURL endpoint required.** Phoenix calls
+  `sdk.registerLightningAddress({ username, description })` at persona
+  creation; the resulting address is published in the persona's kind
+  0 `lud16` field and stored in the encrypted backup under
+  `wallet.lightning_address`.
+- An **LNURL** QR for direct invoice generation, also exposed by the
+  SDK.
+- **NIP-57 zaps** — kind 0 advertises `lud16`, so existing Nostr
+  clients can zap the persona natively.
 
-The public persona feed surfaces zap receipts (NIP-57 kind 9735 events) so
-visitors can see donations as they arrive. This is the headline emotional
-beat of the demo.
+The public persona feed surfaces zap receipts (NIP-57 kind 9735
+events) so visitors can see donations as they arrive. This is the
+headline emotional beat of the demo.
 
 ### 7.3 Spend
 
@@ -448,7 +461,7 @@ encrypted backup. Phoenix UI never shows the seed except during the
 
 When `balance < estimated_cost(action)`:
 
-- AI-gated buttons (compose/style, image gen, TTS) are disabled with a
+- AI-gated buttons (compose/style, image gen) are disabled with a
   tooltip: "This persona needs sats to think. Top up the wallet."
 - A sticky banner offers a one-tap "Generate top-up invoice" sheet.
 - Already-published content stays public and readable; the wallet running
@@ -466,11 +479,11 @@ by token estimates from `pi-ai`.
 
 ### V1 — must ship for the demo
 
-- [ ] Character-creator wizard with embedded `pi-agent-core` agent
-- [ ] Persona keypair + NIP-49 local storage + relay backup (kind 30078)
-- [ ] Per-persona Breeze wallet, seed inside the backup event
-- [ ] Profile image generation with reference image saved
-- [ ] Voice sample generation, stored on Blossom
+- [ ] Form-based character-creator wizard (agent harness deferred to V2)
+- [ ] Operator nsec via NIP-07 / NIP-46 / paste OR fresh local NIP-49 (one passphrase per device)
+- [ ] Persona keypair + kind 30078 backup with stable per-persona d-tag
+- [ ] Per-persona Spark wallet (Breez Spark SDK), BIP-39 seed inside the backup event
+- [ ] Profile picture: user uploads OR generates via PPQ (`gpt-image-1`); saved as canonical reference
 - [ ] Multi-persona UX: list, switch, back up, restore
 - [ ] Compose flow: thought → styled → kind 1 publish (text only)
 - [ ] Post-image generation in compose flow (with reference image)
@@ -483,15 +496,16 @@ by token estimates from `pi-ai`.
 
 ### V1.5 — ship if V1 is solid by hour 24
 
-- [ ] TTS audio rendering of published posts
-- [ ] LNURL-pay endpoint hosted (so Lightning Addresses resolve)
 - [ ] Imigongo-rooted visual polish (palette, pattern, type pairing)
 - [ ] PWA install prompt, service worker, offline shell
 
 ### V2 — stretch
 
+- [ ] Agent-driven character-creator wizard (`pi-agent-core` interview)
+- [ ] Voice sample generation + post-audio TTS (Blossom-stored)
 - [ ] Video generation using persona likeness + voice
 - [ ] NIP-46 remote signer support for power users
+- [ ] Multi-operator-per-device (separate operator keypairs per persona group)
 - [ ] Multi-language interview (Kinyarwanda + English at minimum)
 - [ ] Brainstorm-from-sources flow (RSS in, candidate posts out)
 
@@ -535,19 +549,28 @@ constructive, not just resilient.
 
 ## 10. Open research items
 
-These need answers before or during early implementation. Each has a named
-owner; if no name is attached yet, the team should claim one.
+**Already resolved:**
 
-| # | Question                                                               | Why it matters                                                  |
-| - | ---------------------------------------------------------------------- | --------------------------------------------------------------- |
-| 1 | Which Breeze SDK variant — Liquid SDK, Greenlight, or Nodeless?        | Affects custody, latency, and whether we run any infrastructure |
-| 2 | How do we host LNURL-pay endpoints for the personas' Lightning Addresses? | A per-persona LN address requires a server that resolves it. Could be a single shared domain, statically hosting LNURL JSON pointers per persona, served by Vercel or a Nostr relay. |
-| 3 | PPQ payment flow — L402 macaroon, account credit, or per-request invoice? | Determines how `pi-ai` is configured and whether we need a persistent PPQ session |
-| 4 | Voice model on PPQ — is `tts-1-hd` available, or do we need an alternative? | Locks the voice generation tool                                |
-| 5 | Image model token costs at hackathon-scale demo traffic                | We need to know if ten image gens/persona is affordable        |
-| 6 | NIP-49 passphrase UX — single passphrase per device or per persona?    | Trade-off between convenience and blast radius                 |
-| 7 | Voice sample format and size budget                                    | MP3 32 kbps × 15 s ≈ 60 KB; OGG/Opus may be smaller and avoids MP3 patent baggage |
-| 8 | Strategy for AI safety / abuse                                         | An anonymous voice with a wallet is also an abuse vector. What's our minimum-viable answer for judges? |
+- *Wallet SDK*: locked to **`@breeztech/breez-sdk-spark`** (Breez SDK
+  Spark / Nodeless variant). Lightning Addresses are SDK-native via
+  Breez's hosted `spark.money` LNURL server — no Phoenix-hosted
+  endpoint required.
+- *PPQ payment*: PPQ supports both **L402** (`Authorization: L402
+  <token>:<preimage>` with `WWW-Authenticate: Payment`
+  challenge-pay-replay) and account-credit bearer tokens. V1 plan: use
+  L402 directly for image / video gen; chat completions go through
+  `pi-ai` with a bearer token, with the persona's Spark wallet
+  topping up via NWC.
+- *Image-gen cost at demo scale*: affordable; budget enables ten image
+  generations per persona during the demo without concern.
+- *NIP-49 passphrase UX*: **one passphrase per device**, applied to the
+  operator nsec only. Multi-operator-per-device is a V2 stretch.
+- *Voice deferred*: voice sample / post-audio TTS moves to V2 (§8); PPQ
+  TTS availability and audio format are no longer V1 blockers.
+
+| # | Question                              | Why it matters                                                                      |
+| - | ------------------------------------- | ----------------------------------------------------------------------------------- |
+| 1 | Strategy for AI safety / abuse        | An anonymous voice with a wallet is also an abuse vector. The judges' question to anticipate: "doesn't this enable mass disinformation / scam personas?" Answer combines (a) cost-throttling — bad actors burn sats; donations sustain real voices, (b) pseudonymous-not-anonymous — relay-level mute / block / labels still apply, (c) upstream LLM safety inherited via PPQ, (d) Verify page surfaces persona age / post count. Owner: Anaïse for demo positioning. |
 
 ---
 
@@ -568,9 +591,13 @@ adaptation, not a full rewrite. Replace what the new stack obsoletes.
 
 **Reuse with adaptation.** Architecture matches §3; update to §5 schema:
 - `src/lib/persona.ts`, `personaCrypto.ts`, `personaKey.ts`, `personaPost.ts`
-  → align the persona Zod schema to the §5.2 plaintext payload
-  (embedded Breeze wallet seed, `model_prefs` section). The random-UUID
-  d-tag and no-other-tags scheme already matches §5.2.
+  → align the persona Zod schema to the §5.2 plaintext payload (add
+  `persona.dTag` field for the stable per-persona d-tag, switch
+  `wallet.kind` from `breeze` to `spark`, drop voice fields, embed
+  the Spark wallet seed, the `model_prefs` section). The current code
+  uses a fresh random UUID per publish — switch to a stable d-tag
+  stored inside the encrypted plaintext so addressable-event semantics
+  apply on update. The no-other-tags scheme already matches.
 - `src/hooks/usePersona.ts`, `usePersonaPublish.ts`
   → query by user pubkey + t-tag; multi-persona switching surfaces
 - `src/pages/MyPersonas.tsx`, `PersonaFeed.tsx`, `Verify.tsx`
@@ -587,7 +614,7 @@ adaptation, not a full rewrite. Replace what the new stack obsoletes.
   endpoint; persona's wallet pays PPQ directly)
 
 **New.**
-- `src/lib/wallet.ts`, `src/hooks/useWallet.ts` — Breeze SDK integration
+- `src/lib/wallet/{client,init,types,autoTopup}.ts`, `src/hooks/useWallet.ts` — Breez Spark SDK integration (already prototyped on `jc/add-spark-wallet`)
 - `src/components/Wallet*.tsx` — wallet UI
 - `src/lib/agent.ts`, `src/components/CharacterCreator.tsx` — `pi-agent-core` wiring
 - `src/pages/Settings.tsx` — model selection per task, relays, danger zone
@@ -623,18 +650,23 @@ wallet/agent/Nostr/image-gen seams are where bugs will live.
 ## 13. Glossary
 
 - **Persona** — an AI-driven public identity with its own Nostr keypair,
-  Lightning wallet, profile image, and voice. Owned and operated by one user.
-- **User keypair** — the human's Nostr identity. Signs encrypted persona
-  backups (kind 30078); never publishes kind 0 or kind 1 under Phoenix.
-  See §3 for the full two-level identity model.
-- **Operator** — earlier name for the user keypair, still used in some
-  source files (`src/lib/persona*.ts`). Same role.
-- **PPQ** — `ppq.ai`. OpenAI-compatible inference API priced in sats over
-  Lightning. The persona's wallet pays it directly.
-- **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit. We use
-  `pi-agent-core` (runtime), `pi-ai` (LLM API), `pi-web-ui` (chat UI).
-- **Breeze** — Lightning wallet SDK. Per-persona wallets, seed phrase
-  recoverable from the encrypted kind 30078 backup.
+  Spark Lightning wallet, and profile image. Owned and operated by one
+  operator.
+- **Operator** — the human's Nostr identity. Signs encrypted persona
+  backups (kind 30078); never publishes kind 0 or kind 1 under
+  Phoenix. See §3 for the full two-level identity model.
+- **User keypair** — synonym for "operator" used in some passing prose;
+  prefer "operator."
+- **PPQ** — `ppq.ai`. OpenAI-compatible inference API. Supports L402
+  (`Authorization: L402 <token>:<preimage>`) and account-credit bearer
+  tokens; the persona's Spark wallet pays either way.
+- **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit. V1 uses
+  `pi-ai` (LLM client) only; `pi-agent-core` and `pi-web-ui` are
+  reserved for the V2 agent-driven wizard.
+- **Spark / Breez Spark SDK** — `@breeztech/breez-sdk-spark`,
+  Breez's wrapping of Lightspark's Spark protocol. Provides per-persona
+  Lightning wallets with a hosted Lightning Address at `spark.money`
+  (no self-hosted LNURL endpoint).
 - **NIP-44** — Nostr encrypted-payload spec. Used for the persona's
   encrypted backup event.
 - **NIP-49** — passphrase-encrypted nsec format. Used for at-rest local
