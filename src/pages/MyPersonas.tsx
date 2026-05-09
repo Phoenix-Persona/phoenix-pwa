@@ -111,7 +111,28 @@ const MyPersonas = () => {
                       <FlagStripe className="absolute bottom-0 left-0 right-0" height={3} />
                     </div>
 
-                    <div className="p-5 space-y-3">
+                    {/* Avatar — overlaps the cap by half its height. Picture
+                        when set on the persona, Imigongo seal as fallback. */}
+                    <div className="px-5 -mt-8 relative">
+                      <div className="size-16 rounded-full ring-4 ring-card shadow-lg overflow-hidden bg-imigongo-charcoal flex items-center justify-center">
+                        {persona.reference_image_url ? (
+                          <img
+                            src={persona.reference_image_url}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            crossOrigin="anonymous"
+                          />
+                        ) : (
+                          <ImigongoSeal
+                            size={36}
+                            colorClass="text-rw-gold/80"
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-5 pt-3 space-y-2.5">
                       {topTags.length > 0 && (
                         <div className="text-[10px] uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
                           {topTags.join(" · ")}
