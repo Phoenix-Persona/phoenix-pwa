@@ -39,8 +39,8 @@ const Index = () => {
               </h1>
 
               <p className="text-xl text-muted-foreground max-w-xl leading-relaxed">
-                Activists get arrested, exiled, killed. Their voice dies with
-                them. Phoenix keeps it alive.
+                For every cause that deserves to be heard. A voice that no
+                power can take down.
               </p>
 
               <div className="flex flex-wrap gap-3">
