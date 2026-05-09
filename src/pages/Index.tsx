@@ -177,76 +177,59 @@ const Index = () => {
 
         <ImigongoBand variant="muted" />
 
-        {/* QUIET PROMISES — trust section, Proton-pattern: each promise
-            answers a real activist concern with a concrete capability. */}
-        <section className="container py-20 md:py-28 max-w-5xl space-y-14">
-          <div className="space-y-4 max-w-2xl">
-            <p className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
-              Quiet promises
-            </p>
-            <h2 className="font-display text-4xl md:text-5xl font-medium tracking-tight leading-[1.05]">
-              Built to be earned,{" "}
-              <span className="italic text-imigongo-clay">
-                not assumed.
-              </span>
-            </h2>
-            <p className="text-lg text-muted-foreground leading-relaxed max-w-xl">
-              Three commitments. Every one of them enforced by cryptography,
-              not by us asking you to trust us.
-            </p>
-          </div>
+        {/* CLOSING — single conviction moment, design-board image as proof.
+            Mullvad-pattern: one piece of art + one short statement of belief. */}
+        <section className="container py-20 md:py-28 max-w-6xl">
+          <div className="grid md:grid-cols-[1fr_1fr] gap-10 md:gap-16 items-center">
+            <div className="relative rounded-[1.75rem] overflow-hidden shadow-2xl shadow-imigongo-charcoal/40 ring-1 ring-imigongo-clay/20">
+              <img
+                src="/images/design-board.webp"
+                srcSet="/images/design-board-sm.webp 800w, /images/design-board.webp 1400w"
+                sizes="(max-width: 768px) 100vw, 600px"
+                alt="A design board mapping the persona-creation flow."
+                width={1400}
+                height={1217}
+                loading="lazy"
+                className="w-full h-auto block"
+              />
+            </div>
 
-          <div className="grid md:grid-cols-3 gap-x-10 gap-y-12 md:gap-x-14">
-            {[
-              {
-                n: "01",
-                headline: "Drafts never leave your device.",
-                body: (
-                  <>
-                    Encrypted to your Nostr key in your browser, before
-                    anything crosses the wire. Phoenix never sees what
-                    you&rsquo;re thinking — even if compelled to.
-                  </>
-                ),
-              },
-              {
-                n: "02",
-                headline: "No single relay can silence you.",
-                body: (
-                  <>
-                    Posts replicate to a quorum of relays you choose. Coercing
-                    one isn&rsquo;t enough. Coercing them all isn&rsquo;t
-                    possible.
-                  </>
-                ),
-              },
-              {
-                n: "03",
-                headline: "The voice can be inherited.",
-                body: (
-                  <>
-                    Hand the persona to a successor with one signed event.
-                    Same key. Same conviction. The voice continues — even if
-                    you can&rsquo;t.
-                  </>
-                ),
-              },
-            ].map((p) => (
-              <div
-                key={p.n}
-                className="space-y-3 md:border-l md:border-imigongo-clay/20 md:pl-6 first:md:border-l-0 first:md:pl-0"
-              >
-                <div className="font-mono text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
-                  {p.n}
-                </div>
-                <h3 className="font-display text-2xl font-medium tracking-tight leading-tight">
-                  {p.headline}
-                </h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  {p.body}
-                </p>
+            <div className="space-y-6">
+              <p className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
+                Designed deliberately
+              </p>
+              <h2 className="font-display text-4xl md:text-5xl font-medium tracking-tight leading-[1.05]">
+                For the people whose words{" "}
+                <span className="italic text-imigongo-clay">have weight.</span>
+              </h2>
+              <p className="text-lg text-muted-foreground leading-relaxed max-w-prose">
+                Phoenix is built where compromise isn&rsquo;t an option. Every
+                choice — what&rsquo;s encrypted, what&rsquo;s signed, what
+                survives — was made with one question in mind: what happens
+                when someone&rsquo;s safety depends on this?
+              </p>
+
+              <div className="pt-2">
+                {user ? (
+                  <Button
+                    asChild
+                    size="lg"
+                    className="rounded-full px-8 shadow-lg shadow-primary/20"
+                  >
+                    <Link to="/onboard">Create a persona →</Link>
+                  </Button>
+                ) : (
+                  <Button
+                    asChild
+                    size="lg"
+                    className="rounded-full px-8"
+                    disabled
+                  >
+                    <span>Sign in to begin</span>
+                  </Button>
+                )}
               </div>
-            ))}
+            </div>
           </div>
         </section>
 
