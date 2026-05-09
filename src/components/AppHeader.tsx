@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import { Menu } from "lucide-react";
+import { Menu, Settings as SettingsIcon } from "lucide-react";
 
 import { FlagStripe } from "@/components/ImigongoBand";
 import { LoginArea } from "@/components/auth/LoginArea";
+import { PersonaSwitcher } from "@/components/PersonaSwitcher";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -71,6 +72,7 @@ export function AppHeader() {
         )}
 
         <div className="flex items-center gap-2">
+          <PersonaSwitcher />
           <LoginArea className="max-w-60" />
 
           {/* Mobile menu trigger */}
@@ -106,6 +108,15 @@ export function AppHeader() {
                         className="rounded-lg px-3 py-3 hover:bg-muted transition-colors"
                       >
                         New persona
+                      </Link>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <Link
+                        to="/settings"
+                        className="rounded-lg px-3 py-3 hover:bg-muted transition-colors flex items-center gap-2"
+                      >
+                        <SettingsIcon className="size-4" />
+                        Settings
                       </Link>
                     </SheetClose>
                     <div className="my-2 border-t border-border" />
