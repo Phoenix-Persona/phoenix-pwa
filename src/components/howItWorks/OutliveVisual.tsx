@@ -60,7 +60,7 @@ export function OutliveVisual() {
   return (
     <div
       ref={ref}
-      className="relative w-full max-w-[520px] mx-auto"
+      className="relative w-full max-w-[520px] mx-auto rounded-2xl bg-card border border-imigongo-clay/15 shadow-sm p-5 sm:p-6"
       data-visible={inView}
     >
       <div className="relative aspect-square">
