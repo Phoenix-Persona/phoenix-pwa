@@ -17,11 +17,12 @@ import {
   buildEncryptedPersonaTemplate,
   DEFAULT_FREQUENCY_SEC,
   DEFAULT_PERSONA_MODEL,
+  generatePersonaDTag,
   type PersonaConfig,
   type PersonaSource,
 } from "@/lib/persona";
 import {
-  encryptPersonaConfig,
+  encryptPhoenixEnvelope,
   type Nip44Signer,
 } from "@/lib/personaCrypto";
 import {
@@ -171,18 +172,18 @@ const Onboard = () => {
     try {
       const signer = user.signer as unknown as Nip44Signer;
 
-      // 1. Encrypt the config to the operator (self-encryption).
-      const ciphertext = await encryptPersonaConfig(
-        config,
+      // 1. Encrypt the Phoenix envelope (operator self-encryption).
+      //    Discriminator + persona pubkey live INSIDE the ciphertext so
+      //    the event tag layout reveals nothing Phoenix-specific.
+      const ciphertext = await encryptPhoenixEnvelope(
+        { personaPubkey: kp.hex.pk, config },
         user.pubkey,
         signer
       );
 
-      // 2. Build + sign the encrypted persona definition with the operator's signer.
+      // 2. Build + sign with a random UUID d-tag — no identifying tags.
       const personaTemplate = buildEncryptedPersonaTemplate({
-        operatorPubkey: user.pubkey,
-        personaPubkey: kp.hex.pk,
-        personaName: config.name,
+        dTag: generatePersonaDTag(),
         encryptedContent: ciphertext,
       });
 

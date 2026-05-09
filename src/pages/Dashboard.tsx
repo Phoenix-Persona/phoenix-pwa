@@ -60,10 +60,8 @@ const Dashboard = () => {
     try {
       const template = buildPersonaPostTemplate({
         text: styled,
-        personaName: config.name,
         regionSlug: regionSlug(config.region),
         causeSlug: config.cause,
-        operatorPubkey: user.pubkey,
         sources: config.sources.map((s) => s.url).filter(Boolean),
       });
       await publish.mutateAsync({

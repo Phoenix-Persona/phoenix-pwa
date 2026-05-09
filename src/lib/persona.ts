@@ -1,39 +1,45 @@
 /**
- * Phoenix persona event schema (encrypted).
+ * Phoenix persona event schema (encrypted, untrackable).
  *
- * Persona configurations are PRIVATE to the operator who created them.
- * The operator signs a kind 30078 event whose content is NIP-44 encrypted
- * to the operator's own pubkey. Only the operator can decrypt and use the
- * persona; nobody else on Nostr can extract the system prompt, source list,
- * or persona nsec — so personas can't be cloned by others.
+ * Privacy posture
+ * ───────────────
+ * Personas MUST NOT be trackable. The kind 30078 event that holds a persona
+ * config carries NO Phoenix-specific metadata in its tags. From the outside
+ * it is indistinguishable from any other app's encrypted-app-data event.
  *
- * Schema:
+ * Event shape:
  *   kind: 30078
- *   pubkey: <operator pubkey>          (signed by operator)
+ *   pubkey: <operator pubkey>      (unavoidable; events must be signed)
  *   tags:
- *     ["d", <persona-pubkey-hex>]      addressable per persona
- *     ["t", "phoenix-persona"]         filter for "my personas"
- *     ["p", <persona-pubkey-hex>]      cross-reference to the persona's npub
- *     ["alt", <human-readable>]        NIP-31
- *     ["client", "phoenix"]
+ *     ["d", <random uuid>]         unique addressing only — no semantics
  *   content: NIP-44(operator → operator) of JSON {
- *     name, region, cause, languages, tone, frequencySec,
- *     sources, focus, model,
- *     systemPrompt, personality, bio, voiceStyle?, avoidTopics?,
- *     personaNsec   // included so the operator can recover the persona key
- *                   // from any device they sign in on
+ *     app: "phoenix",
+ *     version: 1,
+ *     personaPubkey: <hex>,        cross-reference to the persona's npub
+ *     ...PersonaConfig             everything else (system prompt, sources,
+ *                                  persona nsec, etc.)
  *   }
  *
- * The persona's *posts* (kind 1) remain PUBLIC. The persona also publishes
- * a public kind 0 profile so the persona is discoverable via standard Nostr
- * tools (any client can render the persona's feed without Phoenix knowledge).
+ * The Phoenix discriminator and the persona-pubkey ↔ operator link only
+ * exist inside the encrypted payload. To find a persona, the operator
+ * scans their own kind 30078 events and decrypts each one — successful
+ * decryption + Phoenix discriminator = a Phoenix persona event.
+ *
+ * Persona POSTS (kind 1)
+ * ──────────────────────
+ * Posts published by the persona's own keypair carry NO operator tag, NO
+ * "phoenix" client tag, and NO persona-name disclosure. They look like
+ * any other kind 1 note from any account — only the source-attribution
+ * `r` tags (which are content, not identity) and topical `t` tags remain.
+ * The persona's kind 0 profile bio is the right place to disclose AI
+ * usage; individual posts stay metadata-clean.
  */
 
 import type { NostrEvent } from "@nostrify/nostrify";
 
 export const PERSONA_KIND = 30078;
-export const PERSONA_FILTER_TAG = "phoenix-persona";
-export const PHOENIX_CLIENT_TAG = "phoenix";
+export const PHOENIX_PAYLOAD_APP = "phoenix";
+export const PHOENIX_PAYLOAD_VERSION = 1;
 
 export type SourceKind = "rss" | "url";
 
@@ -43,21 +49,21 @@ export interface PersonaSource {
 }
 
 /**
- * Decrypted persona configuration.
- * Everything the operator needs to reproduce and operate the persona.
+ * Decrypted persona configuration. Everything an operator needs to run the
+ * persona, including the persona's own nsec for cross-device recovery.
  */
 export interface PersonaConfig {
   /** Persona display name. */
   name: string;
   /** ISO-3166-1 alpha-2 region code. */
   region: string;
-  /** Cause slug (e.g. "human-rights"). */
+  /** Cause slug. */
   cause: string;
   /** BCP-47 language codes. */
   languages: string[];
   /** Freeform tone descriptor. */
   tone: string;
-  /** Target posting interval (seconds) for V2 brainstorm. */
+  /** Target posting interval (seconds) — V2 brainstorm. */
   frequencySec: number;
   /** Source materials. */
   sources: PersonaSource[];
@@ -75,25 +81,32 @@ export interface PersonaConfig {
   voiceStyle?: string;
   /** Topics to avoid. */
   avoidTopics?: string[];
-  /**
-   * Persona nsec — included so the operator can recover the persona keypair
-   * from any device they sign in on. Never leaves the encrypted blob.
-   */
+  /** Persona nsec — included for cross-device recovery. Never leaves the encrypted blob. */
   personaNsec: string;
 }
 
 /**
- * Build the unsigned-event template for a persona definition.
- * Caller is responsible for:
- *   1. Encrypting the JSON-serialized PersonaConfig with the operator's
- *      NIP-44 signer (encrypt to self).
- *   2. Signing the resulting template with the operator's signer.
+ * Phoenix payload wrapper (the JSON value that gets NIP-44 encrypted).
+ * Includes a discriminator (so the operator's decrypt-and-scan loop knows
+ * which 30078 events are Phoenix personas) and the persona pubkey (so the
+ * UI can resolve a persona npub to the right encrypted event).
+ */
+export interface PhoenixEnvelope {
+  app: typeof PHOENIX_PAYLOAD_APP;
+  version: number;
+  personaPubkey: string;
+  config: PersonaConfig;
+}
+
+/**
+ * Build the unsigned event template for an encrypted persona definition.
+ * The d-tag is a random UUID — no semantic information.
  */
 export function buildEncryptedPersonaTemplate(
   args: {
-    operatorPubkey: string;
-    personaPubkey: string;
-    personaName: string;
+    /** Random UUID used as the d-tag (unique addressing only). */
+    dTag: string;
+    /** NIP-44 ciphertext of the PhoenixEnvelope. */
     encryptedContent: string;
   },
   createdAt: number = Math.floor(Date.now() / 1000)
@@ -106,35 +119,58 @@ export function buildEncryptedPersonaTemplate(
   return {
     kind: PERSONA_KIND,
     created_at: createdAt,
-    tags: [
-      ["d", args.personaPubkey],
-      ["t", PERSONA_FILTER_TAG],
-      ["p", args.personaPubkey],
-      [
-        "alt",
-        `Phoenix persona definition (encrypted) for "${args.personaName}". Only the operator (${args.operatorPubkey.slice(0, 12)}…) can decrypt.`,
-      ],
-      ["client", PHOENIX_CLIENT_TAG],
-    ],
+    // No t/p/alt/client tags — anything Phoenix-specific lives inside content.
+    tags: [["d", args.dTag]],
     content: args.encryptedContent,
   };
 }
 
 /**
- * Validate that an event is a Phoenix persona definition.
- * Returns the persona pubkey if valid, otherwise null.
- * The actual config is encrypted; decrypting requires the operator's signer.
+ * Generate a random d-tag for a new persona. Browsers ship crypto.randomUUID().
  */
-export function getPersonaPubkeyFromEvent(event: NostrEvent): string | null {
-  if (event.kind !== PERSONA_KIND) return null;
-  if (!event.tags.some(([n, v]) => n === "t" && v === PERSONA_FILTER_TAG)) {
+export function generatePersonaDTag(): string {
+  return crypto.randomUUID();
+}
+
+/**
+ * Validate a decrypted JSON string is a Phoenix persona envelope.
+ * Returns the parsed envelope on success, null if it's some other app's
+ * payload or malformed data.
+ */
+export function parsePhoenixEnvelope(plaintext: string): PhoenixEnvelope | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(plaintext);
+  } catch {
     return null;
   }
-  const dTag = event.tags.find(([n]) => n === "d")?.[1];
-  if (!dTag) return null;
-  // Persona pubkey is the d-tag value. Validate hex format.
-  if (!/^[0-9a-f]{64}$/i.test(dTag)) return null;
-  return dTag.toLowerCase();
+  if (!parsed || typeof parsed !== "object") return null;
+  const obj = parsed as Record<string, unknown>;
+  if (obj.app !== PHOENIX_PAYLOAD_APP) return null;
+  if (typeof obj.version !== "number") return null;
+  if (typeof obj.personaPubkey !== "string") return null;
+  if (!/^[0-9a-f]{64}$/i.test(obj.personaPubkey)) return null;
+  const config = obj.config as Record<string, unknown> | undefined;
+  if (!config || typeof config.name !== "string" || typeof config.personaNsec !== "string") {
+    return null;
+  }
+  return {
+    app: PHOENIX_PAYLOAD_APP,
+    version: obj.version,
+    personaPubkey: obj.personaPubkey.toLowerCase(),
+    config: config as unknown as PersonaConfig,
+  };
+}
+
+/**
+ * Quick filter: is this event a candidate kind 30078 we should attempt to
+ * decrypt? (We can't tell from tags alone whether it's a Phoenix event —
+ * that's the point — but we can require kind and a `d` tag.)
+ */
+export function isCandidatePersonaEvent(event: NostrEvent): boolean {
+  if (event.kind !== PERSONA_KIND) return false;
+  if (!event.tags.some(([n]) => n === "d")) return false;
+  return true;
 }
 
 /**
@@ -142,7 +178,5 @@ export function getPersonaPubkeyFromEvent(event: NostrEvent): string | null {
  */
 export const DEFAULT_PERSONA_MODEL = "anthropic/claude-sonnet-4.5";
 
-/**
- * Default posting frequency (1 hour).
- */
+/** Default posting frequency (1 hour). */
 export const DEFAULT_FREQUENCY_SEC = 3600;

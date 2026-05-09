@@ -58,14 +58,9 @@ const PersonaFeed = () => {
             <div className="absolute inset-0 imigongo-pattern text-imigongo-clay opacity-[0.05] pointer-events-none" />
             <div className="relative space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-imigongo-clay font-medium mb-1">
-                    Phoenix persona
-                  </div>
-                  <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-                    {displayName}
-                  </h1>
-                </div>
+                <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+                  {displayName}
+                </h1>
                 <Button asChild variant="outline" size="sm">
                   <Link to={`/verify/${npub}`}>
                     <ShieldCheck className="mr-2 size-4" />
@@ -105,12 +100,8 @@ const PersonaFeed = () => {
                           </Badge>
                         ))}
                       </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="size-1.5 rounded-full bg-imigongo-ochre" />
-                          Phoenix-styled
-                        </span>
-                        · {new Date(p.created_at * 1000).toLocaleString()}
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(p.created_at * 1000).toLocaleString()}
                       </div>
                     </div>
                   </li>

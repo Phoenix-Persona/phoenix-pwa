@@ -1,9 +1,14 @@
 /**
  * Hooks for fetching Phoenix persona configurations.
  *
- * Persona configs are encrypted to the operator. The operator's signer
- * (NIP-44) is required to decrypt — so these hooks only return useful data
- * for personas owned by the currently signed-in user.
+ * Phoenix persona events carry no identifying tags (privacy by design),
+ * so the only way to find them is to query the operator's own kind 30078
+ * events, attempt NIP-44 decryption on each, and check whether the
+ * decrypted plaintext matches the Phoenix envelope shape.
+ *
+ * This is slower than tag-filtered queries but inherent to the threat
+ * model — anything that would let us tag-filter would also let an
+ * external observer enumerate operators using Phoenix.
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -12,12 +17,14 @@ import type { NostrEvent } from "@nostrify/nostrify";
 import { nip19 } from "nostr-tools";
 
 import {
-  PERSONA_FILTER_TAG,
   PERSONA_KIND,
-  getPersonaPubkeyFromEvent,
+  isCandidatePersonaEvent,
   type PersonaConfig,
 } from "@/lib/persona";
-import { decryptPersonaConfig, type Nip44Signer } from "@/lib/personaCrypto";
+import {
+  tryDecryptPhoenixEnvelope,
+  type Nip44Signer,
+} from "@/lib/personaCrypto";
 import { useCurrentUser } from "./useCurrentUser";
 
 function npubToHex(npub: string): string | null {
@@ -31,14 +38,9 @@ function npubToHex(npub: string): string | null {
 }
 
 /**
- * Look up a single persona event by persona npub.
- *
- * The event is authored by the *operator* but tagged with the persona's
- * pubkey via the d-tag and a `p` tag. Once located, the content is decrypted
- * using the current operator's signer.
- *
- * If the current user is not the operator, decryption fails and the hook
- * returns an error — the persona is private to its creator.
+ * Look up a single persona by persona npub. Walks the operator's kind
+ * 30078 events, decrypts each, and returns the one whose envelope's
+ * personaPubkey matches the requested npub.
  */
 export function usePersona(npub: string | undefined) {
   const { nostr } = useNostr();
@@ -47,43 +49,63 @@ export function usePersona(npub: string | undefined) {
   return useQuery({
     queryKey: ["phoenix-persona", npub, user?.pubkey],
     enabled: Boolean(npub && user),
-    queryFn: async (c): Promise<{ event: NostrEvent; config: PersonaConfig } | null> => {
+    queryFn: async (
+      c
+    ): Promise<{ event: NostrEvent; config: PersonaConfig } | null> => {
       if (!npub || !user) return null;
       const personaHex = npubToHex(npub);
       if (!personaHex) throw new Error("Invalid npub");
 
-      // The persona event is authored by THIS operator (only the operator
-      // can have signed it). Filter by author + persona pubkey via #d.
+      // Pull every kind 30078 the operator has authored. We can't filter
+      // by anything Phoenix-specific because that would leak app usage.
       const events = await nostr.query(
         [
           {
             kinds: [PERSONA_KIND],
             authors: [user.pubkey],
-            "#d": [personaHex],
-            "#t": [PERSONA_FILTER_TAG],
-            limit: 1,
+            limit: 200,
           },
         ],
         { signal: c.signal }
       );
 
-      const event = events[0];
-      if (!event) return null;
-      if (getPersonaPubkeyFromEvent(event) !== personaHex) return null;
-
       const signer = user.signer as unknown as Nip44Signer;
-      const config = await decryptPersonaConfig(
-        event.content,
-        event.pubkey,
-        signer
-      );
-      return { event, config };
+
+      // Newest first — operator-relevant updates come last in the wire,
+      // but addressable events de-duplicate by latest created_at anyway.
+      const sorted = [...events].sort((a, b) => b.created_at - a.created_at);
+
+      // Track the latest encrypted-blob per d-tag so we don't waste
+      // decrypt cycles on stale revisions.
+      const latestPerD = new Map<string, NostrEvent>();
+      for (const ev of sorted) {
+        if (!isCandidatePersonaEvent(ev)) continue;
+        const d = ev.tags.find(([n]) => n === "d")?.[1];
+        if (!d) continue;
+        if (!latestPerD.has(d)) latestPerD.set(d, ev);
+      }
+
+      for (const ev of latestPerD.values()) {
+        const env = await tryDecryptPhoenixEnvelope(
+          ev.content,
+          ev.pubkey,
+          signer
+        );
+        if (!env) continue;
+        if (env.personaPubkey.toLowerCase() === personaHex.toLowerCase()) {
+          return { event: ev, config: env.config };
+        }
+      }
+
+      return null;
     },
   });
 }
 
 /**
- * List the operator's own personas (decrypted).
+ * List the operator's Phoenix personas. Decrypts every kind 30078 the
+ * operator has authored and keeps the ones that parse as Phoenix payloads.
+ * Other apps' encrypted-app-data events are skipped silently.
  */
 export function useMyPersonas() {
   const { nostr } = useNostr();
@@ -100,21 +122,21 @@ export function useMyPersonas() {
           {
             kinds: [PERSONA_KIND],
             authors: [user.pubkey],
-            "#t": [PERSONA_FILTER_TAG],
-            limit: 100,
+            limit: 200,
           },
         ],
         { signal: c.signal }
       );
 
-      // Deduplicate by persona pubkey (d-tag) — keep latest per persona.
-      const byPersona = new Map<string, NostrEvent>();
+      // Latest revision per d-tag.
+      const latestPerD = new Map<string, NostrEvent>();
       for (const ev of events) {
-        const pp = getPersonaPubkeyFromEvent(ev);
-        if (!pp) continue;
-        const existing = byPersona.get(pp);
+        if (!isCandidatePersonaEvent(ev)) continue;
+        const d = ev.tags.find(([n]) => n === "d")?.[1];
+        if (!d) continue;
+        const existing = latestPerD.get(d);
         if (!existing || existing.created_at < ev.created_at) {
-          byPersona.set(pp, ev);
+          latestPerD.set(d, ev);
         }
       }
 
@@ -125,24 +147,18 @@ export function useMyPersonas() {
         npub: string;
       }> = [];
 
-      for (const ev of byPersona.values()) {
-        try {
-          const config = await decryptPersonaConfig(
-            ev.content,
-            ev.pubkey,
-            signer
-          );
-          const personaPubkey = getPersonaPubkeyFromEvent(ev);
-          if (!personaPubkey) continue;
-          decrypted.push({
-            event: ev,
-            config,
-            npub: nip19.npubEncode(personaPubkey),
-          });
-        } catch (err) {
-          // Skip undecryptable events (shouldn't happen if filter is correct).
-          console.warn("Failed to decrypt persona event", ev.id, err);
-        }
+      for (const ev of latestPerD.values()) {
+        const env = await tryDecryptPhoenixEnvelope(
+          ev.content,
+          ev.pubkey,
+          signer
+        );
+        if (!env) continue;
+        decrypted.push({
+          event: ev,
+          config: env.config,
+          npub: nip19.npubEncode(env.personaPubkey),
+        });
       }
 
       return decrypted.sort((a, b) => b.event.created_at - a.event.created_at);
@@ -152,7 +168,7 @@ export function useMyPersonas() {
 
 /**
  * Fetch posts authored by a persona (PUBLIC kind 1 events).
- * No auth required — anyone can view a persona's feed.
+ * Anyone can view a persona's feed — it looks like any other Nostr account.
  */
 export function usePersonaPosts(npub: string | undefined, limit = 50) {
   const { nostr } = useNostr();

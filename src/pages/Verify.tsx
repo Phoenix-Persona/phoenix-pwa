@@ -21,14 +21,6 @@ function npubToHex(npub: string): string | null {
   }
 }
 
-function safeNpub(hex: string): string {
-  try {
-    return nip19.npubEncode(hex);
-  } catch {
-    return hex;
-  }
-}
-
 const Verify = () => {
   const { npub = "" } = useParams();
   const personaHex = useMemo(() => npubToHex(npub), [npub]);
@@ -46,14 +38,6 @@ const Verify = () => {
   const lastPost = posts.data?.[0];
   const postCount = posts.data?.length ?? 0;
 
-  // Pull the operator pubkey from the most recent post's tag.
-  const operatorPubkey = useMemo(() => {
-    const post = lastPost;
-    if (!post) return null;
-    const tag = post.tags.find(([n]) => n === "operator");
-    return tag?.[1] ?? null;
-  }, [lastPost]);
-
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <PhoenixHeader />
@@ -62,9 +46,11 @@ const Verify = () => {
         <div className="flex items-center gap-3">
           <ShieldCheck className="size-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Persona verification</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Persona verification
+            </h1>
             <p className="text-muted-foreground text-sm">
-              Cryptographic provenance for {displayName}.
+              Public-facing identity for {displayName}.
             </p>
           </div>
         </div>
@@ -86,25 +72,18 @@ const Verify = () => {
               <CardContent className="space-y-4 text-sm">
                 <Field label="Persona name" value={displayName} />
                 <Field label="Persona npub" value={npub} mono />
-                {operatorPubkey ? (
-                  <Field
-                    label="Operator (from posts)"
-                    value={safeNpub(operatorPubkey)}
-                    mono
-                  />
-                ) : (
-                  <Field
-                    label="Operator"
-                    value="No posts yet — operator unknown until first post"
-                  />
-                )}
-                <p className="text-xs text-muted-foreground pt-2">
-                  Phoenix posts include an{" "}
-                  <code className="font-mono">["operator", &lt;pubkey&gt;]</code>{" "}
-                  tag attesting which Nostr identity authored the persona.
-                  The persona's configuration is encrypted to the operator —
-                  only they can operate this voice, even if anyone can read
-                  its posts.
+                <Field
+                  label="Operator"
+                  value="Private by design"
+                />
+                <p className="text-xs text-muted-foreground pt-2 leading-relaxed">
+                  The human accountable for this voice is{" "}
+                  <strong>intentionally not disclosed</strong> on the network.
+                  Phoenix is built for activists who would be at risk if the
+                  operator-persona link were public. The persona's
+                  configuration is encrypted to the operator's Nostr key —
+                  only they can operate the persona, and only they can prove
+                  ownership privately.
                 </p>
               </CardContent>
             </Card>
