@@ -1,9 +1,24 @@
 import { useEffect, useRef } from 'react';
 import { useNostr } from '@nostrify/react';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useAppContext } from '@/hooks/useAppContext';
 import { APP_RELAYS } from '@/lib/appRelays';
 import { APP_BLOSSOM_SERVERS, parseBlossomServerList } from '@/lib/appBlossom';
+
+/**
+ * Drop every cache that depends on the user-pubkey filter or on which
+ * relays we're talking to. Called when the active user changes (so
+ * the previous user's events don't bleed through) and when the
+ * relay/Blossom list updates (so queries refetch against the now-
+ * correct sources).
+ */
+function invalidateUserDependentCaches(queryClient: QueryClient) {
+  queryClient.invalidateQueries({ queryKey: ['phoenix-my-personas'] });
+  queryClient.invalidateQueries({ queryKey: ['phoenix-persona'] });
+  queryClient.invalidateQueries({ queryKey: ['phoenix-persona-posts'] });
+  queryClient.invalidateQueries({ queryKey: ['nostr', 'author'] });
+}
 
 /**
  * NostrSync — keeps the AppContext relay / Blossom lists in lock-step
@@ -27,6 +42,7 @@ export function NostrSync() {
   const { nostr } = useNostr();
   const { user } = useCurrentUser();
   const { updateConfig } = useAppContext();
+  const queryClient = useQueryClient();
 
   // Tracks which pubkey we last synced for. `undefined` on first
   // mount; `null` when no user is signed in.
@@ -47,6 +63,9 @@ export function NostrSync() {
         relayMetadata: APP_RELAYS,
         blossomServerMetadata: APP_BLOSSOM_SERVERS,
       }));
+      // Drop the prior user's cached personas / kind 0 metadata so
+      // the next render queries against the fresh signer.
+      invalidateUserDependentCaches(queryClient);
     }
 
     if (!user) return;
@@ -84,6 +103,12 @@ export function NostrSync() {
             },
           };
         });
+        // Persona queries that ran against APP_RELAYS during the
+        // first paint should now re-run against the user's actual
+        // relay list. Invalidating regardless of whether updateConfig
+        // accepted the change is harmless — TanStack will return
+        // cached data for unchanged-key queries.
+        invalidateUserDependentCaches(queryClient);
       } catch (error) {
         console.error('Failed to sync relays from Nostr:', error);
       }
@@ -114,6 +139,10 @@ export function NostrSync() {
             },
           };
         });
+        // useAuthor pulls kind 0 metadata which uses Blossom-hosted
+        // pictures; refresh it so any per-user picture caching aligns
+        // with the new server list.
+        queryClient.invalidateQueries({ queryKey: ['nostr', 'author'] });
       } catch (error) {
         console.error('Failed to sync Blossom servers from Nostr:', error);
       }
@@ -121,7 +150,7 @@ export function NostrSync() {
 
     syncRelays();
     syncBlossomServers();
-  }, [user, nostr, updateConfig]);
+  }, [user, nostr, updateConfig, queryClient]);
 
   return null;
 }
