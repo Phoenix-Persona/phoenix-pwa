@@ -316,6 +316,10 @@ interface ClipSubmitArgs {
   model: string;
   prompt: string;
   imageUrl?: string;
+  // Per-attempt parameter overrides for the i2v fallback cascade.
+  aspect?: "9:16" | "16:9" | "1:1";
+  duration?: number;
+  quality?: string;
 }
 
 async function generateClip(args: ClipSubmitArgs): Promise<{
@@ -326,9 +330,9 @@ async function generateClip(args: ClipSubmitArgs): Promise<{
   const submitted = await submitVideo(args.apiKey, {
     model: args.model,
     prompt: args.prompt,
-    aspect_ratio: flags.aspect,
-    duration: flags.duration,
-    quality: flags.quality,
+    aspect_ratio: args.aspect ?? flags.aspect,
+    duration: args.duration ?? flags.duration,
+    quality: args.quality ?? flags.quality,
     ...(args.imageUrl !== undefined ? { image_url: args.imageUrl } : {}),
   });
   console.log(`  job id:           ${submitted.id}`);
@@ -590,6 +594,110 @@ async function uploadFrame(framePath: string): Promise<string> {
   );
 }
 
+/* ---------- i2v fallback cascade ---------- */
+
+/**
+ * Curated set of i2v candidate models on ppq.ai with the parameter
+ * combos each accepts. We cascade through these for clip 2 because
+ * ppq.ai's catalog advertises models without telling us which actually
+ * route i2v requests — discovery is empirical.
+ *
+ * Order: most-likely-to-work first. Stops on first success.
+ */
+interface I2vCandidate {
+  model: string;
+  aspect: "9:16" | "16:9" | "1:1";
+  duration: number;
+  quality: string;
+  notes?: string;
+}
+
+const I2V_FALLBACK_CHAIN: I2vCandidate[] = [
+  { model: "kling-2.5-turbo", aspect: "9:16", duration: 5, quality: "standard" },
+  { model: "kling-2.1-master", aspect: "9:16", duration: 5, quality: "standard" },
+  { model: "kling-2.1-pro",    aspect: "9:16", duration: 5, quality: "standard" },
+  { model: "runway-gen4",      aspect: "9:16", duration: 5, quality: "720p" },
+  { model: "luma-dream-machine", aspect: "9:16", duration: 5, quality: "720p" },
+  { model: "pika-v2.2",        aspect: "9:16", duration: 5, quality: "720p" },
+  { model: "seedance-2-fast",  aspect: "9:16", duration: 5, quality: "720p" },
+  { model: "hailuo-02-pro",    aspect: "9:16", duration: 6, quality: "720p" },
+  { model: "pixverse-v4.5",    aspect: "9:16", duration: 5, quality: "720p" },
+];
+
+interface CascadeResult {
+  id: string;
+  url: string;
+  model: string;
+  costUsd?: number;
+  failedAttempts: string[];
+}
+
+async function generateClip2WithCascade(args: {
+  apiKey: string;
+  uploadedFrameUrl: string;
+  prompt: string;
+  preferredModel: string;
+  availableIds: string[];
+}): Promise<CascadeResult> {
+  // Build the queue: preferred first, then everyone else from the chain
+  // who's actually available in ppq.ai's live catalog.
+  const queue: I2vCandidate[] = [];
+  const preferredFirst = I2V_FALLBACK_CHAIN.find(
+    (c) => c.model === args.preferredModel,
+  );
+  if (preferredFirst && args.availableIds.includes(preferredFirst.model)) {
+    queue.push(preferredFirst);
+  }
+  for (const c of I2V_FALLBACK_CHAIN) {
+    if (c.model === args.preferredModel) continue;
+    if (!args.availableIds.includes(c.model)) continue;
+    queue.push(c);
+  }
+
+  if (queue.length === 0) {
+    throw new Error(
+      "No i2v candidates from the fallback chain are present in ppq.ai's catalog.",
+    );
+  }
+
+  console.log(
+    `\nCascade order (${queue.length} candidates): ${queue.map((c) => c.model).join(" → ")}`,
+  );
+  const failures: string[] = [];
+
+  for (let i = 0; i < queue.length; i++) {
+    const cand = queue[i];
+    console.log(
+      `\n  ──── attempt ${i + 1}/${queue.length}: ${cand.model} ` +
+        `(${cand.aspect}, ${cand.duration}s, ${cand.quality}) ────`,
+    );
+    try {
+      const result = await generateClip({
+        apiKey: args.apiKey,
+        model: cand.model,
+        prompt: args.prompt,
+        imageUrl: args.uploadedFrameUrl,
+        aspect: cand.aspect,
+        duration: cand.duration,
+        quality: cand.quality,
+      });
+      console.log(`  ✓ ${cand.model} succeeded`);
+      return { ...result, model: cand.model, failedAttempts: failures };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const trimmed = msg.length > 220 ? msg.slice(0, 220) + "…" : msg;
+      console.warn(`  ✗ ${cand.model}: ${trimmed}`);
+      failures.push(`${cand.model}: ${trimmed}`);
+    }
+  }
+
+  throw new Error(
+    `All ${queue.length} i2v candidates failed. ppq.ai's video models do ` +
+      `not appear to support image-to-video for our prompt+image. ` +
+      `Failures:\n  - ${failures.join("\n  - ")}`,
+  );
+}
+
 /* ---------- main ---------- */
 
 async function main(): Promise<void> {
@@ -767,24 +875,43 @@ async function main(): Promise<void> {
     console.log(`  id:  ${state.clip2.id}`);
     console.log(`  url: ${state.clip2.url}`);
   } else {
-    header(`4. Clip 2 (image-to-video, ${resolvedI2vModel})`);
+    header(`4. Clip 2 (image-to-video) — cascading through i2v candidates`);
     console.log(`  conditioning image: ${state.uploadedFrameUrl}`);
+    console.log(
+      `  preferred starting model: ${resolvedI2vModel} (will fall back to other ` +
+        `i2v-capable families on failure)`,
+    );
     printPrompt("CLIP2_PROMPT", CLIP2_PROMPT);
-    if (!(await askYesNo("Generate clip 2?"))) return;
-    const clip2 = await generateClip({
+    if (
+      !(await askYesNo(
+        "Run the cascade? Each attempt costs ~$0.30-0.50; we stop on first success.",
+      ))
+    )
+      return;
+
+    const cascade = await generateClip2WithCascade({
       apiKey: ppq.api_key,
-      model: resolvedI2vModel,
+      uploadedFrameUrl: state.uploadedFrameUrl,
       prompt: CLIP2_PROMPT,
-      imageUrl: state.uploadedFrameUrl,
+      preferredModel: resolvedI2vModel,
+      availableIds: videoModelIds,
     });
-    console.log(`  ✓ clip 2 url:      ${clip2.url}`);
-    if (clip2.costUsd !== undefined) {
-      console.log(`  ✓ clip 2 cost:     $${clip2.costUsd.toFixed(4)}`);
+    console.log(`\n  ✓ clip 2 url:      ${cascade.url}`);
+    console.log(`  ✓ winning model:   ${cascade.model}`);
+    if (cascade.costUsd !== undefined) {
+      console.log(`  ✓ clip 2 cost:     $${cascade.costUsd.toFixed(4)}`);
+    }
+    if (cascade.failedAttempts.length > 0) {
+      console.log(
+        `  (skipped after failures: ${cascade.failedAttempts
+          .map((f) => f.split(":")[0])
+          .join(", ")})`,
+      );
     }
     state.clip2 = {
-      id: clip2.id,
-      url: clip2.url,
-      model: resolvedI2vModel,
+      id: cascade.id,
+      url: cascade.url,
+      model: cascade.model,
     };
     await saveState(state);
   }
