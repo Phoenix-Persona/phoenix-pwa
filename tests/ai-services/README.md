@@ -92,8 +92,7 @@ Useful flags:
 | `--skip-clip1` | Use a previously generated clip 1 (must be cached) |
 | `--skip-clip2` | Stop after extracting + uploading the last frame |
 | `--list-models` | Print every video model ppq.ai advertises and exit (no clips submitted) |
-| `--text-model <id>` | Clip 1 model. Default: auto-resolve an i2v-capable family from `/v1/models?type=video` (preference: `kling-2.5-turbo` → `kling-2.1-master` → `kling-2.1-pro` → `runway-gen4` → `luma-dream-machine` → `seedance-2-fast` → `hailuo-02-pro` → `pika-v2.2` → `pixverse-v4.5`). Pass `veo3-fast` if you specifically want Veo for clip 1, but expect a visible aesthetic shift at the seam since clip 2 must use a different family. |
-| `--i2v-model <id>` | Clip 2 model. Default: same id as `--text-model`. **Do not point this at `veo3-fast`** — ppq.ai's Veo route doesn't accept `image_url` today (returns 502 "No providers available for this model"). |
+| `--model <id>` | Singleton model used for **both** clips. Default: auto-resolve to the best available from `/v1/models?type=video` (preference: `kling-3.0` → `kling-2.1-master` → `kling-2.1-pro` → `runway-gen4` → `luma-dream-machine` → `seedance-2` → `hailuo-02-pro`). Mixing families is the #1 cause of broken continuity. **Don't point this at `veo3-fast`** — ppq.ai's Veo route doesn't accept `image_url` (returns 502). |
 | `--aspect <ratio>` | `9:16` (default), `16:9`, or `1:1` |
 | `--duration <secs>` | Per-clip duration (default 8) |
 | `--quality <p>` | `720p` (default) or `1080p` |

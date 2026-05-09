@@ -54,17 +54,15 @@
  *   --skip-clip1             Use a previously generated clip 1 (must be cached).
  *   --skip-clip2             Stop after extracting + uploading the last frame.
  *   --list-models            List all video models advertised by ppq.ai and exit.
- *   --text-model <id>        Override clip 1 model. Default: auto-resolve an
- *                            i2v-capable family from `/v1/models?type=video`
- *                            (kling-2.5-turbo > kling-2.1-master >
- *                            kling-2.1-pro > runway-gen4 > luma-dream-machine
- *                            > seedance-2-fast > hailuo-02-pro > pika-v2.2 >
- *                            pixverse-v4.5). Pass `veo3-fast` to use Veo for
- *                            clip 1 (clip 2 will be a different lineage and
- *                            the seam will show).
- *   --i2v-model <id>         Override clip 2 model. Default: same id as clip 1.
- *                            ppq.ai's `veo3-fast` does NOT accept `image_url`
- *                            today (returns 502), so don't point this at Veo.
+ *   --model <id>             Override the singleton model used for BOTH clips.
+ *                            Default: auto-resolve to the best available from
+ *                            `/v1/models?type=video` (preference: kling-3.0 →
+ *                            kling-2.1-master → kling-2.1-pro → runway-gen4 →
+ *                            luma-dream-machine → seedance-2 → hailuo-02-pro).
+ *                            Both clips MUST use the same model — mixing
+ *                            families is the #1 cause of broken continuity.
+ *                            Don't point this at `veo3-fast`: ppq.ai's Veo
+ *                            route doesn't accept `image_url` (returns 502).
  *   --aspect <ratio>         "9:16" (default), "16:9", "1:1".
  *   --duration <secs>        Per-clip duration (default 8).
  *   --quality <p>            "720p" (default) or "1080p".
@@ -110,9 +108,9 @@ const flags = {
   skipClip2: argv.includes("--skip-clip2"),
   manualUpload: argv.includes("--manual-upload"),
   listModels: argv.includes("--list-models"),
-  // Empty string means "auto-resolve from /v1/models?type=video".
-  textModel: flagValue("text-model") ?? "",
-  i2vModel: flagValue("i2v-model") ?? "",
+  // Singleton model — used for BOTH clip 1 and clip 2. Empty string means
+  // "auto-resolve to the best available model from /v1/models?type=video".
+  model: flagValue("model") ?? "",
   aspect: (flagValue("aspect") ?? "9:16") as "9:16" | "16:9" | "1:1",
   // Kling on ppq.ai only accepts duration ∈ {5, 10} and quality "standard".
   // Defaults match Kling's pricing matrix; override per-run for other models.
@@ -218,34 +216,36 @@ function printPrompt(label: string, prompt: string): void {
  * --text-model / --i2v-model to deliberately test cross-model behavior.
  */
 
-const I2V_CAPABLE_PREFERENCE = [
-  // Kling 3.0 — explicitly marketed for "3-15s multi-shot sequences with
-  // subject consistency", i.e. the exact continuity primitive we want.
+/**
+ * Best-singleton preference order. Both clips use the SAME model so the
+ * latent space matches across the seam — mixing model families is the
+ * #1 named cause of broken continuity in 2026 multi-clip AI video.
+ *
+ * Ordered by predicted quality + suitability for talking-head + native
+ * i2v support. We pick the FIRST one that exists in ppq.ai's live
+ * catalog and stop.
+ */
+const BEST_SINGLETON_PREFERENCE = [
+  // Kling 3.0 — flagship, marketed for "3-15s multi-shot sequences with
+  // subject consistency". Highest theoretical compliance.
   "kling-3.0",
-  // Kling 2.5 Turbo — modern, talking-head friendly, native i2v.
-  "kling-2.5-turbo",
-  // Kling 2.x line — high quality, slower.
+  // Kling 2.1 Master — proven to work in our runs (passed processing
+  // for both T2V and I2V on ppq.ai's route).
   "kling-2.1-master",
+  // Kling 2.1 Pro — sibling to Master, slightly different tuning.
   "kling-2.1-pro",
-  "kling-2.1-standard",
-  // Runway Gen-4 — strong reference-image consistency.
+  // Runway Gen-4 — Runway's flagship, strongest character-reference
+  // consistency in their family (40% better than Gen-3 per Runway).
   "runway-gen4",
-  // Luma — supports start- and end-frame conditioning.
+  // Luma Dream Machine — strong realism, native start-frame conditioning.
   "luma-dream-machine",
-  // ByteDance Seedance — fast, decent realism, native i2v.
-  "seedance-2-fast",
+  // Seedance 2 — solid quality, fast.
   "seedance-2",
-  // Hailuo (MiniMax).
+  // Hailuo 02 Pro.
   "hailuo-02-pro",
-  "hailuo-02-standard",
-  // Pika 2.2 — Pikaframes (first+last frame interpolation) is a related
-  // primitive; here we just use plain i2v with the last frame of clip 1.
-  "pika-v2.2",
-  // PixVerse v4.5 — supports i2v.
-  "pixverse-v4.5",
 ];
 
-const I2V_CAPABLE_FAMILIES = [
+const I2V_CAPABLE_FAMILIES_LEGACY = [
   "kling",
   "runway",
   "luma",
@@ -256,7 +256,11 @@ const I2V_CAPABLE_FAMILIES = [
   "minimax",
 ];
 
-function resolveI2vCapableModel(ids: string[], preferRequested: string): string {
+/**
+ * Pick the single best video model available on ppq.ai for the
+ * continuity test. Both clips will use this same id.
+ */
+function resolveBestSingleton(ids: string[], preferRequested: string): string {
   if (preferRequested) {
     if (ids.includes(preferRequested)) return preferRequested;
     throw new Error(
@@ -265,23 +269,22 @@ function resolveI2vCapableModel(ids: string[], preferRequested: string): string 
     );
   }
 
-  // 1. Curated exact-match preference list.
-  for (const candidate of I2V_CAPABLE_PREFERENCE) {
+  // 1. Curated exact-match preference list — best quality first.
+  for (const candidate of BEST_SINGLETON_PREFERENCE) {
     if (ids.includes(candidate)) return candidate;
   }
 
-  // 2. Fuzzy fallback: anything that contains a known i2v-capable family
-  // marker. (We deliberately exclude Veo here — Veo on ppq.ai doesn't
-  // accept image_url today.)
+  // 2. Fuzzy fallback: anything from a known i2v-capable family.
+  // (Veo deliberately excluded — Veo on ppq.ai doesn't accept image_url.)
   const lc = ids.map((id) => ({ id, lc: id.toLowerCase() }));
-  for (const family of I2V_CAPABLE_FAMILIES) {
+  for (const family of I2V_CAPABLE_FAMILIES_LEGACY) {
     const hit = lc.find((e) => e.lc.includes(family));
     if (hit) return hit.id;
   }
 
   throw new Error(
     `No i2v-capable model found in catalog. Available:\n  - ${ids.join("\n  - ")}\n\n` +
-      `Pass --text-model <id> and --i2v-model <id> explicitly.`,
+      `Pass --model <id> explicitly.`,
   );
 }
 
@@ -645,79 +648,9 @@ const I2V_FALLBACK_CHAIN: I2vCandidate[] = [
   { model: "pixverse-v4.5",    aspect: "9:16", duration: 5, quality: "720p" },
 ];
 
-interface CascadeResult {
-  id: string;
-  url: string;
-  model: string;
-  costUsd?: number;
-  failedAttempts: string[];
-}
-
-async function generateClip2WithCascade(args: {
-  apiKey: string;
-  uploadedFrameUrl: string;
-  prompt: string;
-  preferredModel: string;
-  availableIds: string[];
-}): Promise<CascadeResult> {
-  // Build the queue: preferred first, then everyone else from the chain
-  // who's actually available in ppq.ai's live catalog.
-  const queue: I2vCandidate[] = [];
-  const preferredFirst = I2V_FALLBACK_CHAIN.find(
-    (c) => c.model === args.preferredModel,
-  );
-  if (preferredFirst && args.availableIds.includes(preferredFirst.model)) {
-    queue.push(preferredFirst);
-  }
-  for (const c of I2V_FALLBACK_CHAIN) {
-    if (c.model === args.preferredModel) continue;
-    if (!args.availableIds.includes(c.model)) continue;
-    queue.push(c);
-  }
-
-  if (queue.length === 0) {
-    throw new Error(
-      "No i2v candidates from the fallback chain are present in ppq.ai's catalog.",
-    );
-  }
-
-  console.log(
-    `\nCascade order (${queue.length} candidates): ${queue.map((c) => c.model).join(" → ")}`,
-  );
-  const failures: string[] = [];
-
-  for (let i = 0; i < queue.length; i++) {
-    const cand = queue[i];
-    console.log(
-      `\n  ──── attempt ${i + 1}/${queue.length}: ${cand.model} ` +
-        `(${cand.aspect}, ${cand.duration}s, ${cand.quality}) ────`,
-    );
-    try {
-      const result = await generateClip({
-        apiKey: args.apiKey,
-        model: cand.model,
-        prompt: args.prompt,
-        imageUrl: args.uploadedFrameUrl,
-        aspect: cand.aspect,
-        duration: cand.duration,
-        quality: cand.quality,
-      });
-      console.log(`  ✓ ${cand.model} succeeded`);
-      return { ...result, model: cand.model, failedAttempts: failures };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const trimmed = msg.length > 220 ? msg.slice(0, 220) + "…" : msg;
-      console.warn(`  ✗ ${cand.model}: ${trimmed}`);
-      failures.push(`${cand.model}: ${trimmed}`);
-    }
-  }
-
-  throw new Error(
-    `All ${queue.length} i2v candidates failed. ppq.ai's video models do ` +
-      `not appear to support image-to-video for our prompt+image. ` +
-      `Failures:\n  - ${failures.join("\n  - ")}`,
-  );
-}
+// Cascade machinery removed — we run as a singleton on the best
+// available model. If it fails, the script suggests the next-best
+// singleton to try via --model. No automatic fallback.
 
 /* ---------- main ---------- */
 
@@ -745,34 +678,29 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Both clips default to the same auto-resolved i2v-capable model so
-  // the aesthetic matches across the seam. Veo on ppq.ai today is
-  // text-to-video only — passing `image_url` to `veo3-fast` returns
-  // 502, so we deliberately steer away from Veo here. Override via
-  // --text-model if you want to mix lineages.
-  const resolvedTextModel = resolveI2vCapableModel(
-    videoModelIds,
-    flags.textModel,
+  // Singleton: one model for both clips. Different model families have
+  // different latent spaces; mixing them across a continuity seam is the
+  // #1 named cause of broken multi-clip continuity in 2026 AI video.
+  const singletonModel = resolveBestSingleton(videoModelIds, flags.model);
+  const profile =
+    I2V_FALLBACK_CHAIN.find((c) => c.model === singletonModel) ?? {
+      model: singletonModel,
+      aspect: flags.aspect,
+      duration: flags.duration,
+      quality: flags.quality,
+    };
+  console.log(`\n  singleton model → ${singletonModel}`);
+  console.log(
+    `  params:           ${profile.aspect}, ${profile.duration}s, ${profile.quality}`,
   );
-  const resolvedI2vModel = flags.i2vModel
-    ? resolveI2vCapableModel(videoModelIds, flags.i2vModel)
-    : resolvedTextModel;
-  console.log(`\n  text-to-video  (clip 1) → ${resolvedTextModel}`);
-  console.log(`  image-to-video (clip 2) → ${resolvedI2vModel}`);
-  if (resolvedI2vModel === resolvedTextModel) {
+  if (!flags.model) {
     console.log(
-      `  (both clips on the same model — i2v switch is just whether we pass image_url)`,
-    );
-  } else {
-    console.log(
-      `  (clips on different models — expect a visible aesthetic shift at the seam)`,
+      `  (auto-resolved; override with --model <id> — see --list-models for the catalog)`,
     );
   }
-  if (!flags.textModel && !flags.i2vModel) {
-    console.log(
-      `  (auto-resolved; override with --text-model / --i2v-model — see --list-models for the catalog)`,
-    );
-  }
+  // Aliases for the rest of the script's existing call sites.
+  const resolvedTextModel = singletonModel;
+  const resolvedI2vModel = singletonModel;
 
   header("World block (verbatim in both prompts)");
   printPrompt("WORLD_BLOCK", WORLD_BLOCK);
@@ -923,43 +851,45 @@ async function main(): Promise<void> {
     console.log(`  id:  ${state.clip2.id}`);
     console.log(`  url: ${state.clip2.url}`);
   } else {
-    header(`4. Clip 2 (image-to-video) — cascading through i2v candidates`);
+    header(`4. Clip 2 (image-to-video, ${singletonModel})`);
     console.log(`  conditioning image: ${state.uploadedFrameUrl}`);
     console.log(
-      `  preferred starting model: ${resolvedI2vModel} (will fall back to other ` +
-        `i2v-capable families on failure)`,
+      `  params:             ${profile.aspect}, ${profile.duration}s, ${profile.quality}`,
     );
     printPrompt("CLIP2_PROMPT", CLIP2_PROMPT);
-    if (
-      !(await askYesNo(
-        "Run the cascade? Each attempt costs ~$0.30-0.50; we stop on first success.",
-      ))
-    )
-      return;
-
-    const cascade = await generateClip2WithCascade({
-      apiKey: ppq.api_key,
-      uploadedFrameUrl: state.uploadedFrameUrl,
-      prompt: CLIP2_PROMPT,
-      preferredModel: resolvedI2vModel,
-      availableIds: videoModelIds,
-    });
-    console.log(`\n  ✓ clip 2 url:      ${cascade.url}`);
-    console.log(`  ✓ winning model:   ${cascade.model}`);
-    if (cascade.costUsd !== undefined) {
-      console.log(`  ✓ clip 2 cost:     $${cascade.costUsd.toFixed(4)}`);
-    }
-    if (cascade.failedAttempts.length > 0) {
-      console.log(
-        `  (skipped after failures: ${cascade.failedAttempts
-          .map((f) => f.split(":")[0])
-          .join(", ")})`,
+    if (!(await askYesNo("Generate clip 2?"))) return;
+    let clip2;
+    try {
+      clip2 = await generateClip({
+        apiKey: ppq.api_key,
+        model: singletonModel,
+        prompt: CLIP2_PROMPT,
+        imageUrl: state.uploadedFrameUrl,
+        aspect: profile.aspect,
+        duration: profile.duration,
+        quality: profile.quality,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const nextBest =
+        BEST_SINGLETON_PREFERENCE.find(
+          (m) => m !== singletonModel && videoModelIds.includes(m),
+        ) ?? "(none)";
+      throw new Error(
+        `${singletonModel} failed on i2v: ${msg}\n\n` +
+          `Next-best singleton to try:\n` +
+          `  npx tsx tests/ai-services/test-veo-last-frame-conditioning.ts --reset --model ${nextBest}`,
+        { cause: err },
       );
     }
+    console.log(`\n  ✓ clip 2 url:      ${clip2.url}`);
+    if (clip2.costUsd !== undefined) {
+      console.log(`  ✓ clip 2 cost:     $${clip2.costUsd.toFixed(4)}`);
+    }
     state.clip2 = {
-      id: cascade.id,
-      url: cascade.url,
-      model: cascade.model,
+      id: clip2.id,
+      url: clip2.url,
+      model: singletonModel,
     };
     await saveState(state);
   }
