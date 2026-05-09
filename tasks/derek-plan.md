@@ -271,6 +271,51 @@ The wizard runs Jim's agent. I host the chat surface, intercept tool calls that 
 - [ ] `ImigongoBand.tsx` already exists — verify it's on-brand
 - [ ] Splash + 404 + empty-state polish
 
+### Rebrand: Phoenix → Feniksi (Kinyarwanda for "phoenix")
+
+**Decision needed before execution.** The rebrand splits into two
+layers with very different blast radii:
+
+**Layer A — Visible / cosmetic (cheap, mostly safe):**
+- App name in `package.json`, `README.md`, `index.html` `<title>`
+- Documentation: `dev/PROJECT.md` (and the team should know — needs Anaïse's blessing), `AGENTS.md`, `tasks/todo.md`, `docs/*.md`, `tasks/derek-plan.md`
+- UI strings: `PhoenixHeader.tsx` brand mark, `useSeoMeta` titles ("— Phoenix" → "— Feniksi"), splash copy, dialog titles, error messages
+- Component file rename: `src/components/PhoenixHeader.tsx` → `FeniksiHeader.tsx` (or just `BrandHeader.tsx`)
+- Assets: any logo / favicon / OG image referencing "Phoenix"
+- PWA manifest `name` / `short_name` / `description`
+- Demo deck, one-pager, social copy (Anaïse's lane)
+
+**Layer B — On-wire / persistent identifiers (REQUIRES TEAM DECISION):**
+- `PHOENIX_PAYLOAD_APP = "phoenix-persona"` — the magic discriminator inside every encrypted kind 30078 payload. Changing it makes existing personas unreadable.
+- The `client` tag value (currently we deliberately omit it for kind 1, so this is a non-issue for now).
+- Any future Lightning Address domain (`@phoenix.example`) — Topher's decision; should align with the rebrand.
+- The `app:` field inside the NIP-44 plaintext envelope (set to `"phoenix-persona"` via `PHOENIX_PAYLOAD_APP`).
+
+**Recommended on-wire strategy:**
+1. **Keep `phoenix-persona` as the on-wire discriminator forever.** It's the protocol identifier; rebrands shouldn't break parser compatibility. Comparable to how npm packages keep their original published name.
+2. Document this in `NIP.md` and `dev/PROJECT.md`: "The product is Feniksi. The on-wire NIP-78 payload discriminator stays `phoenix-persona` for forward/backward compatibility with V1 personas."
+3. Internal type names + comments + docs say Feniksi; the string constant `PHOENIX_PAYLOAD_APP` becomes a private compatibility detail (could rename the constant to `WIRE_APP_DISCRIMINATOR` to make this explicit).
+
+**Execution checklist (after team approves):**
+- [ ] **Decide on-wire policy** — keep `"phoenix-persona"` discriminator (recommended) or migrate (requires v2 envelope + dual-read fallback for any V1 personas already in the wild)
+- [ ] **Anaïse signs off** on the brand swap and demo language change
+- [ ] Find/replace `Phoenix` → `Feniksi` in user-visible strings only:
+  - [ ] `package.json` (`name`, `description`)
+  - [ ] `index.html`
+  - [ ] `README.md`
+  - [ ] All `useSeoMeta({ title: ... })` calls
+  - [ ] All toast / error / dialog copy
+  - [ ] `PhoenixHeader.tsx` brand wordmark + file rename
+  - [ ] `nip49Storage.ts` storage key (`phoenix:user:ncryptsec` → `feniksi:user:ncryptsec`) — **breaks any existing on-device unlock state; OK pre-launch but needs a migration shim if any users have signed up first**
+  - [ ] PWA manifest (Phase 3 task — coordinate)
+  - [ ] Favicon, OG image, og:title metadata
+- [ ] Update docs: `dev/PROJECT.md`, `AGENTS.md`, `tasks/todo.md`, `tasks/derek-plan.md`, `docs/*.md`
+- [ ] Add a paragraph in `dev/PROJECT.md` §13 (Glossary) explaining the bilingual brand: "Feniksi (Kinyarwanda for phoenix). The protocol-level identifier `phoenix-persona` is retained for compatibility."
+- [ ] Update demo opening: "Feniksi gives an activist a voice that can outlive them." (or whatever Anaïse lands on)
+- [ ] One round of grep-and-fix for any straggler "phoenix" strings that should be "Feniksi"
+
+**Coordination note.** This crosses every owner's lane (UI → Derek, on-wire → Derek + Topher, docs/demo → Anaïse, prompts → Jim). Don't execute solo — surface at next sync, pick a window when no one is mid-feature, and do it as a single atomic commit so we don't ship a half-rebranded build.
+
 ### PWA
 - [ ] `vite-plugin-pwa` — manifest with Imigongo-themed 192/512/maskable icons
 - [ ] Service worker: cache app shell, last-fetched feed, profile assets. Offline shell falls back to "you're offline; recent posts shown below."
