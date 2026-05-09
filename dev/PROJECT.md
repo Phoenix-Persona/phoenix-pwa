@@ -285,26 +285,13 @@ Plaintext payload:
     "reference_image_url": "https://blossom.example/<sha256>.png",
     "languages": ["en", "rw"],
     "tags": ["rwanda", "press-freedom"],
-    "created_at": 1715212800,
-    "region": "rw",
-    "cause": "press-freedom",
-    "bio": "Voice of Rwanda. Press freedom, civil society, the long memory.",
-    "tone": "measured, factual, witness-bearing",
-    "sources": [
-      { "kind": "rss", "url": "https://www.hrw.org/feeds/news/topic/29/rss.xml" },
-      { "kind": "url", "url": "https://en.rsf.org/rwanda" }
-    ]
+    "created_at": 1715212800
   },
   "wallet": {
     "kind": "spark",
-    "seed": "<bip39 mnemonic, 12/15/18/21/24 words>",
+    "seed": "<bip39 mnemonic>",
     "lightning_address": "imani@spark.money",
-    "lnurl": "lnurl1...",
-    "auto_topup": {
-      "enabled": true,
-      "threshold_usd": 5,
-      "target_usd": 5
-    }
+    "lnurl": "lnurl1..."
   },
   "model_prefs": {
     "styling": "claude-sonnet-4.5",
