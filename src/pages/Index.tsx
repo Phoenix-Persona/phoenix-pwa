@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 
@@ -5,6 +6,7 @@ import { PhoenixHeader } from "@/components/PhoenixHeader";
 import { ImigongoBand, ImigongoSeal } from "@/components/ImigongoBand";
 import { HowItWorks } from "@/components/HowItWorks";
 import { Button } from "@/components/ui/button";
+import AuthDialog from "@/components/auth/AuthDialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const Index = () => {
@@ -15,6 +17,7 @@ const Index = () => {
   });
 
   const { user } = useCurrentUser();
+  const [authOpen, setAuthOpen] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -65,12 +68,11 @@ const Index = () => {
                   </>
                 ) : (
                   <Button
-                    asChild
                     size="lg"
-                    className="rounded-full px-8"
-                    disabled
+                    className="rounded-full px-8 shadow-lg shadow-primary/20"
+                    onClick={() => setAuthOpen(true)}
                   >
-                    <span>Sign in to begin</span>
+                    Sign in to begin
                   </Button>
                 )}
               </div>
@@ -220,12 +222,11 @@ const Index = () => {
                   </Button>
                 ) : (
                   <Button
-                    asChild
                     size="lg"
-                    className="rounded-full px-8"
-                    disabled
+                    className="rounded-full px-8 shadow-lg shadow-primary/20"
+                    onClick={() => setAuthOpen(true)}
                   >
-                    <span>Sign in to begin</span>
+                    Sign in to begin
                   </Button>
                 )}
               </div>
@@ -248,6 +249,8 @@ const Index = () => {
           </div>
         </footer>
       </main>
+
+      <AuthDialog isOpen={authOpen} onClose={() => setAuthOpen(false)} />
     </div>
   );
 };
