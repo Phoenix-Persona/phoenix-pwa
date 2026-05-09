@@ -92,8 +92,8 @@ Useful flags:
 | `--skip-clip1` | Use a previously generated clip 1 (must be cached) |
 | `--skip-clip2` | Stop after extracting + uploading the last frame |
 | `--list-models` | Print every video model ppq.ai advertises and exit (no clips submitted) |
-| `--text-model <id>` | Clip 1 model. Default: auto-resolve from `/v1/models?type=video` (prefers Veo 3.1 fast text-to-video; falls back to Veo 3.1 / Veo 3 fast / any Veo). |
-| `--i2v-model <id>` | Clip 2 model. Default: auto-resolve from `/v1/models?type=video` (prefers Veo 3.1 fast image-to-video; same fallback chain). |
+| `--text-model <id>` | Clip 1 model. Default: auto-resolve the best Veo from `/v1/models?type=video` (Veo 3 fast preferred; ppq.ai's API doesn't expose Veo 3.1 yet even though their UI does). |
+| `--i2v-model <id>` | Clip 2 model. Default: same id as `--text-model`. ppq.ai consolidated image-to-video into the polymorphic `image_url` parameter — there's no separate `-i2v` variant in the catalog anymore. Set this only when you want clip 2 on a different family (e.g. `pika-v2.2` for Pikaframes-style first-and-last-frame interpolation). |
 | `--aspect <ratio>` | `9:16` (default), `16:9`, or `1:1` |
 | `--duration <secs>` | Per-clip duration (default 8) |
 | `--quality <p>` | `720p` (default) or `1080p` |

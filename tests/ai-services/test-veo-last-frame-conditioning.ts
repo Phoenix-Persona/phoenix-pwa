@@ -42,12 +42,17 @@
  *   --skip-clip1             Use a previously generated clip 1 (must be cached).
  *   --skip-clip2             Stop after extracting + uploading the last frame.
  *   --list-models            List all video models advertised by ppq.ai and exit.
- *   --text-model <id>        Override clip 1 model. Default: auto-resolve a Veo
- *                            3.1 fast (or closest) text-to-video id from
- *                            `/v1/models?type=video`.
- *   --i2v-model <id>         Override clip 2 model. Default: auto-resolve a Veo
- *                            3.1 fast (or closest) image-to-video id from
- *                            `/v1/models?type=video`.
+ *   --text-model <id>        Override clip 1 model. Default: auto-resolve the
+ *                            best available Veo from `/v1/models?type=video`
+ *                            (Veo 3 fast preferred; ppq.ai's API doesn't
+ *                            expose Veo 3.1 yet even when their UI does).
+ *   --i2v-model <id>         Override clip 2 model. Default: same id as clip 1.
+ *                            ppq.ai consolidated i2v into the polymorphic
+ *                            `image_url` parameter — there's no separate -i2v
+ *                            variant in the catalog anymore. Pass this only if
+ *                            you want clip 2 on a different family (e.g.
+ *                            `pika-v2.2` for Pikaframes-style first-and-last
+ *                            interpolation).
  *   --aspect <ratio>         "9:16" (default), "16:9", "1:1".
  *   --duration <secs>        Per-clip duration (default 8).
  *   --quality <p>            "720p" (default) or "1080p".
@@ -176,57 +181,45 @@ function printPrompt(label: string, prompt: string): void {
 /* ---------- model discovery ---------- */
 
 /**
- * ppq.ai's literal model ids for Veo aren't fully documented and have
- * shifted across releases (`veo3-fast`, `veo3.1-fast`, `veo-3.1-fast`,
- * vendor-prefixed variants). Rather than hard-coding a guess, we list
- * `/v1/models?type=video` at startup and auto-resolve the best match.
+ * ppq.ai consolidated image-to-video into a polymorphic `image_url`
+ * parameter on the same model id, rather than separate `-i2v` model
+ * variants like the earlier docs described (`veo3-i2v`,
+ * `kling-2.5-turbo-i2v` are no longer advertised). So:
  *
- * Auto-resolution preference order, for both text-to-video and i2v:
- *   1. Veo 3.1 + fast + correct polarity (i2v vs. plain).
- *   2. Veo 3.1 + correct polarity (any speed).
- *   3. Veo 3 + fast + correct polarity.
- *   4. Veo 3 + correct polarity (any speed).
- *   5. Any "veo" id with the correct polarity.
+ *   - Clip 1 (text-to-video): submit with no `image_url`.
+ *   - Clip 2 (image-to-video, conditioned on clip 1's last frame):
+ *     submit the SAME model id with `image_url` set.
  *
- * The user can always override with `--text-model` / `--i2v-model`.
+ * The resolver below just finds the best available Veo id (Veo 3 fast
+ * preferred, falling back to plain Veo 3, then any Veo). Both clips
+ * default to the same id; users can split via --text-model / --i2v-model
+ * if they want to test cross-model continuity.
+ *
+ * Note: the live ppq.ai API doesn't expose Veo 3.1 yet even when their
+ * UI does. We pick the closest available substitute.
  */
 
-function isI2vMarker(idLc: string): boolean {
-  return /(i2v|image[-_ ]to[-_ ]video|first[-_ ]image|first[-_ ]last|first[-_ ]frame)/i.test(
-    idLc,
-  );
-}
-
-function resolveVeoModel(
-  ids: string[],
-  want: "text" | "i2v",
-  preferRequested: string,
-): string {
+function resolveVeoModel(ids: string[], preferRequested: string): string {
   if (preferRequested) {
     if (ids.includes(preferRequested)) return preferRequested;
     throw new Error(
-      `--${want === "text" ? "text-model" : "i2v-model"} "${preferRequested}" ` +
-        `is not in the available video models. Available:\n  - ${ids.join("\n  - ")}`,
+      `Model "${preferRequested}" is not in the available video models. ` +
+        `Available:\n  - ${ids.join("\n  - ")}`,
     );
   }
 
   const lc = ids.map((id) => ({ id, lc: id.toLowerCase() }));
-  const polarityOK = (idLc: string) =>
-    want === "i2v" ? isI2vMarker(idLc) : !isI2vMarker(idLc);
-
   const matchers: Array<(e: { lc: string }) => boolean> = [
-    // 1. Veo 3.1 + fast
-    (e) =>
-      /veo[\s\-_]*3[._\-]1/.test(e.lc) && /fast/.test(e.lc) && polarityOK(e.lc),
+    // 1. Veo 3.1 + fast (in case the API catches up to the UI someday)
+    (e) => /veo[\s\-_]*3[._\-]1/.test(e.lc) && /fast/.test(e.lc),
     // 2. Veo 3.1 (any speed)
-    (e) => /veo[\s\-_]*3[._\-]1/.test(e.lc) && polarityOK(e.lc),
+    (e) => /veo[\s\-_]*3[._\-]1/.test(e.lc),
     // 3. Veo 3 + fast
-    (e) =>
-      /veo[\s\-_]*3(?!\d)/.test(e.lc) && /fast/.test(e.lc) && polarityOK(e.lc),
+    (e) => /veo[\s\-_]*3(?!\d)/.test(e.lc) && /fast/.test(e.lc),
     // 4. Veo 3 (any speed)
-    (e) => /veo[\s\-_]*3(?!\d)/.test(e.lc) && polarityOK(e.lc),
+    (e) => /veo[\s\-_]*3(?!\d)/.test(e.lc),
     // 5. Any veo
-    (e) => /veo/.test(e.lc) && polarityOK(e.lc),
+    (e) => /veo/.test(e.lc),
   ];
 
   for (const matcher of matchers) {
@@ -235,9 +228,8 @@ function resolveVeoModel(
   }
 
   throw new Error(
-    `Could not auto-resolve a Veo ${want === "i2v" ? "image-to-video" : "text-to-video"} ` +
-      `model. Available video models:\n  - ${ids.join("\n  - ")}\n\n` +
-      `Pass --${want === "text" ? "text-model" : "i2v-model"} <id> explicitly.`,
+    `Could not auto-resolve a Veo model. Available video models:\n  - ${ids.join("\n  - ")}\n\n` +
+      `Pass --text-model <id> and --i2v-model <id> explicitly.`,
   );
 }
 
@@ -446,23 +438,22 @@ async function main(): Promise<void> {
     return;
   }
 
-  const resolvedTextModel = resolveVeoModel(
-    videoModelIds,
-    "text",
-    flags.textModel,
-  );
-  const resolvedI2vModel = resolveVeoModel(
-    videoModelIds,
-    "i2v",
-    flags.i2vModel,
-  );
-  console.log(`\n  text-to-video → ${resolvedTextModel}`);
-  console.log(`  image-to-video → ${resolvedI2vModel}`);
-  if (!flags.textModel) {
-    console.log(`  (auto-resolved; override with --text-model <id>)`);
+  // Both clips default to the same auto-resolved Veo id. ppq.ai uses the
+  // presence/absence of `image_url` (not a separate `-i2v` model) as the
+  // text-to-video / image-to-video switch.
+  const resolvedTextModel = resolveVeoModel(videoModelIds, flags.textModel);
+  const resolvedI2vModel = flags.i2vModel
+    ? resolveVeoModel(videoModelIds, flags.i2vModel)
+    : resolvedTextModel;
+  console.log(`\n  text-to-video  (clip 1) → ${resolvedTextModel}`);
+  console.log(`  image-to-video (clip 2) → ${resolvedI2vModel}`);
+  if (resolvedI2vModel === resolvedTextModel) {
+    console.log(
+      `  (clip 2 reuses the same model; image_url is the i2v switch)`,
+    );
   }
-  if (!flags.i2vModel) {
-    console.log(`  (auto-resolved; override with --i2v-model <id>)`);
+  if (!flags.textModel && !flags.i2vModel) {
+    console.log(`  (override with --text-model / --i2v-model)`);
   }
 
   header("World block (verbatim in both prompts)");
