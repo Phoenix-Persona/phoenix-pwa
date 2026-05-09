@@ -3,7 +3,7 @@
  *
  *   - the Vite-built browser bundle, where `import.meta.env.VITE_*` is
  *     replaced at build time, and
- *   - Node integration tests (`tsx tests/.../run.ts`), where Vite isn't
+ *   - Node integration tests under `tests/`, where Vite isn't
  *     in the loop and the value lives on `process.env`.
  *
  * Use this everywhere a library reads a `VITE_*` value so primitives stay

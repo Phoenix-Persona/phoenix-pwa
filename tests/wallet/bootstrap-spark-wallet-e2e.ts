@@ -14,11 +14,11 @@
  *   5. Run a single `runAutoTopupOnce` pass against ppq.ai to validate the
  *      default-on auto-topup wiring end-to-end.
  *
- * After a successful run, `tests/wallet/topup-and-infer.ts` can pick up
- * the persisted persona + wallet without minting fresh state.
+ * After a successful run, `tests/wallet/test-auto-topup-and-inference.ts`
+ * can pick up the persisted persona + wallet without minting fresh state.
  *
  * Run:
- *   npx tsx tests/wallet/bootstrap.ts
+ *   npx tsx tests/wallet/bootstrap-spark-wallet-e2e.ts
  *
  * Loads `dev/.env` automatically; just put your `VITE_BREEZ_API_KEY` there.
  *

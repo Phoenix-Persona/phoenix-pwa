@@ -6,7 +6,7 @@
  * (Veo 3). Each step is interactive (y/n) so you can run a subset.
  *
  * Run:
- *   npx tsx tests/ai-services/run.ts
+ *   npx tsx tests/ai-services/test-all-ppq-services-e2e.ts
  *
  * Flags:
  *   --reset            Wipe the persisted account before starting

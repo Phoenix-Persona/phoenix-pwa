@@ -7,8 +7,8 @@ the real Breez Spark SDK.
 
 | Script | What it does |
 | --- | --- |
-| [`bootstrap.ts`](./bootstrap.ts) | First run. Mints an operator nsec, encrypts a fresh persona envelope (with BIP-39 mnemonic embedded), connects the Spark wallet, optionally registers a Lightning Address, prompts you to fund it via BOLT11, then runs one default-on auto-topup pass against ppq.ai. |
-| [`topup-and-infer.ts`](./topup-and-infer.ts) | Follow-up. Reuses the persisted state from `bootstrap.ts` and exercises three flows: a "hello world" inference call against ppq.ai, the disabled-policy short-circuit, and a forced auto-topup that fires no matter the current balance. |
+| [`bootstrap-spark-wallet-e2e.ts`](./bootstrap-spark-wallet-e2e.ts) | First run. Mints an operator nsec, encrypts a fresh persona envelope (with BIP-39 mnemonic embedded), connects the Spark wallet, optionally registers a Lightning Address, prompts you to fund it via BOLT11, then runs one default-on auto-topup pass against ppq.ai. |
+| [`test-auto-topup-and-inference.ts`](./test-auto-topup-and-inference.ts) | Follow-up. Reuses the persisted state from `bootstrap-spark-wallet-e2e.ts` and exercises three flows: a "hello world" inference call against ppq.ai, the disabled-policy short-circuit, and a forced auto-topup that fires no matter the current balance. |
 
 Both scripts load `dev/.env` automatically; just put your API key there:
 
@@ -20,15 +20,15 @@ echo 'VITE_BREEZ_API_KEY=your_key' >> dev/.env
 
 ```bash
 # First time on a machine — mints wallet + persona + first topup
-npx tsx tests/wallet/bootstrap.ts
+npx tsx tests/wallet/bootstrap-spark-wallet-e2e.ts
 
 # Subsequently — reuses the persisted state
-npx tsx tests/wallet/topup-and-infer.ts
+npx tsx tests/wallet/test-auto-topup-and-inference.ts
 ```
 
 ## Useful flags
 
-`bootstrap.ts`
+`bootstrap-spark-wallet-e2e.ts`
 
 | Flag | Effect |
 | --- | --- |
@@ -38,7 +38,7 @@ npx tsx tests/wallet/topup-and-infer.ts
 | `--topup-target <usd>` | Auto-topup target (default 5) |
 | `--topup-threshold <usd>` | Auto-topup threshold (default 1) |
 
-`topup-and-infer.ts`
+`test-auto-topup-and-inference.ts`
 
 | Flag | Effect |
 | --- | --- |

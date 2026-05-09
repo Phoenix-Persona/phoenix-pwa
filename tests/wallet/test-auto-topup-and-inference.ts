@@ -1,5 +1,6 @@
 /**
- * Follow-up integration test that picks up where `bootstrap.ts` leaves off.
+ * Follow-up integration test that picks up where
+ * `bootstrap-spark-wallet-e2e.ts` leaves off.
  *
  * Reuses the persisted operator + encrypted persona + Spark wallet, then
  * exercises three distinct flows:
@@ -18,7 +19,7 @@
  *      landed.
  *
  * Run:
- *   npx tsx tests/wallet/topup-and-infer.ts
+ *   npx tsx tests/wallet/test-auto-topup-and-inference.ts
  *
  * Loads `dev/.env` automatically.
  *
@@ -90,20 +91,20 @@ async function preconditions(): Promise<{
   const operator = await loadOperator();
   if (!operator) {
     throw new Error(
-      "No operator key found. Run `npx tsx tests/wallet/bootstrap.ts` first.",
+      "No operator key found. Run `npx tsx tests/wallet/bootstrap-spark-wallet-e2e.ts` first.",
     );
   }
   const envelope = await loadPersonaOrFail(operator);
   const mnemonic = envelope.config.wallet?.mnemonic;
   if (!mnemonic) {
     throw new Error(
-      "Persona envelope has no wallet mnemonic. Re-run bootstrap with --reset.",
+      "Persona envelope has no wallet mnemonic. Re-run bootstrap-spark-wallet-e2e with --reset.",
     );
   }
   const ppq = await loadPpqAccount();
   if (!ppq) {
     throw new Error(
-      "No ppq.ai account found. Run bootstrap and answer 'y' to the auto-topup step (or run tests/ai-services/walkthrough.ts).",
+      "No ppq.ai account found. Run bootstrap-spark-wallet-e2e and answer 'y' to the auto-topup step (or run tests/ai-services/test-all-ppq-services-e2e.ts).",
     );
   }
   console.log("Connecting Spark wallet…");

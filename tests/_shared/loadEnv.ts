@@ -2,7 +2,7 @@
  * Load `dev/.env` into `process.env` for Node integration test scripts.
  *
  * Vite already auto-loads it (via `envDir: "dev"` in vite.config.ts), but
- * `tsx tests/.../run.ts` runs in plain Node where Vite isn't in the loop.
+ * `tsx tests/<dir>/<script>.ts` runs in plain Node where Vite isn't in the loop.
  * Importing this module at the top of a test script makes `process.env`
  * carry the same keys the browser bundle sees, so primitives can read
  * `VITE_BREEZ_API_KEY` etc. via `readEnv()` without a duplicate fallback.

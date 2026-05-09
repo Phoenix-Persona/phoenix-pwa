@@ -126,7 +126,8 @@ export async function encryptAndSavePersona(
 
 /**
  * Decrypt the persisted persona envelope; throws if missing or malformed.
- * Use from scripts that depend on `bootstrap.ts` having already run.
+ * Use from scripts that depend on `bootstrap-spark-wallet-e2e.ts` having
+ * already run.
  */
 export async function loadPersonaOrFail(
   operator: OperatorData,
@@ -134,7 +135,7 @@ export async function loadPersonaOrFail(
   const stored = await loadStoredPersona();
   if (!stored) {
     throw new Error(
-      "No persona envelope on disk. Run `npx tsx tests/wallet/bootstrap.ts` first.",
+      "No persona envelope on disk. Run `npx tsx tests/wallet/bootstrap-spark-wallet-e2e.ts` first.",
     );
   }
   const signer = buildSigner(operator.nsec);
@@ -145,7 +146,7 @@ export async function loadPersonaOrFail(
   );
   if (!envelope) {
     throw new Error(
-      "Persona envelope failed to decrypt. Operator key may have changed — re-run bootstrap with --reset.",
+      "Persona envelope failed to decrypt. Operator key may have changed — re-run bootstrap-spark-wallet-e2e with --reset.",
     );
   }
   return envelope;
