@@ -82,3 +82,79 @@ export function extractSourceDomains(tags: string[][]): string[] {
     )
   );
 }
+
+export interface ImetaImage {
+  url: string;
+  mime?: string;
+  alt?: string;
+  blurhash?: string;
+  dim?: { w: number; h: number };
+}
+
+/**
+ * Parse NIP-92 `imeta` tags into renderable image descriptors.
+ *
+ * NIP-92 stuffs space-separated key/value pairs into the imeta tag's
+ * remaining elements (e.g.
+ * `["imeta", "url https://...", "m image/png", "alt ...", "dim 1024x768"]`).
+ * Some clients use the alternative form where each kv pair is a
+ * separate tag element — we accept either shape.
+ *
+ * Only entries with a sanitisable http(s) URL and an image MIME (or a
+ * URL that ends in a recognised image extension) are returned.
+ */
+export function extractImetaImages(tags: string[][]): ImetaImage[] {
+  const images: ImetaImage[] = [];
+
+  for (const tag of tags) {
+    if (tag[0] !== "imeta") continue;
+
+    const fields: Record<string, string> = {};
+    for (const part of tag.slice(1)) {
+      if (typeof part !== "string") continue;
+      const idx = part.indexOf(" ");
+      if (idx < 1) continue;
+      const key = part.slice(0, idx);
+      const value = part.slice(idx + 1).trim();
+      if (key && value && !(key in fields)) {
+        fields[key] = value;
+      }
+    }
+
+    const url = fields.url;
+    if (!url) continue;
+
+    // Reject anything but http(s) — never let data: / javascript: through.
+    let safeUrl: string | null = null;
+    try {
+      const u = new URL(url);
+      if (u.protocol === "http:" || u.protocol === "https:") {
+        safeUrl = u.toString();
+      }
+    } catch {
+      continue;
+    }
+    if (!safeUrl) continue;
+
+    const mime = fields.m;
+    const isImage =
+      (mime && mime.startsWith("image/")) ||
+      /\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i.test(safeUrl);
+    if (!isImage) continue;
+
+    const dimMatch = fields.dim?.match(/^(\d+)x(\d+)$/);
+    const dim = dimMatch
+      ? { w: Number(dimMatch[1]), h: Number(dimMatch[2]) }
+      : undefined;
+
+    images.push({
+      url: safeUrl,
+      mime,
+      alt: fields.alt,
+      blurhash: fields.blurhash,
+      dim,
+    });
+  }
+
+  return images;
+}
