@@ -27,6 +27,9 @@
  *   --register-address       Register a Lightning Address if none exists
  */
 
+// Load dev/.env into process.env BEFORE any module that reads env vars.
+import "../_shared/loadEnv";
+
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import readline from "node:readline/promises";
@@ -477,10 +480,11 @@ async function autoTopupStep(state: WalletState): Promise<void> {
 async function main(): Promise<void> {
   console.log("Phoenix wallet integration smoke test");
   if (!process.env.VITE_BREEZ_API_KEY) {
-    // The Breez SDK init reads env via Vite in browser builds; in Node we
-    // expose it under the same name so `connectWallet` finds it.
+    // The shared loader pulls dev/.env into process.env before this point;
+    // if the value is still missing the file is absent or doesn't contain
+    // the key.
     console.warn(
-      "VITE_BREEZ_API_KEY is not set — set it before running this script.",
+      "VITE_BREEZ_API_KEY not found — add it to dev/.env or export it in the shell.",
     );
   }
 

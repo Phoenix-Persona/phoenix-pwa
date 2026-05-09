@@ -21,8 +21,18 @@ real Breez Spark SDK. Walks every goal of the headless wallet branch:
 ## Run it
 
 ```bash
-VITE_BREEZ_API_KEY=your_key npx tsx tests/wallet/run.ts
+npx tsx tests/wallet/run.ts
 ```
+
+The script loads `dev/.env` automatically; just put your `VITE_BREEZ_API_KEY`
+there:
+
+```bash
+echo 'VITE_BREEZ_API_KEY=your_key' >> dev/.env
+```
+
+A shell-set env var still wins if you'd rather pass it ad-hoc:
+`VITE_BREEZ_API_KEY=… npx tsx tests/wallet/run.ts`.
 
 Useful flags:
 

@@ -23,6 +23,9 @@
  * That file is gitignored — but it grants spending power, so don't commit it.
  */
 
+// Load dev/.env into process.env BEFORE any module that reads env vars.
+import "../_shared/loadEnv";
+
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import readline from "node:readline/promises";

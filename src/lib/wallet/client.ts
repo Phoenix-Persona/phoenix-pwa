@@ -19,6 +19,7 @@ import {
   type Network,
 } from "@breeztech/breez-sdk-spark";
 
+import { readEnv } from "@/lib/env";
 import { ensureWalletReady } from "./init";
 import {
   WalletError,
@@ -39,10 +40,7 @@ const DEFAULT_STORAGE_DIR = "phoenix-wallet";
 /* ---------- Helpers ---------- */
 
 function readEnvApiKey(): string | undefined {
-  const env = (import.meta as ImportMeta).env as
-    | Record<string, string | undefined>
-    | undefined;
-  return env?.VITE_BREEZ_API_KEY;
+  return readEnv("VITE_BREEZ_API_KEY");
 }
 
 function buildConfig(
