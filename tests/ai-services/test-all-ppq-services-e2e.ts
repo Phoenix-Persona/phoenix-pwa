@@ -6,7 +6,7 @@
  * (Veo 3). Each step is interactive (y/n) so you can run a subset.
  *
  * Run:
- *   npx tsx tests/ai-services/run.ts
+ *   npx tsx tests/ai-services/test-all-ppq-services-e2e.ts
  *
  * Flags:
  *   --reset            Wipe the persisted account before starting
@@ -22,6 +22,9 @@
  * The persisted account is written to tests/ai-services/.account.json.
  * That file is gitignored — but it grants spending power, so don't commit it.
  */
+
+// Load dev/.env into process.env BEFORE any module that reads env vars.
+import "../_shared/loadEnv";
 
 import { promises as fs } from "node:fs";
 import path from "node:path";

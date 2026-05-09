@@ -135,7 +135,10 @@ describe("parsePhoenixEnvelope", () => {
     const env = makeValidEnvelope();
     const enriched = {
       ...env,
-      wallet: { kind: "breeze", seed: "test seed phrase" },
+      wallet: {
+        kind: "spark",
+        seed: "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+      },
       model_prefs: {
         agent: "anthropic/claude-sonnet-4.5",
         image: "openai/gpt-image-1",
@@ -146,7 +149,7 @@ describe("parsePhoenixEnvelope", () => {
     };
     const parsed = parsePhoenixEnvelope(JSON.stringify(enriched));
     expect(parsed).not.toBeNull();
-    expect(parsed!.wallet?.kind).toBe("breeze");
+    expect(parsed!.wallet?.kind).toBe("spark");
     expect(parsed!.model_prefs?.agent).toBe("anthropic/claude-sonnet-4.5");
     expect(parsed!.settings?.default_relays).toEqual(["wss://relay.damus.io"]);
   });

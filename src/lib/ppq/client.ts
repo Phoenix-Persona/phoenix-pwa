@@ -30,13 +30,12 @@ import {
   type PpqVideoSubmitResponse,
 } from "./types";
 
+import { readEnv } from "@/lib/env";
+
 const DEFAULT_BASE_URL = "https://api.ppq.ai";
 
 function readEnvBase(): string {
-  const env = (import.meta as ImportMeta).env as
-    | Record<string, string | undefined>
-    | undefined;
-  return env?.VITE_PPQ_API_BASE ?? DEFAULT_BASE_URL;
+  return readEnv("VITE_PPQ_API_BASE") ?? DEFAULT_BASE_URL;
 }
 
 /**
@@ -342,6 +341,25 @@ export function extractBolt11(invoice: PpqTopupInvoice): string | undefined {
     if (typeof v === "string" && v.startsWith("ln")) return v;
   }
   return undefined;
+}
+
+/**
+ * Convert ppq.ai's `crypto_amount_due` (BTC) into satoshis. Returns
+ * undefined when the field is missing or unparseable. Used by the wallet
+ * auto-topup policy to pre-flight a Spark balance check before paying.
+ */
+export function extractRequiredSats(
+  invoice: PpqTopupInvoice,
+): number | undefined {
+  const raw = invoice.crypto_amount_due;
+  const btc =
+    typeof raw === "number"
+      ? raw
+      : typeof raw === "string" && raw.trim() && Number.isFinite(Number(raw))
+        ? Number(raw)
+        : undefined;
+  if (btc === undefined || btc <= 0) return undefined;
+  return Math.ceil(btc * 1e8);
 }
 
 /**

@@ -38,4 +38,15 @@ yarn.lock
 tests/ai-services/.account.json
 tests/ai-services/.last-invoice.json
 
+# Veo last-frame-conditioning test artifacts (clip MP4s + extracted frame)
+tests/ai-services/.veo-last-frame/
+
+# Local wallet test credentials (grants spending power — never commit)
+tests/wallet/.operator.json
+tests/wallet/.persona.json
+
+# Breez Spark SDK persistent storage (created by Node tests at storageDir
+# = "phoenix-wallet"; relative to wherever the script ran from)
+phoenix-wallet/
+
 SCRATCH.md

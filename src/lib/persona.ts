@@ -61,6 +61,23 @@ export const PHOENIX_PAYLOAD_VERSION = 1 as const;
 
 // ─────────── Zod schemas ───────────
 
+/** Source of content the persona references (e.g. RSS feed, article URL). */
+const personaSourceSchema = z.object({
+  kind: z.enum(["rss", "url"]),
+  url: z.string().min(1).max(2048),
+});
+
+/**
+ * Auto-topup policy for the persona's PPQ credit (NIP-47 NWC). Persisted
+ * inside the encrypted payload so the user's choice rides the backup
+ * across devices.
+ */
+const personaAutoTopupSchema = z.object({
+  enabled: z.boolean(),
+  threshold_usd: z.number().nonnegative().max(10000),
+  target_usd: z.number().positive().max(10000),
+});
+
 const personaSchema = z.object({
   pubkey: z.string().regex(/^[0-9a-f]{64}$/i, "must be 64 hex chars"),
   nsec: z
@@ -74,14 +91,33 @@ const personaSchema = z.object({
   languages: z.array(z.string().min(1).max(16)).min(1).max(16),
   tags: z.array(z.string().min(1).max(120)).max(32).default([]),
   created_at: z.number().int().nonnegative(),
+  // Demo-critical domain fields (added during PR #2 schema reconciliation).
+  // All optional for back-compat with personas authored before they shipped.
+  region: z.string().min(1).max(8).optional(),
+  cause: z.string().min(1).max(120).optional(),
+  bio: z.string().max(2000).optional(),
+  tone: z.string().max(2000).optional(),
+  sources: z.array(personaSourceSchema).max(64).optional(),
 });
 
 const walletSchema = z.object({
-  // Phase 1: only "breeze" is supported. Future variants land as discriminated union.
-  kind: z.literal("breeze"),
-  /** BIP-39 mnemonic. Held only inside the encrypted backup. */
-  seed: z.string().min(1).max(1024),
+  // Phoenix V1 uses Breez Spark SDK (`@breeztech/breez-sdk-spark`).
+  // Future SDK variants land as a discriminated union.
+  kind: z.literal("spark"),
+  /** BIP-39 mnemonic (12, 15, 18, 21, or 24 words). Held only inside the encrypted backup. */
+  seed: z
+    .string()
+    .min(1)
+    .max(2048)
+    .refine((m) => {
+      const words = m.trim().split(/\s+/);
+      return words.length === 12 || words.length === 15 ||
+        words.length === 18 || words.length === 21 || words.length === 24;
+    }, "must be a valid BIP-39 mnemonic (12, 15, 18, 21, or 24 words)"),
+  /** Public donate handle. Safe to embed; already public via the kind 0 lud16. */
+  lightning_address: z.string().max(512).optional(),
   lnurl: z.string().min(1).max(4096).optional(),
+  auto_topup: personaAutoTopupSchema.optional(),
 });
 
 const modelPrefsSchema = z.object({
@@ -108,6 +144,8 @@ const phoenixEnvelopeSchema = z.object({
 
 // ─────────── Public types (inferred from schemas) ───────────
 
+export type PersonaSource = z.infer<typeof personaSourceSchema>;
+export type PersonaAutoTopup = z.infer<typeof personaAutoTopupSchema>;
 export type Persona = z.infer<typeof personaSchema>;
 export type PersonaWallet = z.infer<typeof walletSchema>;
 export type PersonaModelPrefs = z.infer<typeof modelPrefsSchema>;
