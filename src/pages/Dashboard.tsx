@@ -7,12 +7,13 @@
  */
 
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
-import { Loader2, Send, Sparkles, ExternalLink } from "lucide-react";
+import { Loader2, Send, Sparkles } from "lucide-react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
+import { PersonaActionsMenu } from "@/components/PersonaActionsMenu";
 import { PostCard } from "@/components/PostCard";
 import { PostListSkeleton } from "@/components/Skeletons";
 import { Button } from "@/components/ui/button";
@@ -155,28 +156,29 @@ const Dashboard = () => {
                       {publicBio}
                     </p>
                   )}
-                  <div className="flex flex-wrap gap-2 pt-1 items-center">
-                    {personaConfig.tags.slice(0, 4).map((t) => (
-                      <Badge
-                        key={t}
-                        variant="secondary"
-                        className="text-[10px] bg-imigongo-cream/15 text-imigongo-cream border-0"
-                      >
-                        {t}
-                      </Badge>
-                    ))}
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full border-imigongo-cream/30 text-imigongo-cream bg-transparent hover:bg-imigongo-cream/10 hover:text-imigongo-cream"
-                    >
-                      <Link to={`/p/${npub}`}>
-                        <ExternalLink className="mr-2 size-3.5" />
-                        Public feed
-                      </Link>
-                    </Button>
-                  </div>
+                  {personaConfig.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1 items-center">
+                      {personaConfig.tags.slice(0, 4).map((t) => (
+                        <Badge
+                          key={t}
+                          variant="secondary"
+                          className="text-[10px] bg-imigongo-cream/15 text-imigongo-cream border-0"
+                        >
+                          {t}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <PersonaActionsMenu
+                    npub={npub}
+                    backupEvent={persona.data!.event}
+                    personaPubkey={personaConfig.pubkey}
+                    personaName={personaConfig.name}
+                    variant="inline"
+                    publicFeedNpub={npub}
+                    inverse
+                    className="pt-2"
+                  />
                 </div>
               </div>
             </div>
