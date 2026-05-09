@@ -3,7 +3,6 @@ import { Menu, Settings as SettingsIcon } from "lucide-react";
 
 import { FlagStripe } from "@/components/ImigongoBand";
 import { LoginArea } from "@/components/auth/LoginArea";
-import { PersonaSwitcher } from "@/components/PersonaSwitcher";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -72,7 +71,6 @@ export function AppHeader() {
         )}
 
         <div className="flex items-center gap-2">
-          <PersonaSwitcher />
           <LoginArea className="max-w-60" />
 
           {/* Mobile menu trigger */}
