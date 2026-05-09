@@ -72,41 +72,82 @@ gracefully disable when the wallet is empty.
 
 ## 3. Identity model
 
-**The persona is the Nostr account.** There is no separate "operator"
-identity. A user creates one or more personas; each persona is a fresh
-Nostr keypair the user controls.
+Phoenix uses a **two-level identity** model.
 
-**Multi-persona UX.** Phoenix is a multi-account Nostr client. Users can
-create, switch between, and back up several personas. The MKStack
-`LoginArea` / `useLoggedInAccounts` flow already supports the multi-account
-shape we need.
+**User keypair.** A single Nostr keypair owned by the human running the
+app. It never posts publicly under Phoenix. Its only job is to sign
+encrypted backups (kind 30078, §5.2) for the personas this user has
+created. The user keypair can be:
 
-**Threat model.** The user's *device* and the user's *real identity* are
-the things to protect. The persona's nsec is the only secret on the device
-that links the user to the voice. We never log it remotely, we never derive
-it from anything tied to the user's real identity, and we encrypt anything
-on-device with a user passphrase.
+- An existing Nostr identity (NIP-07 extension, NIP-46 remote signer, or
+  pasted nsec) — useful for users who already have a Nostr account and
+  want one place to manage everything.
+- A fresh Phoenix-generated keypair — useful for users who want their
+  Phoenix activity unlinkable from any other Nostr identity. In this case
+  Phoenix never publishes a kind 0 profile under the user keypair, so to
+  outside observers the user pubkey is just a publisher of opaque
+  ciphertext.
+
+**Persona keypairs.** Each persona is a separate Nostr keypair generated
+during the character-creator wizard. The persona's nsec publishes kind 0
+(profile) and kind 1 (posts). Personas are publicly visible; they are the
+voices.
+
+**The relationship is encrypted-only.** A persona's nsec is stored only
+inside the user's encrypted kind 30078 backup event (NIP-44'd to the user
+keypair). To outside observers, relays show:
+
+- N persona pubkeys posting publicly, each independently
+- The user pubkey publishing N opaque ciphertext events
+
+Linking a specific persona to its user requires the user's nsec. As long
+as the user keypair is safe, *which* personas are this user's is
+unknowable.
+
+**What does leak: the count.** A relay observer can see that
+`user_pubkey` has authored N kind 30078 phoenix-persona events and
+conclude "this user runs N personas." They cannot tell which public
+personas are those N — but the cardinality is visible.
+
+**Compartmentalization.** All personas under a single user keypair share
+one fate: anyone who compromises that user nsec can decrypt every
+persona's backup and operate every voice. For activists who need persona
+groups that can't fall together, the answer is **separate user keypairs
+per group**. The app supports multiple user accounts via the same
+multi-account flow Nostrify already provides (MKStack's `LoginArea` /
+`useLoggedInAccounts`).
+
+**Multi-persona UX.** When the user is logged in, the app fetches all
+kind 30078 phoenix-persona events authored by the current user pubkey,
+decrypts them, and presents the persona list. Switching personas swaps
+which persona nsec the composer signs with — no separate "login" per
+persona.
 
 **Key custody.**
 
-- Persona nsec: generated locally, encrypted at rest with a user passphrase
-  via NIP-49, kept in `localStorage`.
-- Encrypted backup (kind 30078, see §5): published to Nostr relays,
-  NIP-44-encrypted to the persona's own pubkey. Contains the full persona
-  config, the Breeze wallet seed, and references to off-chain assets.
-- Recovery: on a new device, the user pastes the persona nsec (or restores
-  from a downloaded NIP-49 bundle), the app fetches the kind 30078 event
-  from relays, decrypts it, and re-hydrates the wallet and persona config.
-- Loss: if the nsec is lost, the persona and its wallet are gone. The
-  wizard surfaces a one-time "download backup" affordance and asks the
-  user to confirm they have stored it.
+- *User nsec*. For users bringing an existing Nostr identity, custody is
+  whatever signer they use (NIP-07, NIP-46, etc.). For fresh
+  Phoenix-generated user keypairs, stored locally as NIP-49
+  (passphrase-encrypted).
+- *Persona nsec*. Never written to disk by Phoenix. Lives only inside the
+  user's encrypted kind 30078 backup. When the user opens a persona,
+  Phoenix fetches the event from relays, decrypts it via the user's
+  signer (NIP-44 self-decrypt), holds the persona nsec in memory, and
+  uses it to sign that session's posts.
+- *Recovery on a new device*. User logs in with the user nsec; app
+  re-fetches all kind 30078 phoenix-persona events; every persona is
+  re-hydrated in one step.
+- *Loss of user nsec*. Every persona under that user is unrecoverable.
+  The wizard surfaces a one-time "download user backup" affordance.
 
-**Why not split operator/persona keys.** An operator key feels safer in
-theory (encrypted persona config sealed to the operator), but it requires
-the user to manage *two* identities, and the operator key becomes a
-single-point-of-failure linkage between every persona that user has ever
-created — exactly the linkage we are trying to avoid. Collapsing to one
-keypair per persona keeps the threat model clean.
+**Why two-level rather than persona-only.** A persona-only model would
+mean each persona has its own root nsec the user must safeguard
+separately, multi-device sync requires copying every persona's nsec to
+every device, and losing one persona's nsec loses that persona's wallet
+entirely. The two-level model collapses safekeeping to one root secret
+while preserving the public unlinkability of personas. The trade-off is
+shared fate among personas under the same user keypair; mitigated with
+separate user keypairs per unlinkable group.
 
 ---
 
@@ -191,10 +232,23 @@ generic Nostr clients without breaking them.
 `phoenix.*` is a Phoenix-specific namespace clients can ignore. Everything
 above it is standard.
 
-### 5.2 kind 30078 — encrypted backup (NIP-78 application data, signed by persona)
+### 5.2 kind 30078 — encrypted persona backup (signed by *user*, one per persona)
 
-Addressable replaceable event. `d` tag = `"phoenix-persona"`. Content is a
-NIP-44 ciphertext encrypted to the persona's own pubkey.
+Addressable replaceable event published by the **user keypair** (not the
+persona). One event per persona; updates to one persona republish only
+its own event.
+
+Tags:
+
+- `["d", "phoenix-persona:<persona-pubkey-hex>"]` — uniquely addresses
+  this persona's backup.
+- `["t", "phoenix-persona"]` — discovery tag. Lets the app fetch every
+  persona for a user with one filter.
+- `["alt", "Phoenix persona backup (encrypted)"]` — NIP-31 human-readable
+  description.
+
+Content: NIP-44 ciphertext encrypted to the **user's own pubkey** (self-
+encryption: author and conversation key derive from the same keypair).
 
 Plaintext payload:
 
@@ -202,6 +256,8 @@ Plaintext payload:
 {
   "version": 1,
   "persona": {
+    "pubkey": "<persona pubkey, hex>",
+    "nsec": "<persona private key, hex>",
     "name": "Imani Uwase",
     "system_prompt": "...full persona system prompt...",
     "voice_id": "alloy",
@@ -228,8 +284,22 @@ Plaintext payload:
 }
 ```
 
-This is the single source of truth for persona state. A fresh device with
-the persona nsec can fully restore the persona from this event alone.
+**Loading personas on a fresh device.**
+
+1. User logs in with their user nsec (NIP-07 / NIP-46 / paste).
+2. App queries `{ kinds: [30078], authors: [user_pubkey], "#t": ["phoenix-persona"] }`.
+3. For each event, decrypt content via the user's signer (NIP-44 self-decrypt).
+4. The decrypted payload yields the persona keypair, wallet seed, voice URL, etc.
+5. Persona nsec is held in memory for the session; never written to disk by Phoenix.
+
+**Updating a persona.** Republish the kind 30078 event for that persona's
+d-tag. Relays replace the prior version (addressable-event semantics).
+
+**Why one event per persona instead of one event holding all personas.**
+Per-persona events keep updates surgical (changing one persona's wallet
+balance reference doesn't republish the entire user's persona set), and
+they let the discovery query stream in as relays return them, instead of
+blocking on a single large payload.
 
 ### 5.3 kind 1 — posts (NIP-01, signed by persona)
 
@@ -446,43 +516,47 @@ owner; if no name is attached yet, the team should claim one.
 ## 11. Project structure
 
 The repo today is MKStack's React/Vite/Tailwind/Nostrify boilerplate plus
-~10 files of an early operator/persona sketch. Reuse what fits the new
-plan; remove or rewrite the rest.
+an early sketch of the user-signs-encrypted-persona-event scheme — which
+matches the architecture in §3 closely. Most of the persona files need
+adaptation, not a full rewrite. Replace what the new stack obsoletes.
 
-**Reuse.**
+**Reuse as-is.**
 - `src/App.tsx`, `src/AppRouter.tsx`, `src/main.tsx`, all of `src/components/ui/`
-- `src/components/auth/*` (the LoginArea / AccountSwitcher already implement
-  the multi-account UX we want)
+- `src/components/auth/*` (LoginArea / AccountSwitcher already implement
+  the multi-account UX we need for both user and persona switching)
 - `src/components/{AppProvider,NostrProvider,NostrSync,ScrollToTop,ErrorBoundary}.tsx`
 - `src/hooks/{useNostr,useNostrPublish,useAuthor,useCurrentUser,useLoggedInAccounts,useLoginActions,useUploadFile,useAppContext,useTheme,useToast,useLocalStorage,useIsMobile}.ts`
 - `src/lib/{appBlossom,appRelays,utils,polyfills,genUserName}.ts`
 
-**Rewrite.**
+**Reuse with adaptation.** Architecture matches §3; update to §5 schema:
 - `src/lib/persona.ts`, `personaCrypto.ts`, `personaKey.ts`, `personaPost.ts`
-  → drop the operator/persona split; rewrite around the schema in §5
+  → adapt to per-persona d-tag (`phoenix-persona:<pubkey>`), the
+  `phoenix-persona` t-tag, the embedded Breeze wallet seed, and the
+  `model_prefs` section
 - `src/hooks/usePersona.ts`, `usePersonaPublish.ts`
-  → conform to the new schema and the model-prefs settings
-- `src/lib/styleClient.ts`
-  → replace with a `pi-ai` PPQ client; remove the Vercel `/style` round-trip
+  → query by user pubkey + t-tag; multi-persona switching surfaces
+- `src/pages/MyPersonas.tsx`, `PersonaFeed.tsx`, `Verify.tsx`
+  → keep page shape; rewire to §5 schema
+
+**Rewrite.**
 - `src/pages/Onboard.tsx`
   → rebuild as the agent-driven character creator using `pi-web-ui`
 - `src/pages/Dashboard.tsx`
   → integrate image generation, wallet status, model picker
-- `src/pages/MyPersonas.tsx`, `PersonaFeed.tsx`, `Verify.tsx`
-  → keep the page shape, rewire to the new schema
+
+**Replace.**
+- `src/lib/styleClient.ts` → `src/lib/ppq.ts` (wraps `pi-ai`, no Vercel
+  endpoint; persona's wallet pays PPQ directly)
 
 **New.**
 - `src/lib/wallet.ts`, `src/hooks/useWallet.ts` — Breeze SDK integration
 - `src/components/Wallet*.tsx` — wallet UI
-- `src/lib/ppq.ts` — `pi-ai` client wrapper, model-pref aware
 - `src/lib/agent.ts`, `src/components/CharacterCreator.tsx` — `pi-agent-core` wiring
 - `src/pages/Settings.tsx` — model selection per task, relays, danger zone
 - `src/components/DonateButton.tsx`, `src/components/ZapFeed.tsx`
 
 **Delete.**
-- The Vercel `/style` endpoint plan; `tasks/todo.md` and `tasks/lessons.md`
-  references to it (and the operator/persona model)
-- Any reference to OpenRouter
+- Any reference to OpenRouter and the Vercel `/style` endpoint plan
 
 `tasks/todo.md` should be rewritten as a build plan for the scope in §8.
 `AGENTS.md` should be amended with a "Phoenix-specific guidance" section
