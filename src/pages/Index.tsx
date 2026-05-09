@@ -24,12 +24,12 @@ const Index = () => {
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-imigongo-cream via-background to-imigongo-cream/40 pointer-events-none" />
           <div
-            className="absolute -right-12 top-0 bottom-0 w-2/3 imigongo-pattern text-imigongo-clay opacity-[0.09] pointer-events-none"
+            className="absolute -right-20 top-0 bottom-0 w-1/2 imigongo-pattern text-imigongo-clay opacity-[0.07] pointer-events-none"
             aria-hidden="true"
           />
 
-          <div className="container relative py-20 md:py-32 grid md:grid-cols-[1.1fr_0.9fr] gap-12 items-center">
-            <div className="space-y-8">
+          <div className="container relative py-16 md:py-24 grid md:grid-cols-[1fr_1.05fr] gap-10 md:gap-14 items-center">
+            <div className="space-y-7 order-2 md:order-1">
               <h1 className="font-display text-5xl md:text-7xl font-medium tracking-tight leading-[0.98]">
                 Voices that{" "}
                 <span className="italic text-primary">
@@ -75,24 +75,36 @@ const Index = () => {
               </div>
             </div>
 
-            {/* Hero visual */}
-            <div className="relative aspect-square max-w-md mx-auto w-full">
-              <div className="absolute inset-6 rounded-full bg-gradient-to-br from-rw-gold/30 via-imigongo-ochre/30 to-imigongo-clay/30 blur-3xl" />
-
-              <ImigongoSeal
-                size={420}
-                colorClass="text-imigongo-clay"
-                className="absolute inset-0 m-auto opacity-30 motion-safe:animate-[spin_120s_linear_infinite]"
+            {/* Hero image: joyful Rwandan creator on a Kigali rooftop */}
+            <div className="relative order-1 md:order-2">
+              <div
+                className="absolute -inset-3 rounded-[2rem] bg-gradient-to-br from-rw-gold/30 via-imigongo-ochre/30 to-imigongo-clay/30 blur-2xl opacity-80"
+                aria-hidden="true"
               />
-
-              <div className="absolute inset-0 grid place-items-center">
+              <div className="relative rounded-[1.75rem] overflow-hidden shadow-2xl shadow-imigongo-charcoal/30 ring-1 ring-imigongo-clay/20">
                 <img
-                  src="/icon.svg"
-                  alt=""
-                  className="w-1/2 h-1/2 drop-shadow-2xl motion-safe:animate-pulse"
-                  style={{ animationDuration: "5s" }}
+                  src="/images/hero-kigali.webp"
+                  srcSet="/images/hero-kigali-sm.webp 800w, /images/hero-kigali.webp 1600w"
+                  sizes="(max-width: 768px) 100vw, 600px"
+                  alt="A young creator on a rooftop in Kigali, smiling as she records into her phone."
+                  width={1600}
+                  height={1346}
+                  loading="eager"
+                  className="w-full h-auto block"
+                />
+                {/* Subtle Imigongo accent stripe at the top of the frame */}
+                <div
+                  className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-imigongo-clay via-rw-gold to-rw-green"
+                  aria-hidden="true"
                 />
               </div>
+
+              {/* Floating Imigongo seal accent */}
+              <ImigongoSeal
+                size={88}
+                colorClass="text-imigongo-clay"
+                className="hidden md:block absolute -bottom-6 -left-6 bg-card rounded-2xl p-2 shadow-xl ring-1 ring-imigongo-clay/20"
+              />
             </div>
           </div>
         </section>
@@ -145,6 +157,44 @@ const Index = () => {
 
         <ImigongoBand variant="muted" />
 
+        {/* CRAFT — operator at work */}
+        <section className="container py-20 grid md:grid-cols-[1fr_1fr] gap-10 md:gap-14 items-center max-w-6xl">
+          <div className="relative order-2 md:order-1">
+            <div className="relative rounded-[1.75rem] overflow-hidden shadow-2xl shadow-imigongo-charcoal/40 ring-1 ring-imigongo-clay/20">
+              <img
+                src="/images/operator-craft.webp"
+                srcSet="/images/operator-craft-sm.webp 800w, /images/operator-craft.webp 1400w"
+                sizes="(max-width: 768px) 100vw, 500px"
+                alt="A creator reading a printed page in a city café, headphones on, lit by neon city light."
+                width={1400}
+                height={1217}
+                loading="lazy"
+                className="w-full h-auto block"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-5 order-1 md:order-2">
+            <p className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
+              The craft
+            </p>
+            <h2 className="font-display text-4xl md:text-5xl font-medium tracking-tight">
+              Your words. Their voice. The world&rsquo;s ears.
+            </h2>
+            <p className="text-lg text-muted-foreground leading-relaxed">
+              Curate the sources. Shape the tone. Phoenix turns a raw thought
+              into a styled post in your persona&rsquo;s voice — every time,
+              with citations attached.
+            </p>
+            <p className="text-lg text-muted-foreground leading-relaxed">
+              You stay in control. The persona stays consistent. The truth
+              stays cited.
+            </p>
+          </div>
+        </section>
+
+        <ImigongoBand variant="muted" />
+
         {/* MISSION */}
         <section className="container py-20 grid md:grid-cols-[1fr_auto] gap-12 items-center max-w-5xl">
           <div className="space-y-5">
@@ -164,6 +214,38 @@ const Index = () => {
             colorClass="text-imigongo-clay"
             className="hidden md:block flex-shrink-0"
           />
+        </section>
+
+        <ImigongoBand variant="muted" />
+
+        {/* ORIGIN — built in 36 hours */}
+        <section className="container py-20 max-w-5xl space-y-10">
+          <div className="space-y-3 max-w-2xl">
+            <p className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
+              Built by hand
+            </p>
+            <h2 className="font-display text-4xl md:text-5xl font-medium tracking-tight">
+              Sketched on a whiteboard. Shipped in 36 hours.
+            </h2>
+            <p className="text-lg text-muted-foreground leading-relaxed">
+              Phoenix was built at the HRF AI Hack for Freedom by a small team
+              who believe the people most worth hearing should never be the
+              easiest to silence.
+            </p>
+          </div>
+
+          <div className="relative rounded-[1.75rem] overflow-hidden shadow-2xl shadow-imigongo-charcoal/40 ring-1 ring-imigongo-clay/20 max-w-3xl mx-auto">
+            <img
+              src="/images/whiteboard-origin.webp"
+              srcSet="/images/whiteboard-origin-sm.webp 800w, /images/whiteboard-origin.webp 1400w"
+              sizes="(max-width: 768px) 100vw, 800px"
+              alt="A whiteboard with a five-step wizard flow and dashboard sketch in orange marker."
+              width={1400}
+              height={1217}
+              loading="lazy"
+              className="w-full h-auto block"
+            />
+          </div>
         </section>
 
         <ImigongoBand variant="bold" />
