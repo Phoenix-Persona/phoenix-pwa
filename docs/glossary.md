@@ -12,10 +12,11 @@
 - **PPQ** — `ppq.ai`. OpenAI-compatible inference API priced in sats over
   Lightning. The persona's wallet pays it directly. See `docs/ppq.md`.
 
-- **pi-mono** — `github.com/earendil-works/pi-mono`. Agent toolkit. Phoenix
-  uses `pi-agent-core` (runtime), `pi-ai` (LLM API), `pi-web-ui` (chat UI).
-  See `docs/pi-mono.md`. *(PROJECT.md §13 lists the repo as `/pi`; the
-  actual repo path is `/pi-mono`.)*
+- **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit by
+  earendil-works. Phoenix uses `pi-agent-core` (runtime), `pi-ai` (LLM API),
+  `pi-web-ui` (chat UI). The repo was previously named `pi-mono` and the
+  npm `homepage` metadata still points at the old URL — both redirect to
+  the same place. See `docs/pi-mono.md`.
 
 - **Breeze** — Lightning wallet SDK (`@breeztech/breez-sdk-liquid`).
   Per-persona wallets, seed phrase recoverable from the encrypted kind
