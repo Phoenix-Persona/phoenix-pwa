@@ -1,65 +1,165 @@
 # Nostrify
 
-Framework for Nostr on Deno and web. Already wired into the scaffold —
-Phoenix uses `@nostrify/nostrify` (core) and `@nostrify/react` (hooks).
+Nostr framework for web browsers and Deno. Already wired into the scaffold —
+`@nostrify/nostrify` (core) + `@nostrify/react` (hooks/providers).
 
 > Versions in `package.json`: `@nostrify/nostrify@^0.52.0`,
-> `@nostrify/react@^0.6.0`.
+> `@nostrify/react@^0.6.0`. Both are JSR packages, installable via npm.
+> Source: nostrify.dev. GitHub mirror: `soapbox-pub/nostrify`.
 
-## What it provides
+## Modules
 
-| Module              | What it does                                              |
-| ------------------- | --------------------------------------------------------- |
-| Relays              | Pool, reconnection, event gathering across relays         |
-| Storages            | Unified store interface (memory / SQL / relays)           |
-| Signers             | Private key, hardware wallet, remote (NIP-46) signers     |
-| Schemas             | Parse Nostr events / relay messages from untrusted input  |
-| Moderation Policies | Custom rule-based event filtering                         |
-| Uploaders           | File upload to Blossom and nostr.build                    |
+| Module     | Notes                                                       |
+| ---------- | ----------------------------------------------------------- |
+| Schemas    | `NSchema` — zod schemas for events, filters, metadata       |
+| Storages   | `NCache`, `NDatabase`, `NSet` — implement the `NStore` interface |
+| Relays     | `NRelay1` (single relay), `NPool` (multi-relay)             |
+| Signers    | `NSecSigner`, `NSeedSigner`, `NPhraseSigner`, `NCustodial`, `NConnectSigner` (NIP-46) |
+| Uploaders  | Blossom, nostr.build                                        |
+| Policies   | Custom event-filtering rules                                |
 
-## Hooks already in the scaffold
+## Schema validation
 
-These are reused as-is per PROJECT.md §11. Read the source to learn the
-signatures — they're authoritative.
+```ts
+import { NSchema as n } from '@nostrify/nostrify';
 
-| Hook                      | Where in scaffold                  | Phoenix use                                  |
-| ------------------------- | ---------------------------------- | -------------------------------------------- |
-| `useNostr`                | `src/hooks/useNostr.ts`            | Get the configured pool / context            |
-| `useNostrPublish`         | `src/hooks/useNostrPublish.ts`     | Publish kind 0, kind 1, kind 30078           |
-| `useAuthor`               | `src/hooks/useAuthor.ts`           | Resolve a pubkey → kind 0 metadata           |
-| `useCurrentUser`          | `src/hooks/useCurrentUser.ts`      | The active persona (multi-account aware)     |
-| `useLoggedInAccounts`     | `src/hooks/useLoggedInAccounts.ts` | List + switch personas                       |
-| `useLoginActions`         | `src/hooks/useLoginActions.ts`     | Add / remove personas                        |
-| `useUploadFile`           | `src/hooks/useUploadFile.ts`       | Blossom upload (used by all media flows)     |
+const event = n.event().parse(eventData);
+const metadata = n.json().pipe(n.metadata()).parse(event.content);
+const nsec = n.bech32('nsec').parse(token);
+```
 
-The `LoginArea` / `AccountSwitcher` components in `src/components/auth/`
-already implement the multi-persona UX Phoenix needs.
+Always parse untrusted input through `NSchema`.
 
-## NIP support relevant to Phoenix
+## Signers
 
-- **NIP-01** — events, filters, REQ/EVENT/CLOSE. See `docs/nostr-nips.md`.
-- **NIP-44** — encrypted payloads. Used for the encrypted kind 30078 backup
-  (PROJECT.md §5.2). Use the signer's NIP-44 helpers to encrypt to the
-  persona's own pubkey.
-- **NIP-49** — at-rest passphrase encryption of the nsec in `localStorage`.
-  `nostr-tools` provides this; `@nostrify` may also expose helpers.
+The `NostrSigner` interface mirrors NIP-07 (`window.nostr`), so any signer
+is a drop-in. Phoenix uses **`NSecSigner`** — local nsec held in memory
+after the user unlocks the NIP-49 ncryptsec.
 
-## API details — confirm before coding
+```ts
+import { NSecSigner } from '@nostrify/nostrify';
 
-The published website (nostrify.dev) is high-level. JSR pages return 403
-to anonymous fetchers. **Before writing new code that touches Nostrify,
-read the JSR docs in a browser** at:
+const signer = new NSecSigner(secretKeyBytes);
+const pubkey = await signer.getPublicKey();
+const event = await signer.signEvent({
+  kind: 1,
+  content: 'Hello',
+  tags: [],
+  created_at: Math.floor(Date.now() / 1000),
+});
+```
 
-- `jsr.io/@nostrify/nostrify`
-- `jsr.io/@nostrify/react`
+### NIP-44 helpers (used for kind 30078 backup)
 
-…and confirm the exact class names (`NPool`, `NRelay1`, `NSecSigner`, etc.)
-and the NIP-44 method shape on the signer.
+```ts
+const ciphertext = await signer.nip44!.encrypt(personaPubkey, plaintext);
+const plaintext  = await signer.nip44!.decrypt(personaPubkey, ciphertext);
+```
+
+For Phoenix, the persona's backup is encrypted to its **own** pubkey:
+`signer.nip44.encrypt(await signer.getPublicKey(), backupJson)`.
+
+`NConnectSigner` (NIP-46 remote signer) is the V2 stretch goal in PROJECT.md
+§8.
+
+## Relays
+
+### `NRelay1` — single relay
+
+```ts
+import { NRelay1 } from '@nostrify/nostrify';
+
+const relay = new NRelay1('wss://relay.damus.io');
+
+for await (const msg of relay.req([{ kinds: [1], limit: 20 }])) {
+  if (msg[0] === 'EVENT') console.log(msg[2]);
+  if (msg[0] === 'EOSE') break; // breaking sends CLOSE automatically
+}
+```
+
+Auto-reconnects on disconnect, re-subscribes on reconnect.
+
+### `NPool` — multiple relays (Outbox model)
+
+```ts
+import { NPool, NRelay1 } from '@nostrify/nostrify';
+
+const pool = new NPool({
+  open: (url) => new NRelay1(url),
+  reqRelays: async (filters) => personaRelaysFor(filters),
+  eventRelays: async (event) => personaRelaysFor(event),
+});
+
+await pool.event(signedEvent);                      // publish
+const events = await pool.query([{ kinds: [0], authors: [pubkey] }]);
+```
+
+`pool.query` deduplicates and applies replaceable-event semantics; `pool.req`
+streams raw messages and may emit duplicates.
+
+## React integration
+
+### Provider
+
+```tsx
+import { NostrContext } from '@nostrify/react';
+import { NRelay1 } from '@nostrify/nostrify';
+
+<NostrContext.Provider value={{ relay: new NRelay1('wss://relay.example.com') }}>
+  <YourApp />
+</NostrContext.Provider>
+```
+
+In Phoenix this is wrapped by `src/components/NostrProvider.tsx` and
+`NostrSync.tsx`, which load relay config from app settings.
+
+### Login
+
+```tsx
+import { NostrLoginProvider } from '@nostrify/react/login';
+
+<NostrLoginProvider storageKey='nostrify-logins'>
+  <YourApp />
+</NostrLoginProvider>
+```
+
+`storageKey` is the `localStorage` key. Phoenix uses this for the
+multi-persona switcher (`LoginArea` / `AccountSwitcher`).
+
+### Hooks already in the scaffold
+
+These are the project's own wrappers around Nostrify's primitives.
+Authoritative source is the file itself.
+
+| Hook                  | File                                | Phoenix use                              |
+| --------------------- | ----------------------------------- | ---------------------------------------- |
+| `useNostr`            | `src/hooks/useNostr.ts`             | Get pool/relay from context              |
+| `useNostrPublish`     | `src/hooks/useNostrPublish.ts`      | Publish kind 0/1/30078 (auto-tags `client`) |
+| `useAuthor`           | `src/hooks/useAuthor.ts`            | Resolve pubkey → kind 0 metadata         |
+| `useCurrentUser`      | `src/hooks/useCurrentUser.ts`       | Active persona                           |
+| `useLoggedInAccounts` | `src/hooks/useLoggedInAccounts.ts`  | List + switch personas                   |
+| `useLoginActions`     | `src/hooks/useLoginActions.ts`      | Add / remove personas                    |
+| `useUploadFile`       | `src/hooks/useUploadFile.ts`        | Blossom upload                           |
+
+`useNostrLogin` from `@nostrify/react/login` is the lower-level primitive
+those `useLoggedInAccounts` / `useLoginActions` build on.
+
+## Phoenix-specific notes
+
+- **Persona backups (kind 30078)**: encrypt to the persona's own pubkey
+  with `signer.nip44.encrypt`, set `d` tag to `"phoenix-persona"` (PROJECT.md
+  §5.2).
+- **NIP-49 (ncryptsec)** for at-rest local nsec: `nostr-tools` provides
+  this. Signer construction happens after the user unlocks.
+- **Auto-`client` tag**: `useNostrPublish` adds `["client", "phoenix"]`
+  per PROJECT.md §5.3.
 
 ## Source
 
-- nostrify.dev — overview
-- jsr.io/@nostrify/nostrify, jsr.io/@nostrify/react — API reference
+- nostrify.dev — main docs site
+- `github.com/soapbox-pub/nostrify` — GitHub mirror (canonical is GitLab)
+- Per-package READMEs at `packages/{nostrify,react}/README.md` —
+  authoritative API reference
 - Existing scaffold: `src/components/{NostrProvider,NostrSync,auth/*}.tsx`,
   `src/hooks/*`
 - PROJECT.md §4 (architecture), §5 (event schema), §11 (file plan)
