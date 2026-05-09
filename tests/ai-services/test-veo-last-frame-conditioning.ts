@@ -114,8 +114,13 @@ const flags = {
   textModel: flagValue("text-model") ?? "",
   i2vModel: flagValue("i2v-model") ?? "",
   aspect: (flagValue("aspect") ?? "9:16") as "9:16" | "16:9" | "1:1",
-  duration: Number(flagValue("duration") ?? "8"),
-  quality: (flagValue("quality") ?? "720p") as "720p" | "1080p",
+  // Kling on ppq.ai only accepts duration ∈ {5, 10} and quality "standard".
+  // Defaults match Kling's pricing matrix; override per-run for other models.
+  duration: Number(flagValue("duration") ?? "5"),
+  quality: (flagValue("quality") ?? "standard") as
+    | "standard"
+    | "720p"
+    | "1080p",
   // Empty = walk the built-in public-host fallback chain.
   // Set explicitly to pin a single host (basic POST with file field "file").
   uploadHost: flagValue("upload-host") ?? "",
@@ -475,23 +480,64 @@ async function uploadToProvider(
   framePath: string,
   provider: UploadProvider,
 ): Promise<string> {
-  const buf = await fs.readFile(framePath);
-  const blob = new Blob([new Uint8Array(buf)], { type: "image/png" });
-  const form = new FormData();
-  form.set(provider.fileField, blob, "last-frame.png");
-  for (const [k, v] of Object.entries(provider.extraFields ?? {})) {
-    form.set(k, v);
+  const attempt = async (): Promise<string> => {
+    const buf = await fs.readFile(framePath);
+    const blob = new Blob([new Uint8Array(buf)], { type: "image/png" });
+    const form = new FormData();
+    form.set(provider.fileField, blob, "last-frame.png");
+    for (const [k, v] of Object.entries(provider.extraFields ?? {})) {
+      form.set(k, v);
+    }
+    const res = await fetch(provider.url, {
+      method: "POST",
+      body: form,
+      headers: { "user-agent": USER_AGENT },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.text();
+    const url = provider.parseResponse(body);
+    if (!url) throw new Error(`non-URL response: ${body.slice(0, 200)}`);
+    return url;
+  };
+
+  // One retry on transient errors (DNS / TLS hiccups read as "fetch failed").
+  try {
+    return await attempt();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/fetch failed|EAI_AGAIN|ECONNRESET|ETIMEDOUT/i.test(msg)) {
+      console.warn(`  ↻ ${provider.name} transient (${msg}), retrying once…`);
+      return await attempt();
+    }
+    throw err;
   }
-  const res = await fetch(provider.url, {
-    method: "POST",
-    body: form,
-    headers: { "user-agent": USER_AGENT },
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = await res.text();
-  const url = provider.parseResponse(body);
-  if (!url) throw new Error(`non-URL response: ${body.slice(0, 200)}`);
-  return url;
+}
+
+/**
+ * HEAD the cached upload URL to confirm it's still reachable. Public file
+ * hosts have varying TTLs (uguu.se = 3h; catbox.moe = persistent; 0x0.st =
+ * 30+d). If the URL is dead, the script forces a fresh upload rather than
+ * handing ppq.ai a stale link.
+ */
+async function isUrlReachable(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      method: "HEAD",
+      headers: { "user-agent": USER_AGENT },
+    });
+    if (res.ok) return true;
+    // Some hosts 405 on HEAD but serve GET fine; verify with a tiny GET.
+    if (res.status === 405) {
+      const g = await fetch(url, {
+        method: "GET",
+        headers: { "user-agent": USER_AGENT, range: "bytes=0-0" },
+      });
+      return g.ok || g.status === 206;
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 async function uploadFrame(framePath: string): Promise<string> {
@@ -690,13 +736,18 @@ async function main(): Promise<void> {
   header("3. Upload last frame so ppq.ai can fetch it");
   if (state.uploadedFrameUrl) {
     console.log(`  cached upload:   ${state.uploadedFrameUrl}`);
-    if (
-      !(await askYesNo(
-        "Re-use the cached upload URL? (y) or upload a fresh copy? (n)",
-        "y",
-      ))
-    ) {
+    process.stdout.write("  HEAD-checking … ");
+    const reachable = await isUrlReachable(state.uploadedFrameUrl);
+    if (!reachable) {
+      console.log("DEAD (host expired the file). Re-uploading.");
       delete state.uploadedFrameUrl;
+    } else {
+      console.log("OK");
+      if (
+        !(await askYesNo("Re-use the cached upload URL?", "y"))
+      ) {
+        delete state.uploadedFrameUrl;
+      }
     }
   }
   if (!state.uploadedFrameUrl) {
