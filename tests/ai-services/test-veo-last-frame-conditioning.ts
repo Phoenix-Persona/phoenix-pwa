@@ -219,13 +219,15 @@ function printPrompt(label: string, prompt: string): void {
  */
 
 const I2V_CAPABLE_PREFERENCE = [
+  // Kling 3.0 — explicitly marketed for "3-15s multi-shot sequences with
+  // subject consistency", i.e. the exact continuity primitive we want.
+  "kling-3.0",
   // Kling 2.5 Turbo — modern, talking-head friendly, native i2v.
   "kling-2.5-turbo",
   // Kling 2.x line — high quality, slower.
   "kling-2.1-master",
   "kling-2.1-pro",
   "kling-2.1-standard",
-  "kling-3.0",
   // Runway Gen-4 — strong reference-image consistency.
   "runway-gen4",
   // Luma — supports start- and end-frame conditioning.
@@ -625,8 +627,14 @@ interface I2vCandidate {
   notes?: string;
 }
 
+/**
+ * Reordered to surface Kling 3.0 first — it's specifically marketed for
+ * "3-15 second multi-shot sequences while maintaining subject
+ * consistency", which is exactly the continuity goal we're testing.
+ */
 const I2V_FALLBACK_CHAIN: I2vCandidate[] = [
-  { model: "kling-2.5-turbo", aspect: "9:16", duration: 5, quality: "standard" },
+  { model: "kling-3.0",        aspect: "9:16", duration: 5, quality: "standard" },
+  { model: "kling-2.5-turbo",  aspect: "9:16", duration: 5, quality: "standard" },
   { model: "kling-2.1-master", aspect: "9:16", duration: 5, quality: "standard" },
   { model: "kling-2.1-pro",    aspect: "9:16", duration: 5, quality: "standard" },
   { model: "runway-gen4",      aspect: "9:16", duration: 5, quality: "720p" },
@@ -777,27 +785,46 @@ async function main(): Promise<void> {
 
   /* ---- clip 1 ---- */
 
+  // Detect model lineage mismatch — this is THE primary cause of
+  // "no continuity despite locked-down world prompt + i2v conditioning".
+  // Different model families have different latent spaces; the i2v
+  // conditioning image fights the new model's prior and the prior wins.
+  if (state.clip1 && !flags.reset) {
+    const mismatch =
+      !state.clip1.model || state.clip1.model !== resolvedTextModel;
+    if (mismatch) {
+      const cachedModel = state.clip1.model ?? "(unknown — older run)";
+      console.warn(`\n  ⚠ MODEL LINEAGE MISMATCH on cached clip 1`);
+      console.warn(`  Cached clip 1 model: ${cachedModel}`);
+      console.warn(`  Cascade will start clip 2 on: ${resolvedI2vModel}`);
+      console.warn(
+        `  Mixing model families across clips is the #1 cause of broken`,
+      );
+      console.warn(
+        `  continuity — different latent spaces disagree on "what does this`,
+      );
+      console.warn(
+        `  person look like" even given the same conditioning frame.`,
+      );
+      const regenerate = await askYesNo(
+        `  Regenerate clip 1 with ${resolvedTextModel} so both clips share a lineage?`,
+        "y",
+      );
+      if (regenerate) {
+        delete state.clip1;
+        await fs.rm(CLIP1_PATH, { force: true }).catch(() => undefined);
+        await fs.rm(LAST_FRAME_PATH, { force: true }).catch(() => undefined);
+        await saveState(state);
+        console.log("  Cleared cached clip 1 + last frame; will regenerate.");
+      }
+    }
+  }
+
   if (state.clip1 && !flags.reset) {
     header("1. Clip 1 (text-to-video) — cached");
     console.log(`  id:    ${state.clip1.id}`);
     console.log(`  url:   ${state.clip1.url}`);
-    if (state.clip1.model) {
-      console.log(`  model: ${state.clip1.model}`);
-      if (state.clip1.model !== resolvedTextModel) {
-        console.warn(
-          `  ⚠ cached clip 1 was generated with ${state.clip1.model}, but ` +
-            `the current text-to-video resolution is ${resolvedTextModel}. ` +
-            `Clip 2 will be on ${resolvedI2vModel} — expect an aesthetic ` +
-            `shift at the seam. Run with --reset to regenerate clip 1.`,
-        );
-      }
-    } else {
-      console.warn(
-        `  ⚠ cached clip 1 has no model record (older run). It may have ` +
-          `been generated on a different model than ${resolvedTextModel}. ` +
-          `Run with --reset to be sure.`,
-      );
-    }
+    console.log(`  model: ${state.clip1.model ?? "(unknown)"}`);
   } else if (flags.skipClip1) {
     throw new Error(
       "--skip-clip1 set, but no clip 1 is cached. Run without --skip-clip1 first.",
@@ -806,10 +833,18 @@ async function main(): Promise<void> {
     header(`1. Clip 1 (text-to-video, ${resolvedTextModel})`);
     printPrompt("CLIP1_PROMPT", CLIP1_PROMPT);
     if (!(await askYesNo("Generate clip 1?"))) return;
+    // Use the same parameter combo as the cascade default for this model
+    // so clip 1 doesn't fail validation while clip 2 succeeds.
+    const profile =
+      I2V_FALLBACK_CHAIN.find((c) => c.model === resolvedTextModel) ??
+      undefined;
     const clip1 = await generateClip({
       apiKey: ppq.api_key,
       model: resolvedTextModel,
       prompt: CLIP1_PROMPT,
+      aspect: profile?.aspect,
+      duration: profile?.duration,
+      quality: profile?.quality,
     });
     console.log(`  ✓ clip 1 url:      ${clip1.url}`);
     if (clip1.costUsd !== undefined) {
