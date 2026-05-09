@@ -1,6 +1,23 @@
+# Phoenix Project Plan
+
+**Read [`PROJECT.md`](./dev/PROJECT.md) first.** It is the authoritative design document for Phoenix Persona — the user-facing problem, the identity model, the persona Nostr schema, the wallet model, the AI capabilities, the V1 scope, and the demo arc. When this file and `PROJECT.md` disagree on *what* to build, **`PROJECT.md` wins**. This file describes *how* to build on the codebase (Nostr conventions, security, file layout, lint rules).
+
+The active hackathon plan against the V1 scope lives in [`tasks/todo.md`](./tasks/todo.md).
+
+**Phoenix-specific stack additions** (beyond the MKStack base described below):
+
+- **`pi-mono`** ([github.com/earendil-works/pi](https://github.com/earendil-works/pi)) — agent runtime (`pi-agent-core`), unified LLM API (`pi-ai`), web chat components (`pi-web-ui`)
+- **PPQ** (`ppq.ai`) — OpenAI-compatible inference API, paid per-request in sats over Lightning
+- **Breeze SDK** — per-persona Bitcoin Lightning wallet; seed phrase recoverable from the encrypted kind 30078 backup
+- **NIP-49** for at-rest persona-nsec encryption; **NIP-44** for the encrypted backup event; **NIP-57** for donations
+
+**Reuse with adaptation — don't blindly extend, don't blindly rewrite.** The early `src/lib/persona*` and `src/hooks/usePersona*` sketch matches the user/persona architecture in PROJECT.md §3 closely; adapt it to the §5 schema (per-persona d-tag `phoenix-persona:<pubkey>`, `phoenix-persona` t-tag for discovery, embedded Breeze wallet seed, `model_prefs`) rather than rewriting from scratch. The Vercel `/style` endpoint plan in `src/lib/styleClient.ts` is gone — replace with a `pi-ai` PPQ client (PROJECT.md §6). PROJECT.md §11 lists exactly what to reuse, rewrite, replace, add, and delete.
+
+---
+
 # Project Overview
 
-This project is a Nostr client application built with React 19.x, TailwindCSS 4.x, Vite, shadcn/ui, and Nostrify.
+Phoenix Persona is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, Vite, shadcn/ui, and Nostrify, extended with `pi-mono` (agent runtime), PPQ (Lightning-paid AI inference), and the Breeze SDK (per-persona Lightning wallet).
 
 ## Technology Stack
 
