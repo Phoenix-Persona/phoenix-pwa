@@ -41,8 +41,13 @@
  *   --reset                  Wipe the cache dir before starting.
  *   --skip-clip1             Use a previously generated clip 1 (must be cached).
  *   --skip-clip2             Stop after extracting + uploading the last frame.
- *   --text-model <id>        Override clip 1 model (default `veo3.1-fast`).
- *   --i2v-model <id>         Override clip 2 model (default `veo3.1-fast-i2v`).
+ *   --list-models            List all video models advertised by ppq.ai and exit.
+ *   --text-model <id>        Override clip 1 model. Default: auto-resolve a Veo
+ *                            3.1 fast (or closest) text-to-video id from
+ *                            `/v1/models?type=video`.
+ *   --i2v-model <id>         Override clip 2 model. Default: auto-resolve a Veo
+ *                            3.1 fast (or closest) image-to-video id from
+ *                            `/v1/models?type=video`.
  *   --aspect <ratio>         "9:16" (default), "16:9", "1:1".
  *   --duration <secs>        Per-clip duration (default 8).
  *   --quality <p>            "720p" (default) or "1080p".
@@ -62,6 +67,7 @@ import { stdin as input, stdout as output } from "node:process";
 
 import {
   getVideoStatus,
+  listModels,
   submitVideo,
 } from "../../src/lib/ppq/client";
 
@@ -83,8 +89,10 @@ const flags = {
   skipClip1: argv.includes("--skip-clip1"),
   skipClip2: argv.includes("--skip-clip2"),
   manualUpload: argv.includes("--manual-upload"),
-  textModel: flagValue("text-model") ?? "veo3.1-fast",
-  i2vModel: flagValue("i2v-model") ?? "veo3.1-fast-i2v",
+  listModels: argv.includes("--list-models"),
+  // Empty string means "auto-resolve from /v1/models?type=video".
+  textModel: flagValue("text-model") ?? "",
+  i2vModel: flagValue("i2v-model") ?? "",
   aspect: (flagValue("aspect") ?? "9:16") as "9:16" | "16:9" | "1:1",
   duration: Number(flagValue("duration") ?? "8"),
   quality: (flagValue("quality") ?? "720p") as "720p" | "1080p",
@@ -163,6 +171,79 @@ function printPrompt(label: string, prompt: string): void {
   for (const line of prompt.split("\n")) {
     console.log(`  | ${line}`);
   }
+}
+
+/* ---------- model discovery ---------- */
+
+/**
+ * ppq.ai's literal model ids for Veo aren't fully documented and have
+ * shifted across releases (`veo3-fast`, `veo3.1-fast`, `veo-3.1-fast`,
+ * vendor-prefixed variants). Rather than hard-coding a guess, we list
+ * `/v1/models?type=video` at startup and auto-resolve the best match.
+ *
+ * Auto-resolution preference order, for both text-to-video and i2v:
+ *   1. Veo 3.1 + fast + correct polarity (i2v vs. plain).
+ *   2. Veo 3.1 + correct polarity (any speed).
+ *   3. Veo 3 + fast + correct polarity.
+ *   4. Veo 3 + correct polarity (any speed).
+ *   5. Any "veo" id with the correct polarity.
+ *
+ * The user can always override with `--text-model` / `--i2v-model`.
+ */
+
+function isI2vMarker(idLc: string): boolean {
+  return /(i2v|image[-_ ]to[-_ ]video|first[-_ ]image|first[-_ ]last|first[-_ ]frame)/i.test(
+    idLc,
+  );
+}
+
+function resolveVeoModel(
+  ids: string[],
+  want: "text" | "i2v",
+  preferRequested: string,
+): string {
+  if (preferRequested) {
+    if (ids.includes(preferRequested)) return preferRequested;
+    throw new Error(
+      `--${want === "text" ? "text-model" : "i2v-model"} "${preferRequested}" ` +
+        `is not in the available video models. Available:\n  - ${ids.join("\n  - ")}`,
+    );
+  }
+
+  const lc = ids.map((id) => ({ id, lc: id.toLowerCase() }));
+  const polarityOK = (idLc: string) =>
+    want === "i2v" ? isI2vMarker(idLc) : !isI2vMarker(idLc);
+
+  const matchers: Array<(e: { lc: string }) => boolean> = [
+    // 1. Veo 3.1 + fast
+    (e) =>
+      /veo[\s\-_]*3[._\-]1/.test(e.lc) && /fast/.test(e.lc) && polarityOK(e.lc),
+    // 2. Veo 3.1 (any speed)
+    (e) => /veo[\s\-_]*3[._\-]1/.test(e.lc) && polarityOK(e.lc),
+    // 3. Veo 3 + fast
+    (e) =>
+      /veo[\s\-_]*3(?!\d)/.test(e.lc) && /fast/.test(e.lc) && polarityOK(e.lc),
+    // 4. Veo 3 (any speed)
+    (e) => /veo[\s\-_]*3(?!\d)/.test(e.lc) && polarityOK(e.lc),
+    // 5. Any veo
+    (e) => /veo/.test(e.lc) && polarityOK(e.lc),
+  ];
+
+  for (const matcher of matchers) {
+    const hit = lc.find(matcher);
+    if (hit) return hit.id;
+  }
+
+  throw new Error(
+    `Could not auto-resolve a Veo ${want === "i2v" ? "image-to-video" : "text-to-video"} ` +
+      `model. Available video models:\n  - ${ids.join("\n  - ")}\n\n` +
+      `Pass --${want === "text" ? "text-model" : "i2v-model"} <id> explicitly.`,
+  );
+}
+
+async function discoverVideoModels(): Promise<string[]> {
+  const models = await listModels("video");
+  return models.map((m) => m.id).sort();
 }
 
 /* ---------- ppq.ai account loader ---------- */
@@ -353,6 +434,37 @@ async function main(): Promise<void> {
   const ppq = await loadPpqAccount();
   const state = await loadState();
 
+  /* ---- discover + resolve video models ---- */
+
+  header("0. Discover video models on ppq.ai");
+  const videoModelIds = await discoverVideoModels();
+  console.log(`  ${videoModelIds.length} video models advertised:`);
+  for (const id of videoModelIds) console.log(`    - ${id}`);
+
+  if (flags.listModels) {
+    console.log("\n--list-models specified, exiting.");
+    return;
+  }
+
+  const resolvedTextModel = resolveVeoModel(
+    videoModelIds,
+    "text",
+    flags.textModel,
+  );
+  const resolvedI2vModel = resolveVeoModel(
+    videoModelIds,
+    "i2v",
+    flags.i2vModel,
+  );
+  console.log(`\n  text-to-video → ${resolvedTextModel}`);
+  console.log(`  image-to-video → ${resolvedI2vModel}`);
+  if (!flags.textModel) {
+    console.log(`  (auto-resolved; override with --text-model <id>)`);
+  }
+  if (!flags.i2vModel) {
+    console.log(`  (auto-resolved; override with --i2v-model <id>)`);
+  }
+
   header("World block (verbatim in both prompts)");
   printPrompt("WORLD_BLOCK", WORLD_BLOCK);
   console.log(
@@ -373,12 +485,12 @@ async function main(): Promise<void> {
       "--skip-clip1 set, but no clip 1 is cached. Run without --skip-clip1 first.",
     );
   } else {
-    header(`1. Clip 1 (text-to-video, ${flags.textModel})`);
+    header(`1. Clip 1 (text-to-video, ${resolvedTextModel})`);
     printPrompt("CLIP1_PROMPT", CLIP1_PROMPT);
     if (!(await askYesNo("Generate clip 1?"))) return;
     const clip1 = await generateClip({
       apiKey: ppq.api_key,
-      model: flags.textModel,
+      model: resolvedTextModel,
       prompt: CLIP1_PROMPT,
     });
     console.log(`  ✓ clip 1 url:      ${clip1.url}`);
@@ -449,13 +561,13 @@ async function main(): Promise<void> {
     console.log(`  id:  ${state.clip2.id}`);
     console.log(`  url: ${state.clip2.url}`);
   } else {
-    header(`4. Clip 2 (image-to-video, ${flags.i2vModel})`);
+    header(`4. Clip 2 (image-to-video, ${resolvedI2vModel})`);
     console.log(`  conditioning image: ${state.uploadedFrameUrl}`);
     printPrompt("CLIP2_PROMPT", CLIP2_PROMPT);
     if (!(await askYesNo("Generate clip 2?"))) return;
     const clip2 = await generateClip({
       apiKey: ppq.api_key,
-      model: flags.i2vModel,
+      model: resolvedI2vModel,
       prompt: CLIP2_PROMPT,
       imageUrl: state.uploadedFrameUrl,
     });
