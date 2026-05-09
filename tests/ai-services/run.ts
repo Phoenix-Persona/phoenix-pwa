@@ -38,6 +38,8 @@ import {
   getBalance,
   getTopupStatus,
   getVideoStatus,
+  isTopupSettled,
+  isTopupExpired,
   listModels,
   submitVideo,
   type PpqRequestOptions,
@@ -50,15 +52,44 @@ const argv = process.argv.slice(2);
 const flags = {
   reset: argv.includes("--reset"),
   skipBalance: argv.includes("--skip-balance"),
+  skipTopup: argv.includes("--skip-topup"),
+  resumeTopup: argv.includes("--resume-topup"),
   base:
     argv.find((a) => a.startsWith("--base="))?.slice(7) ??
     process.env.PPQ_API_BASE,
+  invoiceId:
+    argv.find((a) => a.startsWith("--invoice-id="))?.slice("--invoice-id=".length) ??
+    process.env.PPQ_INVOICE_ID,
 };
 
 const baseOpts: PpqRequestOptions = flags.base ? { baseUrl: flags.base } : {};
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ACCOUNT_PATH = path.join(SCRIPT_DIR, ".account.json");
+const LAST_INVOICE_PATH = path.join(SCRIPT_DIR, ".last-invoice.json");
+
+interface LastInvoice {
+  invoice_id: string;
+  created_at: number;
+  amount: number | string;
+  currency: string;
+}
+
+async function loadLastInvoice(): Promise<LastInvoice | null> {
+  try {
+    const raw = await fs.readFile(LAST_INVOICE_PATH, "utf8");
+    const parsed = JSON.parse(raw) as LastInvoice;
+    return parsed?.invoice_id ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveLastInvoice(inv: LastInvoice): Promise<void> {
+  await fs.writeFile(LAST_INVOICE_PATH, JSON.stringify(inv, null, 2), {
+    mode: 0o600,
+  });
+}
 
 const rl = readline.createInterface({ input, output });
 
@@ -73,7 +104,8 @@ async function askYesNo(prompt: string, def: "y" | "n" = "y"): Promise<boolean> 
   return ans === "y" || ans === "yes";
 }
 
-function fmtMoney(usd: number): string {
+function fmtMoney(usd: number | undefined | null): string {
+  if (typeof usd !== "number" || !Number.isFinite(usd)) return "$?";
   return `$${usd.toFixed(4)}`;
 }
 
@@ -127,8 +159,16 @@ async function ensureAccount(): Promise<PpqAccount> {
 async function showBalance(acct: PpqAccount): Promise<number | null> {
   try {
     const b = await getBalance(acct.credit_id, baseOpts);
-    console.log(`Current balance: ${fmtMoney(b.balance_usd)}`);
-    return b.balance_usd;
+    if (typeof b.balance_usd === "number") {
+      console.log(`Current balance: ${fmtMoney(b.balance_usd)}`);
+      return b.balance_usd;
+    }
+    console.warn(
+      "Balance response did not include a recognizable balance field.",
+    );
+    console.warn("Raw payload:");
+    console.warn(JSON.stringify(b.raw, null, 2));
+    return null;
   } catch (err) {
     if (flags.skipBalance) {
       console.warn("Balance check failed (continuing):", (err as Error).message);
@@ -138,10 +178,98 @@ async function showBalance(acct: PpqAccount): Promise<number | null> {
   }
 }
 
+async function pollInvoice(
+  acct: PpqAccount,
+  invoiceId: string,
+  timeoutMs = 10 * 60 * 1000,
+): Promise<"settled" | "expired" | "timeout"> {
+  console.log("Polling status every 3s. Ctrl+C to abort.\n");
+  const deadline = Date.now() + timeoutMs;
+  let lastStatus = "";
+  while (Date.now() < deadline) {
+    const s = await getTopupStatus(acct.api_key, invoiceId, baseOpts);
+    if (s.status !== lastStatus) {
+      console.log(`  status: ${s.status}`);
+      lastStatus = s.status;
+    }
+    if (isTopupSettled(s.status)) {
+      console.log("Topup settled.");
+      await showBalance(acct);
+      return "settled";
+    }
+    if (isTopupExpired(s.status)) {
+      console.log(`Invoice ${String(s.status).toLowerCase()}.`);
+      return "expired";
+    }
+    await new Promise((r) => setTimeout(r, 3_000));
+  }
+  console.log("Polling timed out. The invoice may still settle later.");
+  return "timeout";
+}
+
+async function resumeInvoiceStep(
+  acct: PpqAccount,
+  invoiceId: string,
+): Promise<boolean> {
+  console.log(`Resuming invoice: ${invoiceId}`);
+  // First poll once before any prompts — if it's already settled, just say so.
+  const initial = await getTopupStatus(acct.api_key, invoiceId, baseOpts);
+  console.log(`  current status: ${initial.status}`);
+  if (isTopupSettled(initial.status)) {
+    console.log("Already settled — skipping payment wait.");
+    await showBalance(acct);
+    return true;
+  }
+  if (isTopupExpired(initial.status)) {
+    console.log(`Invoice ${String(initial.status).toLowerCase()} — cannot resume.`);
+    return false;
+  }
+  await pollInvoice(acct, invoiceId);
+  return true;
+}
+
 async function topupStep(acct: PpqAccount): Promise<void> {
+  if (flags.skipTopup) {
+    console.log("Skipping topup (--skip-topup).");
+    return;
+  }
+
+  // Explicit invoice id — non-interactive resume.
+  if (flags.invoiceId) {
+    await resumeInvoiceStep(acct, flags.invoiceId);
+    return;
+  }
+
+  // Resume the most recently created invoice from disk.
+  if (flags.resumeTopup) {
+    const last = await loadLastInvoice();
+    if (!last) {
+      console.warn("No saved invoice to resume — falling through to create flow.");
+    } else {
+      console.log(
+        `Last invoice: ${last.invoice_id} (${last.amount} ${last.currency})`,
+      );
+      await resumeInvoiceStep(acct, last.invoice_id);
+      return;
+    }
+  }
+
+  // Otherwise prompt: resume the saved one, or create a new one, or skip.
+  const last = await loadLastInvoice();
+  if (last) {
+    const resume = await askYesNo(
+      `Resume saved invoice ${last.invoice_id} (${last.amount} ${last.currency})?`,
+      "y",
+    );
+    if (resume) {
+      await resumeInvoiceStep(acct, last.invoice_id);
+      return;
+    }
+  }
+
   const wantTopup = await askYesNo(
-    "Top up via Lightning? (you'll pay the BOLT11 manually)",
-    "n",
+    "Create a new Lightning topup? (you'll pay the BOLT11 manually)",
+    last ? "n" : "n",
   );
   if (!wantTopup) return;
 
@@ -159,6 +287,12 @@ async function topupStep(acct: PpqAccount): Promise<void> {
     "USD",
     baseOpts,
   );
+  await saveLastInvoice({
+    invoice_id: invoice.invoice_id,
+    created_at: Math.floor(Date.now() / 1000),
+    amount: invoice.amount,
+    currency: String(invoice.currency),
+  });
   const bolt11 = extractBolt11(invoice);
 
   console.log(`Invoice id: ${invoice.invoice_id}`);
@@ -169,35 +303,21 @@ async function topupStep(acct: PpqAccount): Promise<void> {
     console.log("\nPay this BOLT11 with any Lightning wallet:\n");
     console.log(bolt11);
     console.log("");
+    if (typeof invoice.checkout_url === "string") {
+      console.log(`(Or open the hosted checkout: ${invoice.checkout_url})\n`);
+    }
   } else {
-    console.log("\nFull invoice payload:");
+    console.log("\nNo BOLT11 was extracted from the response. Full payload:");
     console.log(JSON.stringify(invoice, null, 2));
-    console.log(
-      "\n(No `payment_request`/`invoice`/`bolt11` field present — copy the value your wallet needs from the payload above.)\n",
-    );
+    console.log("");
   }
 
-  console.log("Polling status every 3s. Ctrl+C to abort.\n");
-  const deadline = Date.now() + 10 * 60 * 1000; // 10 min
-  let lastStatus = "";
-  while (Date.now() < deadline) {
-    const s = await getTopupStatus(acct.api_key, invoice.invoice_id, baseOpts);
-    if (s.status !== lastStatus) {
-      console.log(`  status: ${s.status}`);
-      lastStatus = s.status;
-    }
-    if (s.status === "completed") {
-      console.log("Topup completed.");
-      await showBalance(acct);
-      return;
-    }
-    if (s.status === "expired") {
-      console.log("Invoice expired.");
-      return;
-    }
-    await new Promise((r) => setTimeout(r, 3_000));
-  }
-  console.log("Polling timed out (10 min). The invoice may still settle later.");
+  console.log(
+    `(Saved to ${path.basename(LAST_INVOICE_PATH)} — re-run with --resume-topup to ` +
+      `pick up here without paying again.)\n`,
+  );
+
+  await pollInvoice(acct, invoice.invoice_id);
 }
 
 async function inferenceStep(acct: PpqAccount): Promise<void> {

@@ -142,12 +142,47 @@ export async function getBalance(
   creditId: string,
   options: PpqRequestOptions = {},
 ): Promise<PpqBalance> {
-  const { data } = await request<PpqBalance>("/credits/balance", {
+  const { data } = await request<unknown>("/credits/balance", {
     method: "POST",
     body: { credit_id: creditId },
     ...options,
   });
-  return data;
+  return {
+    balance_usd: extractBalanceUsd(data),
+    raw: data,
+  };
+}
+
+/**
+ * The /credits/balance response shape isn't fully pinned down. The doc
+ * snippet advertises top-level `balance_usd`, but live payloads can nest
+ * under `data` or use alternate names. Probe the common paths and fall
+ * back to undefined so callers can log the raw payload and adapt.
+ */
+function extractBalanceUsd(data: unknown): number | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const obj = data as Record<string, unknown>;
+  const inner = (obj.data as Record<string, unknown> | undefined) ?? undefined;
+
+  const candidates: unknown[] = [
+    obj.balance_usd,
+    obj.usd_balance,
+    obj.balance,
+    obj.credits,
+    obj.usd,
+    inner?.balance_usd,
+    inner?.usd_balance,
+    inner?.balance,
+    inner?.credits,
+    inner?.usd,
+  ];
+  for (const v of candidates) {
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string" && v.trim() && Number.isFinite(Number(v))) {
+      return Number(v);
+    }
+  }
+  return undefined;
 }
 
 /* ---------- Chat / general inference ---------- */
@@ -289,18 +324,49 @@ export async function listPaymentMethods(
 }
 
 /**
- * Defensive accessor — ppq.ai returns the payable BOLT11 under one of a few
- * possible keys depending on the version, so we check the common ones in
- * order. Returns undefined for non-Lightning methods (which expose `address`
- * instead).
+ * Defensive accessor — ppq.ai returns the payable BOLT11 under
+ * `lightning_invoice` (observed in live responses), but earlier docs
+ * referenced `payment_request`, `invoice`, `bolt11`, or `pr`. Probe in
+ * priority order. Returns undefined for non-Lightning methods (which expose
+ * `address` instead).
  */
 export function extractBolt11(invoice: PpqTopupInvoice): string | undefined {
+  const candidates = [
+    invoice.lightning_invoice,
+    invoice.payment_request,
+    invoice.invoice,
+    invoice.bolt11,
+    (invoice as Record<string, unknown>)["pr"],
+  ];
+  for (const v of candidates) {
+    if (typeof v === "string" && v.startsWith("ln")) return v;
+  }
+  return undefined;
+}
+
+/**
+ * ppq.ai's topup status enum (observed): "New" while pending, "Settled" once
+ * paid, and presumably "Expired" / "Invalid" for failure modes. Earlier docs
+ * referenced lowercase "pending"/"completed"/"expired". We compare
+ * case-insensitively across both vocabularies so the polling loop terminates
+ * regardless of which spelling the API returns.
+ */
+export function isTopupSettled(status: unknown): boolean {
   return (
-    invoice.payment_request ??
-    invoice.invoice ??
-    invoice.bolt11 ??
-    (typeof invoice["pr"] === "string" ? (invoice["pr"] as string) : undefined)
+    typeof status === "string" &&
+    /^(settled|completed|paid|complete)$/i.test(status)
   );
+}
+
+export function isTopupExpired(status: unknown): boolean {
+  return (
+    typeof status === "string" &&
+    /^(expired|invalid|cancelled|canceled|failed)$/i.test(status)
+  );
+}
+
+export function isTopupTerminal(status: unknown): boolean {
+  return isTopupSettled(status) || isTopupExpired(status);
 }
 
 /* ---------- NWC auto-topup (NIP-47) ---------- */
