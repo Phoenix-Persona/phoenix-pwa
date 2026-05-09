@@ -3,6 +3,8 @@ import path from "node:path";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import wasm from "vite-plugin-wasm";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 import { defineConfig } from "vitest/config";
 
 // https://vitejs.dev/config/
@@ -10,9 +12,25 @@ export default defineConfig(() => ({
   server: {
     host: "::",
     port: 8080,
+    // The Breez Spark SDK ships as WASM with threading; the dev server needs
+    // these cross-origin headers so SharedArrayBuffer is available to it.
+    headers: {
+      "Cross-Origin-Embedder-Policy": "require-corp",
+      "Cross-Origin-Opener-Policy": "same-origin",
+    },
+  },
+  build: {
+    // Top-level await in `src/main.tsx` (await initBreezSDK()) requires esnext.
+    target: "esnext",
+  },
+  optimizeDeps: {
+    // Don't try to pre-bundle the WASM SDK — Vite's pre-bundler can't handle it.
+    exclude: ["@breeztech/breez-sdk-spark"],
   },
   plugins: [
     react(),
+    wasm(),
+    nodePolyfills(),
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",

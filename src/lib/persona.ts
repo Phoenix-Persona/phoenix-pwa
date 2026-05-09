@@ -60,6 +60,42 @@ const personaSourceSchema = z.object({
   url: z.string(),
 });
 
+/**
+ * Auto-topup policy for the persona's ppq.ai credit. Persisted inside the
+ * encrypted payload so the user's choice rides the kind 30078 backup
+ * across devices.
+ */
+const personaAutoTopupSchema = z.object({
+  enabled: z.boolean(),
+  thresholdUsd: z.number().nonnegative().max(10000),
+  targetUsd: z.number().positive().max(10000),
+});
+
+/**
+ * Per-persona Spark Lightning wallet credentials. Lives next to
+ * `personaNsec` inside the encrypted blob — same security envelope, same
+ * recovery story. Optional for back-compat with personas authored before
+ * the wallet integration shipped.
+ */
+const personaWalletSchema = z.object({
+  kind: z.literal("spark"),
+  /** BIP-39 mnemonic (12 or 24 words). */
+  mnemonic: z
+    .string()
+    .min(1)
+    .max(2048)
+    .refine((m) => {
+      const words = m.trim().split(/\s+/);
+      return words.length === 12 || words.length === 15 ||
+        words.length === 18 || words.length === 21 || words.length === 24;
+    }, "must be a valid BIP-39 mnemonic (12, 15, 18, 21, or 24 words)"),
+  passphrase: z.string().max(512).optional(),
+  /** Public donate handle — safe to embed (it's already public on chain). */
+  lightningAddress: z.string().max(512).optional(),
+  lnurlPay: z.string().max(2048).optional(),
+  autoTopup: personaAutoTopupSchema.optional(),
+});
+
 const personaConfigSchema = z.object({
   name: z.string().min(1).max(120),
   region: z.string().min(1).max(8),
@@ -78,6 +114,7 @@ const personaConfigSchema = z.object({
   personaNsec: z
     .string()
     .regex(/^nsec1[02-9ac-hj-np-z]{58,}$/i, "must be a valid nsec1… string"),
+  wallet: personaWalletSchema.optional(),
 });
 
 const phoenixEnvelopeSchema = z.object({
@@ -91,6 +128,8 @@ const phoenixEnvelopeSchema = z.object({
 
 export type PersonaSource = z.infer<typeof personaSourceSchema>;
 export type PersonaConfig = z.infer<typeof personaConfigSchema>;
+export type PersonaWalletConfig = z.infer<typeof personaWalletSchema>;
+export type PersonaAutoTopup = z.infer<typeof personaAutoTopupSchema>;
 export type PhoenixEnvelope = z.infer<typeof phoenixEnvelopeSchema>;
 
 // ─────────── Event template builder ───────────
