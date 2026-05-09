@@ -1,14 +1,13 @@
 /**
- * Onboard — Phoenix character-creator wizard.
+ * Onboard — character-creator entry point.
  *
- * Phase 1 status: STUB. The full agent-driven wizard (PROJECT.md §6,
- * tasks/derek-plan.md Phase 2) wires `pi-agent-core` + `pi-web-ui` +
- * Jim's PPQ hooks. Until those land we ship a minimal "create blank
- * persona" form so the rest of the multi-persona flow is exercisable.
+ * Renders a form for minting a new persona. On submit, generates a
+ * fresh keypair, encrypts the configuration to the user's own Nostr
+ * key, publishes the encrypted backup to relays, and publishes a
+ * public kind 0 profile so the persona's feed is discoverable.
  *
- * The blank-persona path generates a fresh keypair and an empty
- * envelope. There is no agent, no image, no voice yet — those land
- * in Phase 2 (CharacterCreator.tsx).
+ * The agent-driven creator (`CharacterCreator.tsx`) layers on top of
+ * this same publish path when it's ready.
  */
 
 import { useState } from "react";
@@ -17,7 +16,7 @@ import { useSeoMeta } from "@unhead/react";
 import { Loader2, Sparkles } from "lucide-react";
 import { useNostr } from "@nostrify/react";
 
-import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +42,7 @@ import {
 } from "@/lib/personaKey";
 
 const Onboard = () => {
-  useSeoMeta({ title: "Create a persona — Phoenix" });
+  useSeoMeta({ title: "Create a persona — Feniksi" });
   const navigate = useNavigate();
   const { user } = useCurrentUser();
   const { nostr } = useNostr();
@@ -144,7 +143,7 @@ const Onboard = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <PhoenixHeader />
+      <AppHeader />
 
       <main id="main-content" className="flex-1">
         {/* Cover band — charcoal mat with seal accent */}
@@ -170,18 +169,19 @@ const Onboard = () => {
                 </div>
               </div>
               <div className="space-y-3">
-                <p className="inline-flex items-center gap-2 rounded-full border border-rw-gold/40 bg-rw-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
-                  <Sparkles className="size-3.5" />
-                  Phase 1 stub
+                <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
+                  <span className="h-px w-6 bg-rw-gold" />
+                  New voice
                 </p>
                 <h1 className="font-display text-4xl md:text-5xl font-medium tracking-tight leading-tight">
                   Create a persona
                 </h1>
                 <p className="text-imigongo-cream/80 leading-relaxed max-w-xl">
-                  The agent-driven wizard with image generation and voice
-                  sampling lands in Phase 2. For now, this is a minimal form
-                  so we can exercise multi-persona, encrypted-backup, and
-                  publish flows end-to-end.
+                  Mint a new voice. Feniksi generates a fresh Nostr keypair
+                  for the persona — only you can operate it. The configuration
+                  below is encrypted to your key and published privately to
+                  relays; the persona's public profile goes out so anyone
+                  can find and follow its feed.
                 </p>
               </div>
             </div>
@@ -192,7 +192,7 @@ const Onboard = () => {
         {/* Form */}
         <div className="container py-10 max-w-2xl">
           <Card className="border-imigongo-clay/20 bg-gradient-to-br from-card via-card to-rw-gold-soft/10 overflow-hidden">
-            <div className="bg-gradient-to-r from-imigongo-clay/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center justify-between">
               <h2 className="font-display text-2xl font-medium tracking-tight">
                 New persona
               </h2>
@@ -266,7 +266,7 @@ const Onboard = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="persona-voice">Voice id (placeholder)</Label>
+                <Label htmlFor="persona-voice">Voice</Label>
                 <Input
                   id="persona-voice"
                   value={voiceId}
@@ -275,8 +275,8 @@ const Onboard = () => {
                   className="bg-background/60"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Voice sample generation lands in Phase 2. The id is
-                  stored now so the wizard can re-use it later.
+                  Voice id used when the persona generates audio. The
+                  default works fine if you're not sure.
                 </p>
               </div>
 

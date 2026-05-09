@@ -94,7 +94,7 @@ export function BuildVisual() {
         {/* Brand stripe */}
         <div
           aria-hidden="true"
-          className="h-1 bg-gradient-to-r from-imigongo-clay via-rw-gold to-rw-green"
+          className="h-1 bg-gradient-to-r from-rw-sky via-rw-gold to-rw-green"
         />
 
         <div className="p-6 md:p-7 space-y-5">

@@ -9,8 +9,6 @@ import { cn } from "@/lib/utils";
 interface PostCardProps {
   event: NostrEvent;
   className?: string;
-  /** Show a subtle "Phoenix-styled" badge in the operator's own dashboard. Off by default. */
-  showOperatorBadge?: boolean;
 }
 
 function relativeTime(unixSec: number): string {
@@ -31,7 +29,7 @@ function relativeTime(unixSec: number): string {
   });
 }
 
-export function PostCard({ event, className, showOperatorBadge }: PostCardProps) {
+export function PostCard({ event, className }: PostCardProps) {
   const domains = useMemo(() => extractSourceDomains(event.tags), [event.tags]);
   const absoluteTime = useMemo(
     () => new Date(event.created_at * 1000).toLocaleString(),
@@ -47,7 +45,7 @@ export function PostCard({ event, className, showOperatorBadge }: PostCardProps)
     >
       <PostBody content={event.content} />
 
-      {(domains.length > 0 || showOperatorBadge) && (
+      {domains.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-1.5">
           {domains.map((d) => (
             <Badge
@@ -58,14 +56,6 @@ export function PostCard({ event, className, showOperatorBadge }: PostCardProps)
               {d}
             </Badge>
           ))}
-          {showOperatorBadge && (
-            <Badge
-              variant="secondary"
-              className="text-[10px] font-medium bg-rw-gold/15 text-imigongo-charcoal border-rw-gold/30"
-            >
-              Phoenix-styled
-            </Badge>
-          )}
         </div>
       )}
 

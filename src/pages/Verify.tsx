@@ -4,7 +4,7 @@ import { useSeoMeta } from "@unhead/react";
 import { ShieldCheck, CheckCircle2 } from "lucide-react";
 import { nip19 } from "nostr-tools";
 
-import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,7 +33,7 @@ const Verify = () => {
     author.data?.metadata?.name ??
     (personaHex ? genUserName(personaHex) : "Unknown persona");
 
-  useSeoMeta({ title: `Verify ${displayName} — Phoenix` });
+  useSeoMeta({ title: `Verify ${displayName} — Feniksi` });
 
   const firstPost = posts.data?.[posts.data.length - 1];
   const lastPost = posts.data?.[0];
@@ -41,7 +41,7 @@ const Verify = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <PhoenixHeader />
+      <AppHeader />
 
       <main id="main-content" className="flex-1">
         {/* Cover band — green-tinted "verified" mat */}
@@ -69,7 +69,7 @@ const Verify = () => {
               <div className="space-y-2">
                 <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
                   <span className="h-px w-6 bg-rw-gold" />
-                  Phoenix attestation
+                  Feniksi attestation
                 </p>
                 <h1 className="font-display text-3xl md:text-4xl font-medium tracking-tight">
                   Persona verification
@@ -95,7 +95,7 @@ const Verify = () => {
           ) : (
             <>
               <Card className="border-imigongo-clay/20 bg-gradient-to-br from-card to-rw-gold-soft/10 overflow-hidden">
-                <div className="bg-gradient-to-r from-imigongo-clay/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center gap-2">
+                <div className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center gap-2">
                   <CheckCircle2 className="size-5 text-rw-green" />
                   <CardTitle className="text-lg">Identity</CardTitle>
                 </div>
@@ -106,7 +106,7 @@ const Verify = () => {
                   <p className="text-xs text-muted-foreground pt-2 leading-relaxed">
                     The human accountable for this voice is{" "}
                     <strong>intentionally not disclosed</strong> on the network.
-                    Phoenix is built for activists who would be at risk if the
+                    Feniksi is built for activists who would be at risk if the
                     operator-persona link were public. The persona's
                     configuration is encrypted to the operator's Nostr key —
                     only they can operate the persona, and only they can prove
@@ -116,7 +116,7 @@ const Verify = () => {
               </Card>
 
               <Card className="border-imigongo-clay/20 overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-imigongo-clay/10 via-rw-gold/10 to-rw-green/10 border-b border-imigongo-clay/15 flex flex-row items-center gap-2">
+                <CardHeader className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 border-b border-imigongo-clay/15 flex flex-row items-center gap-2">
                   <ImigongoSeal size={20} colorClass="text-imigongo-clay" />
                   <CardTitle className="text-lg">Activity</CardTitle>
                 </CardHeader>

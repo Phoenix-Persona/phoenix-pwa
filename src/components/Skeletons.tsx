@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function PersonaHeaderSkeleton() {
   return (
     <div className="rounded-2xl border border-border bg-card p-6 relative overflow-hidden">
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-imigongo-clay via-rw-gold to-rw-green opacity-50" />
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rw-sky via-rw-gold to-rw-green opacity-50" />
       <div className="space-y-3">
         <Skeleton className="h-3 w-40" />
         <Skeleton className="h-9 w-72" />
@@ -53,7 +53,7 @@ export function PostListSkeleton({ count = 3 }: { count?: number }) {
 export function PersonaCardSkeleton() {
   return (
     <div className="rounded-2xl border border-border bg-card p-6 space-y-3 relative overflow-hidden">
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-imigongo-clay via-rw-gold to-rw-green opacity-50" />
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rw-sky via-rw-gold to-rw-green opacity-50" />
       <Skeleton className="h-3 w-32 mt-2" />
       <Skeleton className="h-7 w-48" />
       <Skeleton className="h-4 w-full" />

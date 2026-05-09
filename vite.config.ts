@@ -47,7 +47,7 @@ export default defineConfig(() => ({
             urlPattern: ({ url }) => url.origin === self.location.origin,
             handler: "StaleWhileRevalidate",
             options: {
-              cacheName: "phoenix-shell",
+              cacheName: "feniksi-shell",
               expiration: { maxEntries: 64, maxAgeSeconds: 60 * 60 * 24 * 7 },
             },
           },
@@ -56,8 +56,8 @@ export default defineConfig(() => ({
         navigateFallbackDenylist: [/^\/api\//],
       },
       manifest: {
-        name: "Phoenix — Uncensorable Voices",
-        short_name: "Phoenix",
+        name: "Feniksi — Uncensorable Voices",
+        short_name: "Feniksi",
         description:
           "AI personas on Nostr. Voices that can be amplified but not silenced.",
         theme_color: "#a8431b",

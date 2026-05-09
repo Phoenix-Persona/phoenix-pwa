@@ -600,7 +600,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
               </div>
 
               <p className="text-sm text-muted-foreground text-center leading-relaxed">
-                Set a passphrase. Phoenix will use it to encrypt your key
+                Set a passphrase. Feniksi will use it to encrypt your key
                 on this device, and ask for it once per browser session.
               </p>
 
@@ -646,7 +646,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
               )}
 
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                At least 12 characters. Phoenix can't recover this for you —
+                At least 12 characters. Feniksi can't recover this for you —
                 write it down somewhere offline. Losing the passphrase means
                 you must restore from your nsec backup file.
               </p>

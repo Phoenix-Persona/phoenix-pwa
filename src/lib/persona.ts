@@ -17,7 +17,7 @@
  *     app: "phoenix-persona",      magic discriminator
  *     version: 1,                  schema version (only 1 accepted)
  *     persona: { pubkey, nsec, name, system_prompt, ... },
- *     wallet?: { kind, seed, lnurl? },         (optional in Phase 1; required Phase 2)
+ *     wallet?: { kind, seed, lnurl? },         (optional for now; required once wallet wiring lands)
  *     model_prefs?: { agent, image, tts, video? },
  *     settings?:    { default_relays }
  *   }
@@ -135,9 +135,9 @@ const phoenixEnvelopeSchema = z.object({
   app: z.literal(PHOENIX_PAYLOAD_APP),
   version: z.literal(PHOENIX_PAYLOAD_VERSION),
   persona: personaSchema,
-  // Optional in Phase 1 until Jim's Breeze wallet wiring lands. Phase 2 tightens.
+  // Optional until the wallet wiring lands; required after that.
   wallet: walletSchema.optional(),
-  // Optional in Phase 1; defaults applied at use-time.
+  // Optional; defaults applied at use-time.
   model_prefs: modelPrefsSchema.optional(),
   settings: settingsSchema.optional(),
 });

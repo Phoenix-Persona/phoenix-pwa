@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 import { Plus, Sparkles } from "lucide-react";
 
-import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
 import { PersonaGridSkeleton } from "@/components/Skeletons";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,13 +12,13 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useMyPersonas } from "@/hooks/usePersona";
 
 const MyPersonas = () => {
-  useSeoMeta({ title: "My personas — Phoenix" });
+  useSeoMeta({ title: "My personas — Feniksi" });
   const { user } = useCurrentUser();
   const { data, isLoading, isError, error } = useMyPersonas();
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <PhoenixHeader />
+      <AppHeader />
 
       {/* Cover band — charcoal mat with bold pattern + warm glow */}
       <section className="relative overflow-hidden hero-mat text-imigongo-cream">
@@ -150,7 +150,7 @@ const MyPersonas = () => {
                 </p>
                 <p className="text-muted-foreground max-w-md mx-auto">
                   Create the first voice. Choose a cause, shape the tone,
-                  and Phoenix will mint a fresh keypair just for it.
+                  and Feniksi will mint a fresh keypair just for it.
                 </p>
               </div>
               <Button
