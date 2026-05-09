@@ -59,31 +59,34 @@ const MyPersonas = () => {
           </Card>
         ) : data && data.length > 0 ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.map(({ event, config, npub }) => (
-              <Link
-                key={event.id}
-                to={`/dashboard/${npub}`}
-                className="group relative rounded-2xl border border-border bg-card p-6 hover:border-imigongo-clay hover:shadow-lg hover:shadow-imigongo-clay/10 transition-all space-y-3 overflow-hidden"
-              >
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-imigongo-clay via-rw-gold to-rw-green opacity-70 group-hover:opacity-100 transition-opacity" />
-                <div className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold pt-1">
-                  {config.region} · {config.cause}
-                </div>
-                <h3 className="font-display text-2xl font-medium tracking-tight group-hover:text-primary transition-colors">
-                  {config.name}
-                </h3>
-                <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-                  {config.bio}
-                </p>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {config.languages.slice(0, 3).map((l) => (
-                    <Badge key={l} variant="secondary" className="text-[10px]">
-                      {l.toUpperCase()}
-                    </Badge>
-                  ))}
-                </div>
-              </Link>
-            ))}
+            {data.map(({ event, envelope, npub }) => {
+              const persona = envelope.persona;
+              const topTags = persona.tags.slice(0, 2);
+              return (
+                <Link
+                  key={event.id}
+                  to={`/dashboard/${npub}`}
+                  className="group relative rounded-2xl border border-border bg-card p-6 hover:border-imigongo-clay hover:shadow-lg hover:shadow-imigongo-clay/10 transition-all space-y-3 overflow-hidden"
+                >
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-imigongo-clay via-rw-gold to-rw-green opacity-70 group-hover:opacity-100 transition-opacity" />
+                  {topTags.length > 0 && (
+                    <div className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold pt-1">
+                      {topTags.join(" · ")}
+                    </div>
+                  )}
+                  <h3 className="font-display text-2xl font-medium tracking-tight group-hover:text-primary transition-colors">
+                    {persona.name}
+                  </h3>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {persona.languages.slice(0, 3).map((l) => (
+                      <Badge key={l} variant="secondary" className="text-[10px]">
+                        {l.toUpperCase()}
+                      </Badge>
+                    ))}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         ) : (
           <Card className="border-dashed">

@@ -1,34 +1,30 @@
 /**
  * Helpers for building persona posts (kind 1).
  *
- * Privacy: posts MUST NOT carry any tag that identifies the operator or
+ * Privacy: posts MUST NOT carry any tag that identifies the user or
  * advertises Phoenix usage. They look like ordinary kind 1 notes from
  * any account. Source-attribution `r` tags and topical `t` tags are
  * content, not identity, and remain.
  *
  * What we publish:
- *   ["t", <region-slug>]      e.g. "rwanda" — topical discovery
- *   ["t", <cause-slug>]       e.g. "human-rights" — topical discovery
+ *   ["t", <topic-slug>]       repeatable; topical discovery (e.g. "rwanda", "press-freedom")
  *   ["r", <source-url>]       repeatable; source attribution
- *   ["t", <extra-topic>]      optional extras
  *
  * What we deliberately DON'T publish:
- *   - operator pubkey tag       (would directly link persona → human)
+ *   - user pubkey tag           (would directly link persona → human)
  *   - "phoenix" / "client" tag  (would fingerprint the app)
  *   - persona name in alt tag   (would identify the persona)
+ *
+ * See tasks/derek-plan.md "Locked decisions" §2 (kind 1 posts).
  */
 
 export interface PersonaPostInput {
   /** Final post body (post-styling). */
   text: string;
-  /** Region slug, e.g. "rwanda" — lowercased ISO name or similar. */
-  regionSlug: string;
-  /** Cause slug, e.g. "human-rights". */
-  causeSlug: string;
+  /** Topical tags — region, cause, etc. Lowercased, no `#` prefix. */
+  tags?: string[];
   /** Source URLs that informed the post. */
   sources?: string[];
-  /** Optional extra topical hashtags (lowercased, no #). */
-  extraTopics?: string[];
 }
 
 export function buildPersonaPostTemplate(
@@ -42,15 +38,12 @@ export function buildPersonaPostTemplate(
 } {
   const tags: string[][] = [];
 
-  if (input.regionSlug) tags.push(["t", input.regionSlug]);
-  if (input.causeSlug) tags.push(["t", input.causeSlug]);
+  for (const t of input.tags ?? []) {
+    if (t) tags.push(["t", t]);
+  }
 
   for (const url of input.sources ?? []) {
     if (url) tags.push(["r", url]);
-  }
-
-  for (const topic of input.extraTopics ?? []) {
-    if (topic) tags.push(["t", topic]);
   }
 
   return {
