@@ -97,6 +97,6 @@ Useful flags:
 | `--aspect <ratio>` | `9:16` (default), `16:9`, or `1:1` |
 | `--duration <secs>` | Per-clip duration (default 8) |
 | `--quality <p>` | `720p` (default) or `1080p` |
-| `--manual-upload` | Skip 0x0.st upload; paste your own URL |
-| `--upload-host <url>` | Override the upload host |
+| `--manual-upload` | Skip the public-host upload entirely; paste a URL you host yourself |
+| `--upload-host <url>` | Pin uploads to a single host (basic POST, file field `file`). Default: walk a fallback chain of public no-auth hosts (catbox.moe → uguu.se → 0x0.st). |
 | `--ffmpeg <path>` | Override the ffmpeg binary path |

@@ -56,8 +56,11 @@
  *   --aspect <ratio>         "9:16" (default), "16:9", "1:1".
  *   --duration <secs>        Per-clip duration (default 8).
  *   --quality <p>            "720p" (default) or "1080p".
- *   --manual-upload          Skip 0x0.st upload; prompt for a URL you host yourself.
- *   --upload-host <url>      Override the upload host (default https://0x0.st).
+ *   --manual-upload          Skip the public-host upload; prompt for a URL you host yourself.
+ *   --upload-host <url>      Pin uploads to a single host (basic POST,
+ *                            file field "file"). Default: walk a fallback
+ *                            chain of public no-auth hosts (catbox.moe →
+ *                            uguu.se → 0x0.st).
  *   --ffmpeg <path>          Override the ffmpeg binary path.
  */
 
@@ -101,7 +104,9 @@ const flags = {
   aspect: (flagValue("aspect") ?? "9:16") as "9:16" | "16:9" | "1:1",
   duration: Number(flagValue("duration") ?? "8"),
   quality: (flagValue("quality") ?? "720p") as "720p" | "1080p",
-  uploadHost: flagValue("upload-host") ?? "https://0x0.st",
+  // Empty = walk the built-in public-host fallback chain.
+  // Set explicitly to pin a single host (basic POST with file field "file").
+  uploadHost: flagValue("upload-host") ?? "",
   ffmpeg: flagValue("ffmpeg") ?? "ffmpeg",
 };
 
@@ -372,44 +377,131 @@ function runCommand(cmd: string, args: string[]): Promise<void> {
 
 /* ---------- upload last frame ---------- */
 
+interface UploadProvider {
+  name: string;
+  url: string;
+  fileField: string;
+  extraFields?: Record<string, string>;
+  parseResponse: (body: string) => string | undefined;
+}
+
+/**
+ * Public no-auth file hosts we'll try in order until one accepts the
+ * upload. Files just need to stay reachable long enough for ppq.ai to
+ * fetch them once during clip 2 generation (~minutes).
+ */
+const UPLOAD_PROVIDERS: UploadProvider[] = [
+  {
+    // Persistent, reliable, allows direct image hotlinking.
+    name: "catbox.moe",
+    url: "https://catbox.moe/user/api.php",
+    fileField: "fileToUpload",
+    extraFields: { reqtype: "fileupload" },
+    parseResponse: (body) => {
+      const t = body.trim();
+      return /^https?:\/\//.test(t) ? t : undefined;
+    },
+  },
+  {
+    // 3-hour TTL; long enough for the test, short enough to be friendly.
+    name: "uguu.se",
+    url: "https://uguu.se/upload.php",
+    fileField: "files[]",
+    parseResponse: (body) => {
+      try {
+        const j = JSON.parse(body) as { files?: Array<{ url?: string }> };
+        const url = j.files?.[0]?.url;
+        return typeof url === "string" ? url : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+  },
+  {
+    // Legacy fallback — sometimes 503s under load.
+    name: "0x0.st",
+    url: "https://0x0.st",
+    fileField: "file",
+    parseResponse: (body) => {
+      const t = body.trim();
+      return /^https?:\/\//.test(t) ? t : undefined;
+    },
+  },
+];
+
+const USER_AGENT = "phoenix-test/0.1 (+https://phoenix.example)";
+
+async function uploadToProvider(
+  framePath: string,
+  provider: UploadProvider,
+): Promise<string> {
+  const buf = await fs.readFile(framePath);
+  const blob = new Blob([new Uint8Array(buf)], { type: "image/png" });
+  const form = new FormData();
+  form.set(provider.fileField, blob, "last-frame.png");
+  for (const [k, v] of Object.entries(provider.extraFields ?? {})) {
+    form.set(k, v);
+  }
+  const res = await fetch(provider.url, {
+    method: "POST",
+    body: form,
+    headers: { "user-agent": USER_AGENT },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const body = await res.text();
+  const url = provider.parseResponse(body);
+  if (!url) throw new Error(`non-URL response: ${body.slice(0, 200)}`);
+  return url;
+}
+
 async function uploadFrame(framePath: string): Promise<string> {
   if (flags.manualUpload) {
     console.log(
-      `  --manual-upload: please host ${framePath} somewhere reachable by ppq.ai (Imgur, Blossom, gist raw, etc.) and paste the URL.`,
+      `  --manual-upload: host ${framePath} somewhere reachable by ppq.ai ` +
+        `(Imgur, Blossom, gist raw, etc.) and paste the URL.`,
     );
     const pasted = (await ask("frame URL?")).trim();
     if (!pasted) throw new Error("no frame URL provided");
     return pasted;
   }
 
-  console.log(`  uploading ${framePath} → ${flags.uploadHost} …`);
-  const buf = await fs.readFile(framePath);
-  const blob = new Blob([new Uint8Array(buf)], { type: "image/png" });
-  const form = new FormData();
-  form.set("file", blob, "last-frame.png");
+  // --upload-host overrides the fallback chain with a single fixed target
+  // (basic POST with file field "file"). Useful when you have an internal
+  // hosting service or want to pin a specific provider.
+  if (flags.uploadHost) {
+    console.log(`  uploading to override host: ${flags.uploadHost} …`);
+    const url = await uploadToProvider(framePath, {
+      name: flags.uploadHost,
+      url: flags.uploadHost,
+      fileField: "file",
+      parseResponse: (body) => {
+        const t = body.trim();
+        return /^https?:\/\//.test(t) ? t : undefined;
+      },
+    });
+    console.log(`  ✓ uploaded: ${url}`);
+    return url;
+  }
 
-  const res = await fetch(flags.uploadHost, {
-    method: "POST",
-    body: form,
-    // 0x0.st requires a User-Agent — many Node fetch clients omit one and
-    // get 403'd back. Set a sane default.
-    headers: { "user-agent": "phoenix-test/0.1 (+https://phoenix.example)" },
-  });
-  if (!res.ok) {
-    throw new Error(
-      `upload to ${flags.uploadHost} failed (${res.status}). ` +
-        `Re-run with --manual-upload to paste a URL of your own.`,
-    );
+  // Otherwise walk the public-host fallback chain.
+  const errors: string[] = [];
+  for (const provider of UPLOAD_PROVIDERS) {
+    try {
+      console.log(`  trying ${provider.name} …`);
+      const url = await uploadToProvider(framePath, provider);
+      console.log(`  ✓ uploaded via ${provider.name}: ${url}`);
+      return url;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`  ✗ ${provider.name}: ${msg}`);
+      errors.push(`${provider.name}: ${msg}`);
+    }
   }
-  const url = (await res.text()).trim();
-  if (!/^https?:\/\//.test(url)) {
-    throw new Error(
-      `upload host returned non-URL response: ${url.slice(0, 200)}. ` +
-        `Re-run with --manual-upload.`,
-    );
-  }
-  console.log(`  uploaded:        ${url}`);
-  return url;
+  throw new Error(
+    `All upload providers failed:\n  - ${errors.join("\n  - ")}\n\n` +
+      `Re-run with --manual-upload to paste a URL of your own, or use ` +
+      `--upload-host <url> to target a specific endpoint.`,
+  );
 }
 
 /* ---------- main ---------- */
