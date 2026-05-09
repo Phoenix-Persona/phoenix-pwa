@@ -41,7 +41,7 @@ Same product. Two stories.
    - Generate name + bio + system prompt
    - Generate profile picture (canonical reference image)
    - Generate voice sample
-   - Mint Nostr keypair + Breeze Lightning wallet
+   - Mint Nostr keypair + Spark Lightning wallet
    - Publish encrypted backup event
 3. Persona dashboard:
    - Compose: write/dictate raw thoughts → agent styles them into the
@@ -168,7 +168,7 @@ separate user keypairs per unlinkable group.
 │  │   - pi-agent-core   (agent loop, tool calling)             │  │
 │  │   - pi-ai           (LLM client → PPQ)                     │  │
 │  │   - Nostrify        (Nostr publish/query, NIP-44, NIP-49)  │  │
-│  │   - Breeze SDK      (Lightning wallet, LNURL, zap pay)     │  │
+│  │   - Breez Spark SDK (Lightning wallet, LN address, zaps)   │  │
 │  │   - Blossom client  (media uploads — voice, images)        │  │
 │  └──┬──────────────┬───────────────┬───────────────┬──────────┘  │
 └─────┼──────────────┼───────────────┼───────────────┼─────────────┘
@@ -177,7 +177,7 @@ separate user keypairs per unlinkable group.
   ┌────────┐   ┌──────────┐   ┌──────────────┐  ┌──────────────┐
   │  PPQ   │   │  Nostr   │   │   Lightning  │  │   Blossom    │
   │ ppq.ai │   │  relays  │   │   network    │  │   servers    │
-  │        │   │          │   │ (via Breeze) │  │              │
+  │        │   │          │   │  (via Spark) │  │              │
   └────────┘   └──────────┘   └──────────────┘  └──────────────┘
    AI infer.   Identity,        Donations,        Voice sample,
    paid in     publishing,      AI payments,      profile image,
@@ -193,7 +193,7 @@ separate user keypairs per unlinkable group.
 | Agent chat UI    | `pi-web-ui`                          | Drop-in components for the wizard chat surface               |
 | Nostr            | `@nostrify/nostrify`, `@nostrify/react` | Already in `package.json`                                 |
 | Encryption       | `nostr-tools` (NIP-44, NIP-49)       | Already pulled in                                            |
-| Lightning wallet | `@breeztech/breeze-sdk` (Liquid SDK or Greenlight; choice TBD — see §10) | Per-persona wallet, seed phrase backup     |
+| Lightning wallet | `@breeztech/breez-sdk-spark` (Breez SDK — Nodeless / Spark variant) | Per-persona wallet, BIP-39 seed backup. WASM in browser; needs `await init()` before any SDK call. Native Lightning Addresses (no self-hosted LNURL-pay endpoint). API key via `VITE_BREEZ_API_KEY`. |
 | Media            | Blossom upload (`useUploadFile`)     | Already in scaffold                                          |
 
 There is no Phoenix-owned backend. Everything runs in the PWA against
@@ -268,7 +268,7 @@ Plaintext payload:
     "created_at": 1715212800
   },
   "wallet": {
-    "kind": "breeze",
+    "kind": "spark",
     "seed": "<bip39 mnemonic>",
     "lnurl": "lnurl1..."
   },
@@ -333,7 +333,7 @@ encryption is needed on Blossom.
 
 All inference goes through **PPQ** (`https://api.ppq.ai`, OpenAI-compatible)
 via `pi-ai`. PPQ accepts Lightning payment per request, paid by the
-persona's Breeze wallet.
+persona's Spark wallet.
 
 | Task                    | Default model    | Notes                                                       |
 | ----------------------- | ---------------- | ----------------------------------------------------------- |
@@ -376,16 +376,20 @@ at any tool call, edit the proposal, and continue.
 
 ### 7.1 Wallet model
 
-One Breeze Lightning wallet **per persona**. Wallet seed is generated at
-persona creation time and stored only inside the encrypted kind 30078
-backup (and ephemerally in memory while the persona is active).
+One Spark Lightning wallet **per persona**, via the Breez Spark SDK.
+Wallet seed is a BIP-39 mnemonic generated at persona creation time and
+stored only inside the encrypted kind 30078 backup (and ephemerally in
+memory while the persona is active). The SDK runs in the browser as
+WebAssembly — `await init()` is required once at app boot, after which
+each persona's wallet is reconstituted by passing its seed to the
+`SdkBuilder` config.
 
 ### 7.2 Receive
 
 Each persona surfaces:
 
-- A **Lightning Address** (`<persona-handle>@phoenix.example` — implementation
-  via LNURL-pay endpoint resolving to the Breeze wallet; mechanism TBD in §10)
+- A **Lightning Address** — provided natively by the Spark SDK; no
+  self-hosted LNURL-pay endpoint required.
 - An **LNURL** QR for direct invoice generation
 - **NIP-57 zaps** — kind 0 advertises `lud16`, so existing Nostr clients
   can zap the persona natively
@@ -430,7 +434,7 @@ by token estimates from `pi-ai`.
 
 - [ ] Character-creator wizard with embedded `pi-agent-core` agent
 - [ ] Persona keypair + NIP-49 local storage + relay backup (kind 30078)
-- [ ] Per-persona Breeze wallet, seed inside the backup event
+- [ ] Per-persona Spark wallet, BIP-39 seed inside the backup event
 - [ ] Profile image generation with reference image saved
 - [ ] Voice sample generation, stored on Blossom
 - [ ] Multi-persona UX: list, switch, back up, restore
@@ -500,16 +504,18 @@ constructive, not just resilient.
 These need answers before or during early implementation. Each has a named
 owner; if no name is attached yet, the team should claim one.
 
+**Already resolved.** Wallet SDK is locked to **`@breeztech/breez-sdk-spark`**
+(Breez SDK — Nodeless / Spark variant). Lightning Addresses are SDK-native,
+so no self-hosted LNURL-pay endpoint is required.
+
 | # | Question                                                               | Why it matters                                                  |
 | - | ---------------------------------------------------------------------- | --------------------------------------------------------------- |
-| 1 | Which Breeze SDK variant — Liquid SDK, Greenlight, or Nodeless?        | Affects custody, latency, and whether we run any infrastructure |
-| 2 | How do we host LNURL-pay endpoints for the personas' Lightning Addresses? | A per-persona LN address requires a server that resolves it. Could be a single shared domain, statically hosting LNURL JSON pointers per persona, served by Vercel or a Nostr relay. |
-| 3 | PPQ payment flow — L402 macaroon, account credit, or per-request invoice? | Determines how `pi-ai` is configured and whether we need a persistent PPQ session |
-| 4 | Voice model on PPQ — is `tts-1-hd` available, or do we need an alternative? | Locks the voice generation tool                                |
-| 5 | Image model token costs at hackathon-scale demo traffic                | We need to know if ten image gens/persona is affordable        |
-| 6 | NIP-49 passphrase UX — single passphrase per device or per persona?    | Trade-off between convenience and blast radius                 |
-| 7 | Voice sample format and size budget                                    | MP3 32 kbps × 15 s ≈ 60 KB; OGG/Opus may be smaller and avoids MP3 patent baggage |
-| 8 | Strategy for AI safety / abuse                                         | An anonymous voice with a wallet is also an abuse vector. What's our minimum-viable answer for judges? |
+| 1 | PPQ payment flow — L402 macaroon, account credit, or per-request invoice? | Determines how `pi-ai` is configured and whether we need a persistent PPQ session. PPQ exposes `/nwc-auto-topup/connect`; if Spark can act as a NWC service this collapses to one wiring call. |
+| 2 | Voice model on PPQ — is `tts-1-hd` available, or do we need an alternative? | Locks the voice generation tool                                |
+| 3 | Image model token costs at hackathon-scale demo traffic                | We need to know if ten image gens/persona is affordable        |
+| 4 | NIP-49 passphrase UX — single passphrase per device or per persona?    | Trade-off between convenience and blast radius                 |
+| 5 | Voice sample format and size budget                                    | MP3 32 kbps × 15 s ≈ 60 KB; OGG/Opus may be smaller and avoids MP3 patent baggage |
+| 6 | Strategy for AI safety / abuse                                         | An anonymous voice with a wallet is also an abuse vector. What's our minimum-viable answer for judges? |
 
 ---
 
@@ -531,7 +537,7 @@ adaptation, not a full rewrite. Replace what the new stack obsoletes.
 **Reuse with adaptation.** Architecture matches §3; update to §5 schema:
 - `src/lib/persona.ts`, `personaCrypto.ts`, `personaKey.ts`, `personaPost.ts`
   → adapt to per-persona d-tag (`phoenix-persona:<pubkey>`), the
-  `phoenix-persona` t-tag, the embedded Breeze wallet seed, and the
+  `phoenix-persona` t-tag, the embedded Spark wallet seed, and the
   `model_prefs` section
 - `src/hooks/usePersona.ts`, `usePersonaPublish.ts`
   → query by user pubkey + t-tag; multi-persona switching surfaces
@@ -549,7 +555,7 @@ adaptation, not a full rewrite. Replace what the new stack obsoletes.
   endpoint; persona's wallet pays PPQ directly)
 
 **New.**
-- `src/lib/wallet.ts`, `src/hooks/useWallet.ts` — Breeze SDK integration
+- `src/lib/spark/` (`client.ts`, `init.ts`, `types.ts`), `src/hooks/useWallet.ts` — Breez Spark SDK integration
 - `src/components/Wallet*.tsx` — wallet UI
 - `src/lib/agent.ts`, `src/components/CharacterCreator.tsx` — `pi-agent-core` wiring
 - `src/pages/Settings.tsx` — model selection per task, relays, danger zone
@@ -589,8 +595,13 @@ wallet/agent/Nostr/image-gen seams are where bugs will live.
   Lightning. The persona's wallet pays it directly.
 - **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit. We use
   `pi-agent-core` (runtime), `pi-ai` (LLM API), `pi-web-ui` (chat UI).
-- **Breeze** — Lightning wallet SDK. Per-persona wallets, seed phrase
-  recoverable from the encrypted kind 30078 backup.
+- **Breez Spark SDK** (`@breeztech/breez-sdk-spark`) — Lightning wallet
+  SDK published by Breez Technology, built on the Spark protocol
+  ("Nodeless" variant). Per-persona wallets keyed off a BIP-39 mnemonic
+  recoverable from the encrypted kind 30078 backup. Provides native
+  Lightning Addresses, removing the need for a self-hosted LNURL-pay
+  endpoint. Browser usage requires `await init()` once at boot before
+  any other SDK call. API key supplied via `VITE_BREEZ_API_KEY`.
 - **NIP-44** — Nostr encrypted-payload spec. Used for the persona's
   encrypted backup event.
 - **NIP-49** — passphrase-encrypted nsec format. Used for at-rest local
