@@ -17,11 +17,12 @@ import {
   buildEncryptedPersonaTemplate,
   DEFAULT_FREQUENCY_SEC,
   DEFAULT_PERSONA_MODEL,
+  generatePersonaDTag,
   type PersonaConfig,
   type PersonaSource,
 } from "@/lib/persona";
 import {
-  encryptPersonaConfig,
+  encryptPhoenixEnvelope,
   type Nip44Signer,
 } from "@/lib/personaCrypto";
 import {
@@ -171,18 +172,18 @@ const Onboard = () => {
     try {
       const signer = user.signer as unknown as Nip44Signer;
 
-      // 1. Encrypt the config to the operator (self-encryption).
-      const ciphertext = await encryptPersonaConfig(
-        config,
+      // 1. Encrypt the Phoenix envelope (operator self-encryption).
+      //    Discriminator + persona pubkey live INSIDE the ciphertext so
+      //    the event tag layout reveals nothing Phoenix-specific.
+      const ciphertext = await encryptPhoenixEnvelope(
+        { personaPubkey: kp.hex.pk, config },
         user.pubkey,
         signer
       );
 
-      // 2. Build + sign the encrypted persona definition with the operator's signer.
+      // 2. Build + sign with a random UUID d-tag — no identifying tags.
       const personaTemplate = buildEncryptedPersonaTemplate({
-        operatorPubkey: user.pubkey,
-        personaPubkey: kp.hex.pk,
-        personaName: config.name,
+        dTag: generatePersonaDTag(),
         encryptedContent: ciphertext,
       });
 
@@ -230,37 +231,61 @@ const Onboard = () => {
     }
   }
 
-  // Quick safety: surface if the user hasn't signed in.
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background relative">
       <PhoenixHeader />
 
-      <main className="flex-1 container py-10 max-w-3xl">
+      {/* Subtle Imigongo backdrop on the page */}
+      <div
+        className="fixed inset-0 imigongo-pattern text-imigongo-clay opacity-[0.04] pointer-events-none"
+        aria-hidden="true"
+      />
+
+      <main id="main-content" className="flex-1 container py-10 max-w-3xl relative">
+        <div className="mb-10 space-y-2">
+          <p className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
+            Persona setup
+          </p>
+          <h1 className="font-display text-3xl md:text-4xl font-medium tracking-tight">
+            {step.id === "splash" && "Sign in to begin"}
+            {step.id === "explainer" && "How it works"}
+            {step.id === "qa" && "Persona details"}
+            {step.id === "sample" && "Hear it speak"}
+            {step.id === "confirm" && "Confirm and publish"}
+          </h1>
+        </div>
+
         {/* Progress */}
-        <ol className="flex items-center justify-between mb-10 text-xs font-medium">
-          {STEPS.map((s, i) => (
-            <li
-              key={s.id}
-              className={`flex-1 flex flex-col items-center text-center ${
-                i === stepIdx
-                  ? "text-primary"
-                  : i < stepIdx
-                    ? "text-foreground"
-                    : "text-muted-foreground"
-              }`}
-            >
-              <div
-                className={`size-8 rounded-full grid place-items-center mb-2 border-2 ${
-                  i <= stepIdx
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-card"
+        <ol className="flex items-center justify-between mb-10 text-xs font-medium gap-2">
+          {STEPS.map((s, i) => {
+            const done = i < stepIdx;
+            const active = i === stepIdx;
+            return (
+              <li
+                key={s.id}
+                className={`flex-1 flex flex-col items-center text-center ${
+                  active
+                    ? "text-imigongo-clay"
+                    : done
+                      ? "text-foreground"
+                      : "text-muted-foreground/70"
                 }`}
               >
-                {i + 1}
-              </div>
-              <span className="hidden sm:block">{s.label}</span>
-            </li>
-          ))}
+                <div
+                  className={`size-9 rounded-full grid place-items-center mb-2 border-2 transition-all ${
+                    active
+                      ? "border-imigongo-clay bg-imigongo-clay text-imigongo-cream shadow-md shadow-imigongo-clay/30"
+                      : done
+                        ? "border-imigongo-clay/60 bg-imigongo-clay/10 text-imigongo-clay"
+                        : "border-border bg-card"
+                  }`}
+                >
+                  {done ? "✓" : i + 1}
+                </div>
+                <span className="hidden sm:block">{s.label}</span>
+              </li>
+            );
+          })}
         </ol>
 
         <Card>

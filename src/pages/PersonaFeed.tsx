@@ -5,13 +5,13 @@ import { ShieldCheck } from "lucide-react";
 import { nip19 } from "nostr-tools";
 
 import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { PostCard } from "@/components/PostCard";
+import { PersonaHeaderSkeleton, PostListSkeleton } from "@/components/Skeletons";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuthor } from "@/hooks/useAuthor";
 import { usePersonaPosts } from "@/hooks/usePersona";
-import { extractSourceDomains } from "@/lib/personaPost";
 import { genUserName } from "@/lib/genUserName";
 
 function npubToHex(npub: string): string | null {
@@ -45,7 +45,7 @@ const PersonaFeed = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <PhoenixHeader />
 
-      <main className="flex-1 container py-8 max-w-3xl space-y-8">
+      <main id="main-content" className="flex-1 container py-8 max-w-3xl space-y-8">
         {/* Header */}
         {!personaHex ? (
           <Card className="border-dashed">
@@ -53,19 +53,17 @@ const PersonaFeed = () => {
               Invalid persona npub.
             </CardContent>
           </Card>
+        ) : author.isLoading ? (
+          <PersonaHeaderSkeleton />
         ) : (
-          <div className="rounded-2xl border border-border bg-card p-6 relative overflow-hidden">
-            <div className="absolute inset-0 imigongo-pattern text-imigongo-clay opacity-[0.05] pointer-events-none" />
-            <div className="relative space-y-4">
+          <div className="rounded-2xl border border-border bg-card p-7 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-imigongo-clay via-rw-gold to-rw-green" />
+            <div className="absolute inset-0 imigongo-pattern text-imigongo-clay opacity-[0.04] pointer-events-none" />
+            <div className="relative space-y-4 pt-2">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-imigongo-clay font-medium mb-1">
-                    Phoenix persona
-                  </div>
-                  <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-                    {displayName}
-                  </h1>
-                </div>
+                <h1 className="font-display text-3xl md:text-5xl font-medium tracking-tight">
+                  {displayName}
+                </h1>
                 <Button asChild variant="outline" size="sm">
                   <Link to={`/verify/${npub}`}>
                     <ShieldCheck className="mr-2 size-4" />
@@ -74,7 +72,7 @@ const PersonaFeed = () => {
                 </Button>
               </div>
               {bio && (
-                <p className="text-muted-foreground max-w-2xl">{bio}</p>
+                <p className="text-muted-foreground max-w-2xl leading-relaxed">{bio}</p>
               )}
               <div className="flex flex-wrap gap-2">
                 <Badge variant="secondary" className="font-mono text-[10px]">
@@ -86,36 +84,19 @@ const PersonaFeed = () => {
         )}
 
         {/* Feed */}
-        <div className="space-y-3">
-          <h2 className="text-xl font-semibold">Feed</h2>
+        <div className="space-y-4">
+          <h2 className="font-display text-2xl font-medium tracking-tight">
+            Feed
+          </h2>
           {posts.isLoading ? (
-            <Skeleton className="h-48 w-full" />
+            <PostListSkeleton count={3} />
           ) : posts.data && posts.data.length > 0 ? (
             <ul className="space-y-3">
-              {posts.data.map((p) => {
-                const domains = extractSourceDomains(p.tags);
-                return (
-                  <li key={p.id} className="rounded-lg border border-border bg-card p-5">
-                    <p className="whitespace-pre-wrap leading-relaxed">{p.content}</p>
-                    <div className="mt-4 flex items-center justify-between flex-wrap gap-3">
-                      <div className="flex flex-wrap gap-1.5">
-                        {domains.map((d) => (
-                          <Badge key={d} variant="outline" className="text-xs font-normal">
-                            {d}
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="size-1.5 rounded-full bg-imigongo-ochre" />
-                          Phoenix-styled
-                        </span>
-                        · {new Date(p.created_at * 1000).toLocaleString()}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
+              {posts.data.map((p) => (
+                <li key={p.id}>
+                  <PostCard event={p} />
+                </li>
+              ))}
             </ul>
           ) : (
             <Card className="border-dashed">

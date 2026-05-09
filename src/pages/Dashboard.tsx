@@ -4,10 +4,11 @@ import { useSeoMeta } from "@unhead/react";
 import { Loader2, Send, Sparkles } from "lucide-react";
 
 import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { PostCard } from "@/components/PostCard";
+import { PersonaHeaderSkeleton, PostListSkeleton } from "@/components/Skeletons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/useToast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePersona, usePersonaPosts } from "@/hooks/usePersona";
@@ -60,10 +61,8 @@ const Dashboard = () => {
     try {
       const template = buildPersonaPostTemplate({
         text: styled,
-        personaName: config.name,
         regionSlug: regionSlug(config.region),
         causeSlug: config.cause,
-        operatorPubkey: user.pubkey,
         sources: config.sources.map((s) => s.url).filter(Boolean),
       });
       await publish.mutateAsync({
@@ -87,7 +86,7 @@ const Dashboard = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <PhoenixHeader />
 
-      <main className="flex-1 container py-8 max-w-4xl space-y-8">
+      <main id="main-content" className="flex-1 container py-8 max-w-4xl space-y-8">
         {/* Persona header */}
         {!user ? (
           <Card className="border-dashed">
@@ -96,19 +95,24 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         ) : persona.isLoading ? (
-          <Skeleton className="h-24 w-full" />
+          <PersonaHeaderSkeleton />
         ) : config ? (
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <div className="text-xs uppercase tracking-wider text-imigongo-clay font-medium mb-1">
-                {config.region} · {config.cause}
+          <div className="rounded-2xl border border-border bg-card p-6 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-imigongo-clay via-rw-gold to-rw-green" />
+            <div className="flex items-start justify-between gap-4 flex-wrap relative">
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold mb-1">
+                  {config.region} · {config.cause}
+                </div>
+                <h1 className="font-display text-3xl md:text-4xl font-medium tracking-tight">
+                  {config.name}
+                </h1>
+                <p className="text-muted-foreground mt-3 max-w-2xl">{config.bio}</p>
               </div>
-              <h1 className="text-3xl font-bold tracking-tight">{config.name}</h1>
-              <p className="text-muted-foreground mt-2 max-w-2xl">{config.bio}</p>
+              <Button asChild variant="outline" size="sm">
+                <Link to={`/p/${npub}`}>View public feed →</Link>
+              </Button>
             </div>
-            <Button asChild variant="outline" size="sm">
-              <Link to={`/p/${npub}`}>View public feed →</Link>
-            </Button>
           </div>
         ) : persona.isError ? (
           <Card className="border-dashed">
@@ -132,27 +136,61 @@ const Dashboard = () => {
         {/* Composer */}
         {config && (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="size-5 text-primary" />
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 font-display text-2xl font-medium">
+                <Sparkles className="size-5 text-primary" aria-hidden="true" />
                 Compose
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Your raw thought</label>
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="composer-raw"
+                    className="text-sm font-medium"
+                  >
+                    Your raw thought
+                  </label>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {raw.length} chars
+                  </span>
+                </div>
                 <Textarea
+                  id="composer-raw"
                   rows={4}
                   value={raw}
                   onChange={(e) => setRaw(e.target.value)}
                   placeholder="Type a thought, a fact, a reaction. The persona will style it."
+                  onKeyDown={(e) => {
+                    if (
+                      (e.metaKey || e.ctrlKey) &&
+                      e.key === "Enter" &&
+                      raw.trim() &&
+                      !styling
+                    ) {
+                      e.preventDefault();
+                      onStyle();
+                    }
+                  }}
+                  className="resize-y min-h-[6rem]"
                 />
+                <p className="text-[11px] text-muted-foreground">
+                  Press{" "}
+                  <kbd className="font-mono px-1 py-0.5 rounded bg-muted border border-border text-[10px]">
+                    ⌘ Enter
+                  </kbd>{" "}
+                  to style.
+                </p>
               </div>
               <div className="flex justify-end">
-                <Button onClick={onStyle} disabled={!raw.trim() || styling} variant="outline">
+                <Button
+                  onClick={onStyle}
+                  disabled={!raw.trim() || styling}
+                  variant="outline"
+                >
                   {styling ? (
                     <>
-                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
                       Styling…
                     </>
                   ) : (
@@ -162,62 +200,96 @@ const Dashboard = () => {
               </div>
 
               {styled && (
-                <>
+                <div className="space-y-4 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 duration-300">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Styled in {config.name}'s voice
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label
+                        htmlFor="composer-styled"
+                        className="text-sm font-medium"
+                      >
+                        Styled in {config.name}'s voice
+                      </label>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {styled.length} chars
+                      </span>
+                    </div>
                     <Textarea
+                      id="composer-styled"
                       rows={6}
                       value={styled}
                       onChange={(e) => setStyled(e.target.value)}
-                      className="border-imigongo-clay/40 bg-imigongo-clay/5"
+                      onKeyDown={(e) => {
+                        if (
+                          (e.metaKey || e.ctrlKey) &&
+                          e.key === "Enter" &&
+                          styled.trim() &&
+                          !publish.isPending
+                        ) {
+                          e.preventDefault();
+                          onPost();
+                        }
+                      }}
+                      className="border-imigongo-clay/40 bg-imigongo-clay/5 focus-visible:bg-card transition-colors resize-y min-h-[8rem]"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      You can edit before posting. Sources from the persona
-                      config will be attached as attribution tags.
+                    <p className="text-[11px] text-muted-foreground">
+                      Edit freely before posting. Source URLs from the persona
+                      config attach as <code className="font-mono">r</code> tags
+                      for attribution. Press{" "}
+                      <kbd className="font-mono px-1 py-0.5 rounded bg-muted border border-border text-[10px]">
+                        ⌘ Enter
+                      </kbd>{" "}
+                      to publish.
                     </p>
                   </div>
-                  <div className="flex justify-end">
-                    <Button onClick={onPost} disabled={publish.isPending}>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => setStyled("")}
+                      disabled={publish.isPending}
+                    >
+                      Discard
+                    </Button>
+                    <Button
+                      onClick={onPost}
+                      disabled={publish.isPending || !styled.trim()}
+                    >
                       {publish.isPending ? (
                         <>
-                          <Loader2 className="mr-2 size-4 animate-spin" />
+                          <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
                           Publishing…
                         </>
                       ) : (
                         <>
-                          <Send className="mr-2 size-4" />
+                          <Send className="mr-2 size-4" aria-hidden="true" />
                           Publish to relays
                         </>
                       )}
                     </Button>
                   </div>
-                </>
+                </div>
               )}
             </CardContent>
           </Card>
         )}
 
         {/* Recent posts */}
-        <div className="space-y-3">
-          <h2 className="text-xl font-semibold">Recent posts</h2>
+        <div className="space-y-4">
+          <h2 className="font-display text-2xl font-medium tracking-tight">
+            Recent posts
+          </h2>
           {posts.isLoading ? (
-            <Skeleton className="h-32 w-full" />
+            <PostListSkeleton count={2} />
           ) : posts.data && posts.data.length > 0 ? (
             <ul className="space-y-3">
               {posts.data.map((p) => (
-                <li key={p.id} className="rounded-lg border border-border bg-card p-4">
-                  <p className="whitespace-pre-wrap leading-relaxed">{p.content}</p>
-                  <div className="mt-3 text-xs text-muted-foreground">
-                    {new Date(p.created_at * 1000).toLocaleString()}
-                  </div>
+                <li key={p.id}>
+                  <PostCard event={p} showOperatorBadge />
                 </li>
               ))}
             </ul>
           ) : (
             <Card className="border-dashed">
-              <CardContent className="py-8 px-6 text-sm text-muted-foreground text-center">
+              <CardContent className="py-10 px-6 text-sm text-muted-foreground text-center">
                 No posts yet. Compose the first one above.
               </CardContent>
             </Card>
