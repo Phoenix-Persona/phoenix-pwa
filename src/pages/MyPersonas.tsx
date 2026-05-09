@@ -3,8 +3,8 @@ import { useSeoMeta } from "@unhead/react";
 import { Plus } from "lucide-react";
 
 import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { PersonaGridSkeleton } from "@/components/Skeletons";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -19,7 +19,7 @@ const MyPersonas = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <PhoenixHeader />
 
-      <main className="flex-1 container py-10 max-w-5xl space-y-8">
+      <main id="main-content" className="flex-1 container py-10 max-w-5xl space-y-8">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="space-y-3">
             <p className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
@@ -49,11 +49,7 @@ const MyPersonas = () => {
             </CardContent>
           </Card>
         ) : isLoading ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-40 w-full" />
-            ))}
-          </div>
+          <PersonaGridSkeleton count={3} />
         ) : isError ? (
           <Card className="border-dashed">
             <CardContent className="py-12 px-8 text-center text-muted-foreground space-y-2">

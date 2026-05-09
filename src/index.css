@@ -276,9 +276,29 @@
     letter-spacing: -0.015em;
   }
 
-  /* Selection color picks up the brand */
+  /* Brand-colored selection */
   ::selection {
     background-color: var(--rw-gold-soft);
     color: var(--imigongo-charcoal);
+  }
+
+  /* Stronger focus-visible rings — 2px outer ring, brand-colored. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Honor user reduced-motion preference globally for any CSS animation
+     not already gated by a motion-safe Tailwind variant. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

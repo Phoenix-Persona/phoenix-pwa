@@ -19,7 +19,7 @@ const Index = () => {
     <div className="min-h-screen flex flex-col">
       <PhoenixHeader />
 
-      <main className="flex-1">
+      <main id="main-content" className="flex-1">
         {/* HERO */}
         <section className="relative overflow-hidden">
           {/* Layered backdrop: warm cream wash + Imigongo motif on the right */}

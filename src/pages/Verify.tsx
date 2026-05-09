@@ -42,7 +42,7 @@ const Verify = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <PhoenixHeader />
 
-      <main className="flex-1 container py-10 max-w-3xl space-y-6">
+      <main id="main-content" className="flex-1 container py-10 max-w-3xl space-y-6">
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
             Phoenix attestation

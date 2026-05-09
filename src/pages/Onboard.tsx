@@ -241,7 +241,7 @@ const Onboard = () => {
         aria-hidden="true"
       />
 
-      <main className="flex-1 container py-10 max-w-3xl relative">
+      <main id="main-content" className="flex-1 container py-10 max-w-3xl relative">
         <div className="mb-10 space-y-2">
           <p className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
             Persona setup
