@@ -99,7 +99,7 @@ export function HowItWorks() {
         body={
           <>
             Choose the cause. Curate the sources it speaks from. Shape the
-            tone, the cadence, the conviction. Phoenix mints the persona&rsquo;s
+            tone, the cadence, the conviction. Feniksi mints the persona&rsquo;s
             own keypair on creation — a fresh identity, cryptographically
             separate from yours.
           </>
@@ -125,7 +125,7 @@ export function HowItWorks() {
         }
         body={
           <>
-            Type the rawest version of what you mean. Phoenix styles it in the
+            Type the rawest version of what you mean. Feniksi styles it in the
             persona&rsquo;s voice, attaches the citation, and publishes it —
             signed by the persona&rsquo;s key, not yours. You stay invisible.
             The persona stays consistent.

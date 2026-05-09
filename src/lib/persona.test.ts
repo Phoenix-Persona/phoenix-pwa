@@ -131,6 +131,24 @@ describe("parsePhoenixEnvelope", () => {
     expect(parsePhoenixEnvelope(JSON.stringify(empty))).toBeNull();
   });
 
+  it("accepts an envelope with persona.dTag (stable per-persona d-tag)", () => {
+    const env = makeValidEnvelope();
+    const withDTag = {
+      ...env,
+      persona: { ...env.persona, dTag: "abc-123-stable-uuid" },
+    };
+    const parsed = parsePhoenixEnvelope(JSON.stringify(withDTag));
+    expect(parsed).not.toBeNull();
+    expect(parsed!.persona.dTag).toBe("abc-123-stable-uuid");
+  });
+
+  it("accepts an envelope without persona.dTag for back-compat", () => {
+    const env = makeValidEnvelope();
+    const parsed = parsePhoenixEnvelope(JSON.stringify(env));
+    expect(parsed).not.toBeNull();
+    expect(parsed!.persona.dTag).toBeUndefined();
+  });
+
   it("accepts an envelope with optional wallet, model_prefs, settings", () => {
     const env = makeValidEnvelope();
     const enriched = {

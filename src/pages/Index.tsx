@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 import { ArrowRight } from "lucide-react";
 
-import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { AppHeader } from "@/components/AppHeader";
 import {
   FlagStripe,
   ImigongoBand,
@@ -16,7 +16,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const Index = () => {
   useSeoMeta({
-    title: "Phoenix — Uncensorable Voices",
+    title: "Feniksi — Uncensorable Voices",
     description:
       "AI personas on Nostr. Voices that can be amplified but not silenced.",
   });
@@ -26,7 +26,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <PhoenixHeader />
+      <AppHeader />
 
       <main id="main-content" className="flex-1">
         {/* HERO — charcoal mat with warm clay glow + bold pattern overlay */}
@@ -91,7 +91,7 @@ const Index = () => {
 
               {/* Trust ribbon — outcome-focused promises */}
               <ul className="grid grid-cols-3 gap-3 pt-6 max-w-md text-[12px] tracking-tight text-imigongo-cream/85 font-medium leading-snug">
-                <li className="border-l-2 border-imigongo-clay pl-3">
+                <li className="border-l-2 border-rw-sky pl-3">
                   Your identity<br />stays hidden
                 </li>
                 <li className="border-l-2 border-rw-gold pl-3">
@@ -114,9 +114,9 @@ const Index = () => {
                   src="/images/hero-kigali.webp"
                   srcSet="/images/hero-kigali-sm.webp 800w, /images/hero-kigali.webp 1600w"
                   sizes="(max-width: 768px) 100vw, 600px"
-                  alt="A young creator on a rooftop in Kigali, smiling as she records into her phone."
+                  alt="A young creator at her desk in Kigali, working on her laptop."
                   width={1600}
-                  height={1346}
+                  height={1206}
                   loading="eager"
                   className="w-full h-auto block"
                 />
@@ -188,7 +188,7 @@ const Index = () => {
                 <span className="italic text-rw-gold">The world&rsquo;s ears.</span>
               </h2>
               <p className="text-lg text-imigongo-cream/80 leading-relaxed">
-                Curate the sources. Shape the tone. Phoenix turns a raw thought
+                Curate the sources. Shape the tone. Feniksi turns a raw thought
                 into a styled post in your persona&rsquo;s voice — every time,
                 with citations attached.
               </p>
@@ -261,9 +261,9 @@ const Index = () => {
                   src="/images/design-board.webp"
                   srcSet="/images/design-board-sm.webp 800w, /images/design-board.webp 1400w"
                   sizes="(max-width: 768px) 100vw, 600px"
-                  alt="A design board mapping the persona-creation flow."
+                  alt="A creator at her workstation, deep in a writing session."
                   width={1400}
-                  height={1217}
+                  height={1337}
                   loading="lazy"
                   className="w-full h-auto block"
                 />
@@ -281,7 +281,7 @@ const Index = () => {
                 <span className="italic text-rw-gold">have weight.</span>
               </h2>
               <p className="text-lg text-imigongo-cream/80 leading-relaxed max-w-prose">
-                Phoenix is built where compromise isn&rsquo;t an option. Every
+                Feniksi is built where compromise isn&rsquo;t an option. Every
                 choice — what&rsquo;s encrypted, what&rsquo;s signed, what
                 survives — was made with one question in mind: what happens
                 when someone&rsquo;s safety depends on this?
@@ -333,7 +333,7 @@ const Index = () => {
                   className="rounded-lg"
                 />
                 <span className="font-display font-semibold text-2xl text-imigongo-cream">
-                  Phoenix
+                  Feniksi
                 </span>
               </div>
               <p className="text-sm text-imigongo-cream/60 max-w-sm leading-relaxed">
@@ -416,7 +416,7 @@ const Index = () => {
           <div className="border-t border-imigongo-cream/10">
             <div className="container py-5 text-xs text-imigongo-cream/50">
               <span>
-                © {new Date().getFullYear()} Phoenix. Built for voices that
+                © {new Date().getFullYear()} Feniksi. Built for voices that
                 can&rsquo;t be silenced.
               </span>
             </div>

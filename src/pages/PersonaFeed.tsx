@@ -4,7 +4,7 @@ import { useSeoMeta } from "@unhead/react";
 import { ShieldCheck } from "lucide-react";
 import { nip19 } from "nostr-tools";
 
-import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
 import { PostCard } from "@/components/PostCard";
 import { PostListSkeleton } from "@/components/Skeletons";
@@ -39,13 +39,13 @@ const PersonaFeed = () => {
   const picture = author.data?.metadata?.picture;
 
   useSeoMeta({
-    title: `${displayName} — Phoenix`,
+    title: `${displayName} — Feniksi`,
     description: bio || undefined,
   });
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <PhoenixHeader />
+      <AppHeader />
 
       <main id="main-content" className="flex-1">
         {/* Persona cover band — charcoal mat with avatar disc + bio */}
@@ -85,6 +85,7 @@ const PersonaFeed = () => {
                         alt=""
                         className="w-full h-full object-cover"
                         loading="eager"
+                        crossOrigin="anonymous"
                       />
                     ) : (
                       <ImigongoSeal size={72} colorClass="text-rw-gold/80" />

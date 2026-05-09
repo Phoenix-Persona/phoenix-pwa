@@ -17,7 +17,7 @@
  *     app: "phoenix-persona",      magic discriminator
  *     version: 1,                  schema version (only 1 accepted)
  *     persona: { pubkey, nsec, name, system_prompt, ... },
- *     wallet?: { kind, seed, lnurl? },         (optional in Phase 1; required Phase 2)
+ *     wallet?: { kind, seed, lnurl? },         (optional for now; required once wallet wiring lands)
  *     model_prefs?: { agent, image, tts, video? },
  *     settings?:    { default_relays }
  *   }
@@ -83,6 +83,17 @@ const personaSchema = z.object({
   nsec: z
     .string()
     .regex(/^nsec1[02-9ac-hj-np-z]{58,}$/i, "must be a valid nsec1… string"),
+  /**
+   * Stable per-persona d-tag. Generated once at creation, mirrored
+   * onto the kind 30078 envelope's `["d", ...]` tag, and reused on
+   * every update so addressable-event semantics replace the prior
+   * revision (see PROJECT.md §5.2).
+   *
+   * Optional here for back-compat with personas published before this
+   * field landed; readers fall back to the event tag. New personas
+   * always write it.
+   */
+  dTag: z.string().min(1).max(128).optional(),
   name: z.string().min(1).max(120),
   system_prompt: z.string().max(20000),
   voice_id: z.string().min(1).max(64),
@@ -135,9 +146,9 @@ const phoenixEnvelopeSchema = z.object({
   app: z.literal(PHOENIX_PAYLOAD_APP),
   version: z.literal(PHOENIX_PAYLOAD_VERSION),
   persona: personaSchema,
-  // Optional in Phase 1 until Jim's Breeze wallet wiring lands. Phase 2 tightens.
+  // Optional until the wallet wiring lands; required after that.
   wallet: walletSchema.optional(),
-  // Optional in Phase 1; defaults applied at use-time.
+  // Optional; defaults applied at use-time.
   model_prefs: modelPrefsSchema.optional(),
   settings: settingsSchema.optional(),
 });

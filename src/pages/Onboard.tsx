@@ -1,29 +1,45 @@
 /**
- * Onboard — Phoenix character-creator wizard.
+ * Onboard — character-creator wizard.
  *
- * Phase 1 status: STUB. The full agent-driven wizard (PROJECT.md §6,
- * tasks/derek-plan.md Phase 2) wires `pi-agent-core` + `pi-web-ui` +
- * Jim's PPQ hooks. Until those land we ship a minimal "create blank
- * persona" form so the rest of the multi-persona flow is exercisable.
+ * Two-step flow:
+ *   1. Details — name, bio, system prompt, tags, languages, voice id.
+ *   2. Picture — upload an image OR generate via PPQ. Skippable; the
+ *      persona ships without a picture if the user chooses.
  *
- * The blank-persona path generates a fresh keypair and an empty
- * envelope. There is no agent, no image, no voice yet — those land
- * in Phase 2 (CharacterCreator.tsx).
+ * On submit, generates a fresh keypair, encrypts the configuration to
+ * the user's own Nostr key, publishes the encrypted backup to relays,
+ * and publishes a public kind 0 profile.
+ *
+ * The agent-driven creator (`CharacterCreator.tsx`) layers on top of
+ * the same publish path when it's ready.
  */
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
-import { Loader2, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  HelpCircle,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
 import { useNostr } from "@nostrify/react";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
+import { PersonaPictureField } from "@/components/PersonaPictureField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useToast } from "@/hooks/useToast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
@@ -31,7 +47,10 @@ import {
   buildEncryptedPersonaTemplate,
   DEFAULT_MODEL_PREFS,
   generatePersonaDTag,
+  PHOENIX_PAYLOAD_APP,
+  PHOENIX_PAYLOAD_VERSION,
   type Persona,
+  type PhoenixEnvelope,
 } from "@/lib/persona";
 import {
   encryptPhoenixEnvelope,
@@ -42,13 +61,19 @@ import {
   signWithPersona,
 } from "@/lib/personaKey";
 
+type WizardStep = "details" | "picture";
+
 const Onboard = () => {
-  useSeoMeta({ title: "Create a persona — Phoenix" });
+  useSeoMeta({ title: "Create a persona — Feniksi" });
   const navigate = useNavigate();
   const { user } = useCurrentUser();
   const { nostr } = useNostr();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
+  const [step, setStep] = useState<WizardStep>("details");
+
+  // Details
   const [name, setName] = useState("Voice of Rwanda");
   const [bio, setBio] = useState(
     "An AI-assisted voice. Press freedom, civil society, the long memory."
@@ -59,7 +84,23 @@ const Onboard = () => {
   const [tagsInput, setTagsInput] = useState("rwanda, press-freedom");
   const [languagesInput, setLanguagesInput] = useState("en, rw");
   const [voiceId, setVoiceId] = useState("alloy");
+
+  // Picture
+  const [pictureUrl, setPictureUrl] = useState("");
+
   const [publishing, setPublishing] = useState(false);
+
+  function goNext() {
+    if (!name.trim()) {
+      toast({
+        title: "Name required",
+        description: "Give the persona a name before continuing.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setStep("picture");
+  }
 
   async function publishPersona() {
     if (!user) {
@@ -73,14 +114,22 @@ const Onboard = () => {
     setPublishing(true);
     try {
       const kp = generatePersonaKeypair();
+      // Generate the stable d-tag once and store it inside the
+      // encrypted payload (PROJECT.md §5.2). Updates reuse this same
+      // d-tag so addressable-event semantics replace prior revisions.
+      const dTag = generatePersonaDTag();
       const persona: Persona = {
         pubkey: kp.hex.pk,
         nsec: kp.nsec,
+        dTag,
         name: name.trim() || "Untitled",
         system_prompt: systemPrompt,
         voice_id: voiceId,
         languages: parseList(languagesInput, ["en"]),
         tags: parseList(tagsInput, []),
+        // The picture doubles as the canonical reference image used
+        // by future post-image generation for likeness consistency.
+        reference_image_url: pictureUrl || undefined,
         created_at: Math.floor(Date.now() / 1000),
       };
 
@@ -96,9 +145,10 @@ const Onboard = () => {
         signer
       );
 
-      // 2. Build + sign with a random UUID d-tag — no identifying tags.
+      // 2. Build + sign — d-tag mirrors persona.dTag so addressable
+      //    replacement works on update.
       const personaTemplate = buildEncryptedPersonaTemplate({
-        dTag: generatePersonaDTag(),
+        dTag,
         encryptedContent: ciphertext,
       });
       const signed = await user.signer.signEvent(personaTemplate);
@@ -106,22 +156,57 @@ const Onboard = () => {
 
       // 3. Publish a public kind 0 profile so the persona's feed is
       //    browsable from any Nostr client.
+      const kind0Content: Record<string, unknown> = {
+        name: persona.name,
+        display_name: persona.name,
+        about: bio,
+        picture: pictureUrl || "",
+        bot: true,
+      };
+      // Phoenix-namespace extension: the canonical reference image
+      // (PROJECT.md §5.1). Same URL as the picture for V1.
+      if (pictureUrl) {
+        kind0Content.phoenix = {
+          reference_image: pictureUrl,
+          version: 1,
+        };
+      }
       const profileEvent = signWithPersona(
         {
           kind: 0,
           created_at: Math.floor(Date.now() / 1000),
           tags: [],
-          content: JSON.stringify({
-            name: persona.name,
-            display_name: persona.name,
-            about: bio,
-            picture: "",
-            bot: true,
-          }),
+          content: JSON.stringify(kind0Content),
         },
         kp
       );
       await nostr.event(profileEvent, { signal: AbortSignal.timeout(8000) });
+
+      // Optimistic cache updates so the user doesn't have to reload to
+      // see the new persona in /my-personas or its kind 0 metadata.
+      const envelope: PhoenixEnvelope = {
+        app: PHOENIX_PAYLOAD_APP,
+        version: PHOENIX_PAYLOAD_VERSION,
+        persona,
+        model_prefs: DEFAULT_MODEL_PREFS,
+      };
+      const newRecord = {
+        event: signed,
+        envelope,
+        npub: kp.npub,
+      };
+      queryClient.setQueryData(
+        ["phoenix-my-personas", user.pubkey],
+        (old: typeof newRecord[] | undefined) => {
+          const existing = old ?? [];
+          if (existing.some((r) => r.event.id === signed.id)) return existing;
+          return [newRecord, ...existing];
+        }
+      );
+      queryClient.setQueryData(["nostr", "author", kp.hex.pk], {
+        event: profileEvent,
+        metadata: kind0Content,
+      });
 
       toast({
         title: "Persona published",
@@ -142,9 +227,18 @@ const Onboard = () => {
     }
   }
 
+  // Suggest a starting prompt for the picture step based on what the
+  // user wrote on the details step.
+  const promptHint =
+    name && bio
+      ? `Stylized portrait of ${name}: ${truncate(bio, 80)}`
+      : name
+      ? `Stylized portrait of ${name}`
+      : "";
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <PhoenixHeader />
+      <AppHeader />
 
       <main id="main-content" className="flex-1">
         {/* Cover band — charcoal mat with seal accent */}
@@ -170,18 +264,17 @@ const Onboard = () => {
                 </div>
               </div>
               <div className="space-y-3">
-                <p className="inline-flex items-center gap-2 rounded-full border border-rw-gold/40 bg-rw-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
-                  <Sparkles className="size-3.5" />
-                  Phase 1 stub
+                <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
+                  <span className="h-px w-6 bg-rw-gold" />
+                  New voice — step {step === "details" ? "1" : "2"} of 2
                 </p>
                 <h1 className="font-display text-4xl md:text-5xl font-medium tracking-tight leading-tight">
-                  Create a persona
+                  {step === "details" ? "Create a persona" : "Choose a face"}
                 </h1>
                 <p className="text-imigongo-cream/80 leading-relaxed max-w-xl">
-                  The agent-driven wizard with image generation and voice
-                  sampling lands in Phase 2. For now, this is a minimal form
-                  so we can exercise multi-persona, encrypted-backup, and
-                  publish flows end-to-end.
+                  {step === "details"
+                    ? "Mint a new voice. Feniksi generates a fresh Nostr keypair for the persona — only you can operate it. The configuration below is encrypted to your key and published privately to relays; the persona's public profile goes out so anyone can find and follow its feed."
+                    : "Add a portrait so the persona has a face. Upload an image or generate one. You can skip this step and add a picture later."}
                 </p>
               </div>
             </div>
@@ -189,117 +282,197 @@ const Onboard = () => {
           <FlagStripe height={4} />
         </section>
 
-        {/* Form */}
+        {/* Step body */}
         <div className="container py-10 max-w-2xl">
           <Card className="border-imigongo-clay/20 bg-gradient-to-br from-card via-card to-rw-gold-soft/10 overflow-hidden">
-            <div className="bg-gradient-to-r from-imigongo-clay/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center justify-between gap-3">
               <h2 className="font-display text-2xl font-medium tracking-tight">
-                New persona
+                {step === "details" ? "Persona details" : "Profile picture"}
               </h2>
-              <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
-                Encrypted at rest
-              </span>
+
+              {step === "details" ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-imigongo-clay/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
+                      aria-label="How is my persona protected?"
+                    >
+                      <HelpCircle className="size-5" aria-hidden="true" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="bottom"
+                    align="end"
+                    className="w-80 text-sm leading-relaxed space-y-2"
+                  >
+                    <p className="font-medium text-foreground">
+                      How your persona is protected
+                    </p>
+                    <p className="text-muted-foreground">
+                      The configuration below is encrypted to your own Nostr
+                      key (NIP-44) before it leaves your browser. Relays
+                      store the ciphertext — only your signer can decrypt
+                      it.
+                    </p>
+                    <p className="text-muted-foreground">
+                      The persona's private key lives only inside that
+                      encrypted backup. It never touches the network, and
+                      never lands on disk in plaintext.
+                    </p>
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
+                  Optional
+                </span>
+              )}
             </div>
+
             <CardContent className="space-y-5 pt-5">
-              <div className="space-y-2">
-                <Label htmlFor="persona-name">Name</Label>
-                <Input
-                  id="persona-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Voice of Rwanda"
-                  className="bg-background/60"
-                />
-              </div>
+              {step === "details" ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="persona-name">Name</Label>
+                    <Input
+                      id="persona-name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Voice of Rwanda"
+                      className="bg-background/60"
+                      autoFocus
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="persona-bio">
-                  Bio (public, lives on the persona's kind 0 profile)
-                </Label>
-                <Textarea
-                  id="persona-bio"
-                  rows={2}
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  className="bg-background/60"
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="persona-bio">
+                      Bio (public, lives on the persona's kind 0 profile)
+                    </Label>
+                    <Textarea
+                      id="persona-bio"
+                      rows={2}
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                      className="bg-background/60"
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="persona-system-prompt">
-                  System prompt (private, encrypted in the backup)
-                </Label>
-                <Textarea
-                  id="persona-system-prompt"
-                  rows={5}
-                  value={systemPrompt}
-                  onChange={(e) => setSystemPrompt(e.target.value)}
-                  className="bg-background/60"
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="persona-system-prompt">
+                      System prompt (private, encrypted in the backup)
+                    </Label>
+                    <Textarea
+                      id="persona-system-prompt"
+                      rows={5}
+                      value={systemPrompt}
+                      onChange={(e) => setSystemPrompt(e.target.value)}
+                      className="bg-background/60"
+                    />
+                  </div>
 
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="persona-tags">
-                    Topical tags (comma separated)
-                  </Label>
-                  <Input
-                    id="persona-tags"
-                    value={tagsInput}
-                    onChange={(e) => setTagsInput(e.target.value)}
-                    placeholder="rwanda, press-freedom"
-                    className="bg-background/60"
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="persona-tags">
+                        Topical tags (comma separated)
+                      </Label>
+                      <Input
+                        id="persona-tags"
+                        value={tagsInput}
+                        onChange={(e) => setTagsInput(e.target.value)}
+                        placeholder="rwanda, press-freedom"
+                        className="bg-background/60"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="persona-languages">
+                        Languages (comma separated)
+                      </Label>
+                      <Input
+                        id="persona-languages"
+                        value={languagesInput}
+                        onChange={(e) => setLanguagesInput(e.target.value)}
+                        placeholder="en, rw"
+                        className="bg-background/60"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="persona-voice">Voice</Label>
+                    <Input
+                      id="persona-voice"
+                      value={voiceId}
+                      onChange={(e) => setVoiceId(e.target.value)}
+                      placeholder="alloy"
+                      className="bg-background/60"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Voice id used when the persona generates audio. The
+                      default works fine if you're not sure.
+                    </p>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <Button
+                      onClick={goNext}
+                      size="lg"
+                      className="rounded-full px-8 shadow-lg shadow-primary/20"
+                    >
+                      Next: profile picture
+                      <ArrowRight className="ml-2 size-4" />
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <PersonaPictureField
+                    value={pictureUrl}
+                    onChange={setPictureUrl}
+                    promptHint={promptHint}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="persona-languages">
-                    Languages (comma separated)
-                  </Label>
-                  <Input
-                    id="persona-languages"
-                    value={languagesInput}
-                    onChange={(e) => setLanguagesInput(e.target.value)}
-                    placeholder="en, rw"
-                    className="bg-background/60"
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="persona-voice">Voice id (placeholder)</Label>
-                <Input
-                  id="persona-voice"
-                  value={voiceId}
-                  onChange={(e) => setVoiceId(e.target.value)}
-                  placeholder="alloy"
-                  className="bg-background/60"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Voice sample generation lands in Phase 2. The id is
-                  stored now so the wizard can re-use it later.
-                </p>
-              </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">
+                    <Button
+                      variant="ghost"
+                      onClick={() => setStep("details")}
+                      disabled={publishing}
+                    >
+                      <ArrowLeft className="mr-2 size-4" />
+                      Back
+                    </Button>
 
-              <div className="flex justify-end pt-2">
-                <Button
-                  onClick={publishPersona}
-                  disabled={publishing || !user}
-                  size="lg"
-                  className="rounded-full px-8 shadow-lg shadow-primary/20"
-                >
-                  {publishing ? (
-                    <>
-                      <Loader2 className="mr-2 size-4 animate-spin" />
-                      Publishing…
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 size-4" />
-                      Mint persona
-                    </>
-                  )}
-                </Button>
-              </div>
+                    <div className="flex flex-wrap gap-2">
+                      {!pictureUrl && (
+                        <Button
+                          variant="outline"
+                          onClick={publishPersona}
+                          disabled={publishing || !user}
+                        >
+                          Skip &amp; mint
+                        </Button>
+                      )}
+                      <Button
+                        onClick={publishPersona}
+                        disabled={publishing || !user}
+                        size="lg"
+                        className="rounded-full px-8 shadow-lg shadow-primary/20"
+                      >
+                        {publishing ? (
+                          <>
+                            <Loader2 className="mr-2 size-4 animate-spin" />
+                            Publishing…
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="mr-2 size-4" />
+                            Mint persona
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -314,6 +487,10 @@ function parseList(raw: string, fallback: string[]): string[] {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
   return parts.length > 0 ? parts : fallback;
+}
+
+function truncate(s: string, n: number): string {
+  return s.length <= n ? s : s.slice(0, n).trimEnd() + "…";
 }
 
 export default Onboard;

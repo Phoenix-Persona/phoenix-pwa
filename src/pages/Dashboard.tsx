@@ -1,19 +1,19 @@
 /**
  * Dashboard — the active persona's composer + recent feed.
  *
- * Phase 1 status: the composer publishes raw text directly. PPQ
- * styling, image generation, wallet badge, and cost estimates land
- * in Phase 2 (tasks/derek-plan.md). Anything depending on Jim's PPQ
- * hooks is stubbed with a TODO comment.
+ * The composer publishes raw text directly. AI styling (PPQ), image
+ * generation, and the wallet/cost layer are Jim's surface area and
+ * land separately on this page when they're ready.
  */
 
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
-import { Loader2, Send, Sparkles, ExternalLink } from "lucide-react";
+import { Loader2, Send, Sparkles } from "lucide-react";
 
-import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
+import { PersonaActionsMenu } from "@/components/PersonaActionsMenu";
 import { PostCard } from "@/components/PostCard";
 import { PostListSkeleton } from "@/components/Skeletons";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,7 @@ function npubToHex(npub: string): string | null {
 
 const Dashboard = () => {
   const { npub = "" } = useParams();
-  useSeoMeta({ title: "Dashboard — Phoenix" });
+  useSeoMeta({ title: "Dashboard — Feniksi" });
 
   const { user } = useCurrentUser();
   const { toast } = useToast();
@@ -61,8 +61,8 @@ const Dashboard = () => {
   async function onPost() {
     if (!personaConfig || !user || !raw.trim()) return;
     try {
-      // Phase 1: no styling step yet — publish the raw text directly.
-      // Phase 2 wires `pi-ai` (Jim's hook) between raw and template.
+      // No styling step yet — publish the raw text directly. AI
+      // styling will run between `raw` and `template` once it's wired.
       const template = buildPersonaPostTemplate({
         text: raw,
         tags: personaConfig.tags,
@@ -85,7 +85,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <PhoenixHeader />
+      <AppHeader />
 
       <main id="main-content" className="flex-1">
         {/* Persona cover header — charcoal mat with avatar + tags */}
@@ -136,6 +136,7 @@ const Dashboard = () => {
                         alt=""
                         className="w-full h-full object-cover"
                         loading="eager"
+                        crossOrigin="anonymous"
                       />
                     ) : (
                       <ImigongoSeal size={56} colorClass="text-rw-gold/80" />
@@ -156,28 +157,29 @@ const Dashboard = () => {
                       {publicBio}
                     </p>
                   )}
-                  <div className="flex flex-wrap gap-2 pt-1 items-center">
-                    {personaConfig.tags.slice(0, 4).map((t) => (
-                      <Badge
-                        key={t}
-                        variant="secondary"
-                        className="text-[10px] bg-imigongo-cream/15 text-imigongo-cream border-0"
-                      >
-                        {t}
-                      </Badge>
-                    ))}
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full border-imigongo-cream/30 text-imigongo-cream bg-transparent hover:bg-imigongo-cream/10 hover:text-imigongo-cream"
-                    >
-                      <Link to={`/p/${npub}`}>
-                        <ExternalLink className="mr-2 size-3.5" />
-                        Public feed
-                      </Link>
-                    </Button>
-                  </div>
+                  {personaConfig.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1 items-center">
+                      {personaConfig.tags.slice(0, 4).map((t) => (
+                        <Badge
+                          key={t}
+                          variant="secondary"
+                          className="text-[10px] bg-imigongo-cream/15 text-imigongo-cream border-0"
+                        >
+                          {t}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <PersonaActionsMenu
+                    npub={npub}
+                    backupEvent={persona.data!.event}
+                    personaPubkey={personaConfig.pubkey}
+                    personaName={personaConfig.name}
+                    variant="inline"
+                    publicFeedNpub={npub}
+                    inverse
+                    className="pt-2"
+                  />
                 </div>
               </div>
             </div>
@@ -214,16 +216,11 @@ const Dashboard = () => {
         <div className="container py-10 max-w-4xl space-y-8">
           {personaConfig && (
             <Card className="border-imigongo-clay/20 bg-gradient-to-br from-card via-card to-rw-gold-soft/10 overflow-hidden">
-              <div className="bg-gradient-to-r from-imigongo-clay/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="size-5 text-imigongo-clay" aria-hidden="true" />
-                  <h2 className="font-display text-2xl font-medium tracking-tight">
-                    Compose
-                  </h2>
-                </div>
-                <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
-                  Phase 1 · Raw publish
-                </span>
+              <div className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center gap-2">
+                <Sparkles className="size-5 text-imigongo-clay" aria-hidden="true" />
+                <h2 className="font-display text-2xl font-medium tracking-tight">
+                  Compose
+                </h2>
               </div>
               <CardContent className="space-y-5 pt-5">
                 <div className="space-y-2">
@@ -240,7 +237,7 @@ const Dashboard = () => {
                     rows={5}
                     value={raw}
                     onChange={(e) => setRaw(e.target.value)}
-                    placeholder="Phase 1: publishes as-is. Phase 2: AI styling will run before publish."
+                    placeholder="Type the raw thought. We'll publish it as-is for now; AI styling will run here once it lands."
                     onKeyDown={(e) => {
                       if (
                         (e.metaKey || e.ctrlKey) &&
@@ -311,7 +308,7 @@ const Dashboard = () => {
               <ul className="space-y-3">
                 {posts.data.map((p) => (
                   <li key={p.id}>
-                    <PostCard event={p} showOperatorBadge />
+                    <PostCard event={p} />
                   </li>
                 ))}
               </ul>

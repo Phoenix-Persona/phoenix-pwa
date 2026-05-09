@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Menu } from "lucide-react";
+import { Menu, Settings as SettingsIcon } from "lucide-react";
 
 import { FlagStripe } from "@/components/ImigongoBand";
 import { LoginArea } from "@/components/auth/LoginArea";
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/sheet";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
-export function PhoenixHeader() {
+export function AppHeader() {
   const { user } = useCurrentUser();
   const isLoggedIn = Boolean(user);
 
@@ -30,7 +30,7 @@ export function PhoenixHeader() {
         <Link
           to="/"
           className="flex items-center gap-3 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
-          aria-label="Phoenix home"
+          aria-label="Feniksi home"
         >
           <span className="relative">
             <span className="absolute -inset-1 rounded-xl bg-rw-gold/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -44,7 +44,7 @@ export function PhoenixHeader() {
           </span>
           <div className="flex flex-col leading-tight">
             <span className="font-display font-semibold text-xl tracking-tight">
-              Phoenix
+              Feniksi
             </span>
             <span className="hidden sm:inline text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
               Uncensorable voices
@@ -87,7 +87,7 @@ export function PhoenixHeader() {
             </SheetTrigger>
             <SheetContent side="right" className="w-72">
               <SheetHeader>
-                <SheetTitle className="font-display text-2xl">Phoenix</SheetTitle>
+                <SheetTitle className="font-display text-2xl">Feniksi</SheetTitle>
               </SheetHeader>
               <nav className="px-4 pb-6 flex flex-col gap-1 text-base font-medium">
                 {isLoggedIn && (
@@ -106,6 +106,15 @@ export function PhoenixHeader() {
                         className="rounded-lg px-3 py-3 hover:bg-muted transition-colors"
                       >
                         New persona
+                      </Link>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <Link
+                        to="/settings"
+                        className="rounded-lg px-3 py-3 hover:bg-muted transition-colors flex items-center gap-2"
+                      >
+                        <SettingsIcon className="size-4" />
+                        Settings
                       </Link>
                     </SheetClose>
                     <div className="my-2 border-t border-border" />

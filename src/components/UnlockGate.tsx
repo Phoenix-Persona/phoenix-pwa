@@ -112,7 +112,7 @@ export function UnlockGate({ children }: UnlockGateProps) {
 
   function handleForgetDevice() {
     const ok = window.confirm(
-      "Forget this device? You'll need your nsec backup to use Phoenix on this browser again. Personas survive — they're stored on relays."
+      "Forget this device? You'll need your nsec backup to use Feniksi on this browser again. Personas survive — they're stored on relays."
     );
     if (!ok) return;
     clearUserNcryptsec();
@@ -130,7 +130,7 @@ export function UnlockGate({ children }: UnlockGateProps) {
           <div className="flex items-center gap-2">
             <Lock className="size-5 text-primary" aria-hidden="true" />
             <h2 className="font-display text-2xl font-medium tracking-tight">
-              Unlock Phoenix
+              Unlock Feniksi
             </h2>
           </div>
           <p className="text-sm text-muted-foreground leading-relaxed">

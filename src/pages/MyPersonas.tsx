@@ -2,8 +2,9 @@ import { Link } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 import { Plus, Sparkles } from "lucide-react";
 
-import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
+import { PersonaActionsMenu } from "@/components/PersonaActionsMenu";
 import { PersonaGridSkeleton } from "@/components/Skeletons";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,13 +13,13 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useMyPersonas } from "@/hooks/usePersona";
 
 const MyPersonas = () => {
-  useSeoMeta({ title: "My personas — Phoenix" });
+  useSeoMeta({ title: "My personas — Feniksi" });
   const { user } = useCurrentUser();
   const { data, isLoading, isError, error } = useMyPersonas();
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <PhoenixHeader />
+      <AppHeader />
 
       {/* Cover band — charcoal mat with bold pattern + warm glow */}
       <section className="relative overflow-hidden hero-mat text-imigongo-cream">
@@ -88,47 +89,82 @@ const MyPersonas = () => {
                 ? "from-rw-green to-rw-green-deep"
                 : "from-rw-gold to-imigongo-ochre";
               return (
-                <Link
+                <article
                   key={event.id}
-                  to={`/dashboard/${npub}`}
                   className="group relative rounded-2xl border border-border bg-card hover:border-imigongo-clay/60 hover:shadow-2xl hover:shadow-imigongo-clay/20 transition-all overflow-hidden"
                 >
-                  {/* Color cap header */}
-                  <div className={`relative h-24 bg-gradient-to-br ${accent} overflow-hidden`}>
-                    <div
-                      className="absolute inset-0 imigongo-pattern-bold text-imigongo-cream opacity-[0.18]"
-                      aria-hidden="true"
-                    />
-                    <ImigongoSeal
-                      size={64}
-                      colorClass="text-imigongo-cream/40"
-                      className="absolute -right-3 -bottom-3"
-                    />
-                    <FlagStripe className="absolute bottom-0 left-0 right-0" height={3} />
-                  </div>
-
-                  <div className="p-5 space-y-3">
-                    {topTags.length > 0 && (
-                      <div className="text-[10px] uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
-                        {topTags.join(" · ")}
-                      </div>
-                    )}
-                    <h3 className="font-display text-2xl font-medium tracking-tight group-hover:text-primary transition-colors leading-tight">
-                      {persona.name}
-                    </h3>
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {persona.languages.slice(0, 3).map((l) => (
-                        <Badge
-                          key={l}
-                          variant="secondary"
-                          className="text-[10px] bg-secondary/80"
-                        >
-                          {l.toUpperCase()}
-                        </Badge>
-                      ))}
+                  <Link
+                    to={`/dashboard/${npub}`}
+                    className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl"
+                  >
+                    {/* Color cap header */}
+                    <div className={`relative h-24 bg-gradient-to-br ${accent} overflow-hidden`}>
+                      <div
+                        className="absolute inset-0 imigongo-pattern-bold text-imigongo-cream opacity-[0.18]"
+                        aria-hidden="true"
+                      />
+                      <ImigongoSeal
+                        size={64}
+                        colorClass="text-imigongo-cream/40"
+                        className="absolute -right-3 -bottom-3"
+                      />
+                      <FlagStripe className="absolute bottom-0 left-0 right-0" height={3} />
                     </div>
+
+                    {/* Avatar — overlaps the cap by half its height. Picture
+                        when set on the persona, Imigongo seal as fallback. */}
+                    <div className="px-5 -mt-8 relative">
+                      <div className="size-16 rounded-full ring-4 ring-card shadow-lg overflow-hidden bg-imigongo-charcoal flex items-center justify-center">
+                        {persona.reference_image_url ? (
+                          <img
+                            src={persona.reference_image_url}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            crossOrigin="anonymous"
+                          />
+                        ) : (
+                          <ImigongoSeal
+                            size={36}
+                            colorClass="text-rw-gold/80"
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-5 pt-3 space-y-2.5">
+                      {topTags.length > 0 && (
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
+                          {topTags.join(" · ")}
+                        </div>
+                      )}
+                      <h3 className="font-display text-2xl font-medium tracking-tight group-hover:text-primary transition-colors leading-tight">
+                        {persona.name}
+                      </h3>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {persona.languages.slice(0, 3).map((l) => (
+                          <Badge
+                            key={l}
+                            variant="secondary"
+                            className="text-[10px] bg-secondary/80"
+                          >
+                            {l.toUpperCase()}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </Link>
+
+                  {/* Sibling of <Link>, not nested — clicks don't bubble. */}
+                  <div className="absolute top-3 right-3 z-10">
+                    <PersonaActionsMenu
+                      npub={npub}
+                      backupEvent={event}
+                      personaPubkey={persona.pubkey}
+                      personaName={persona.name}
+                    />
                   </div>
-                </Link>
+                </article>
               );
             })}
           </div>
@@ -150,7 +186,7 @@ const MyPersonas = () => {
                 </p>
                 <p className="text-muted-foreground max-w-md mx-auto">
                   Create the first voice. Choose a cause, shape the tone,
-                  and Phoenix will mint a fresh keypair just for it.
+                  and Feniksi will mint a fresh keypair just for it.
                 </p>
               </div>
               <Button
