@@ -1,40 +1,34 @@
-# wallet integration smoke test
+# wallet integration smoke tests
 
-Manual end-to-end check that the Phoenix wallet primitives work against the
-real Breez Spark SDK. Walks every goal of the headless wallet branch:
+Manual end-to-end checks that the Phoenix wallet primitives work against
+the real Breez Spark SDK.
 
-1. **Operator key** — generates a fresh Nostr nsec to act as the persona's
-   owner, persisted to `.operator.json`.
-2. **Encrypted persona envelope** — mints (or decrypts) a kind-30078-shaped
-   `PhoenixEnvelope` containing a fresh BIP-39 mnemonic alongside
-   `personaNsec`. Round-trips it through NIP-44 self-encryption to prove
-   the seed lives next to the other secrets in the same envelope.
-3. **Spark wallet connect** — boots the SDK with the decrypted mnemonic and
-   prints balance + Lightning Address (registers one with
-   `--register-address`).
-4. **Receive** — generates a BOLT11 invoice and polls until you pay it from
-   another wallet.
-5. **Default-on auto-topup → ppq.ai** — runs `runAutoTopupOnce` once,
-   paying ppq.ai's Lightning invoice from the Spark wallet to bring the
-   ppq credit balance to at least the configured target.
+## Two scripts
 
-## Run it
+| Script | What it does |
+| --- | --- |
+| [`bootstrap.ts`](./bootstrap.ts) | First run. Mints an operator nsec, encrypts a fresh persona envelope (with BIP-39 mnemonic embedded), connects the Spark wallet, optionally registers a Lightning Address, prompts you to fund it via BOLT11, then runs one default-on auto-topup pass against ppq.ai. |
+| [`topup-and-infer.ts`](./topup-and-infer.ts) | Follow-up. Reuses the persisted state from `bootstrap.ts` and exercises three flows: a "hello world" inference call against ppq.ai, the disabled-policy short-circuit, and a forced auto-topup that fires no matter the current balance. |
 
-```bash
-npx tsx tests/wallet/run.ts
-```
-
-The script loads `dev/.env` automatically; just put your `VITE_BREEZ_API_KEY`
-there:
+Both scripts load `dev/.env` automatically; just put your API key there:
 
 ```bash
 echo 'VITE_BREEZ_API_KEY=your_key' >> dev/.env
 ```
 
-A shell-set env var still wins if you'd rather pass it ad-hoc:
-`VITE_BREEZ_API_KEY=… npx tsx tests/wallet/run.ts`.
+## Run them
 
-Useful flags:
+```bash
+# First time on a machine — mints wallet + persona + first topup
+npx tsx tests/wallet/bootstrap.ts
+
+# Subsequently — reuses the persisted state
+npx tsx tests/wallet/topup-and-infer.ts
+```
+
+## Useful flags
+
+`bootstrap.ts`
 
 | Flag | Effect |
 | --- | --- |
@@ -44,18 +38,31 @@ Useful flags:
 | `--topup-target <usd>` | Auto-topup target (default 5) |
 | `--topup-threshold <usd>` | Auto-topup threshold (default 1) |
 
+`topup-and-infer.ts`
+
+| Flag | Effect |
+| --- | --- |
+| `--skip-inference` | Skip the chat completion call |
+| `--skip-disabled` | Skip the off-switch assertion |
+| `--skip-forced` | Skip the forced-topup step (it costs real sats) |
+| `--topup-target <usd>` | Override the forced-topup target (default: current + $0.50) |
+| `--topup-threshold <usd>` | Override the forced-topup threshold (default $1000 — guarantees fire) |
+| `--inference-model <id>` | Override the inference model (default `claude-sonnet-4.5`) |
+
 ## Persisted credentials (gitignored)
 
 | File | What it holds |
 | --- | --- |
 | `tests/wallet/.operator.json` | Operator nsec used to (de)crypt the envelope |
 | `tests/wallet/.persona.json` | Encrypted PhoenixEnvelope (the kind-30078 ciphertext) |
-| `tests/ai-services/.account.json` | ppq.ai credentials, shared with the AI test |
+| `tests/ai-services/.account.json` | ppq.ai credentials, shared with the AI walkthrough |
 
 All three files are mode `0600` and gitignored. They grant spending power
-— never commit.
+— never commit. The Breez SDK also creates a `phoenix-wallet/` directory
+in whatever working directory the script ran from; that's gitignored too.
 
 ## Cost ballpark
 
-- Receive: zero, or whatever your funding wallet charges as routing fee.
-- Auto-topup of $1: a few hundred sats of routing + the topup amount.
+- Receive: zero, plus whatever your funding wallet charges as routing fee.
+- Auto-topup of $0.50: a few hundred sats of routing + the topup amount.
+- Hello-world inference: well under $0.001.

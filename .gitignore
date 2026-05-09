@@ -41,3 +41,7 @@ tests/ai-services/.last-invoice.json
 # Local wallet test credentials (grants spending power — never commit)
 tests/wallet/.operator.json
 tests/wallet/.persona.json
+
+# Breez Spark SDK persistent storage (created by Node tests at storageDir
+# = "phoenix-wallet"; relative to wherever the script ran from)
+phoenix-wallet/

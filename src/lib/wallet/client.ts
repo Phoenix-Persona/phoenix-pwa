@@ -274,12 +274,12 @@ export async function subscribeWalletEvents(
  */
 export async function generateMnemonic(): Promise<string> {
   const { generateMnemonic } = await import("@scure/bip39");
-  const { wordlist } = await import("@scure/bip39/wordlists/english");
+  const { wordlist } = await import("@scure/bip39/wordlists/english.js");
   return generateMnemonic(wordlist, 128);
 }
 
 export async function validateMnemonic(mnemonic: string): Promise<boolean> {
   const { validateMnemonic } = await import("@scure/bip39");
-  const { wordlist } = await import("@scure/bip39/wordlists/english");
+  const { wordlist } = await import("@scure/bip39/wordlists/english.js");
   return validateMnemonic(mnemonic, wordlist);
 }

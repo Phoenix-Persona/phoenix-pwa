@@ -23,7 +23,7 @@ spend on this run.
 ## Run it
 
 ```bash
-npx tsx tests/ai-services/run.ts
+npx tsx tests/ai-services/walkthrough.ts
 ```
 
 Useful flags:
