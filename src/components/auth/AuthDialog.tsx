@@ -5,11 +5,13 @@ import {
   Eye,
   EyeOff,
   Key,
+  Lock,
   ChevronDown,
   ChevronUp,
   Loader2,
   ExternalLink,
 } from 'lucide-react';
+import { encryptNsec, storeUserNcryptsec } from '@/lib/nip49Storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -39,7 +41,7 @@ interface AuthDialogProps {
   onClose: () => void;
 }
 
-type Step = 'welcome' | 'generate' | 'secure' | 'profile' | 'login' | 'connect';
+type Step = 'welcome' | 'generate' | 'secure' | 'passphrase' | 'profile' | 'login' | 'connect';
 
 const validateNsec = (nsec: string) => /^nsec1[a-zA-Z0-9]{58}$/.test(nsec);
 const validateBunkerUri = (uri: string) => uri.startsWith('bunker://');
@@ -89,6 +91,12 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
   const [showKey, setShowKey] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [profileData, setProfileData] = useState({ name: '', about: '', picture: '' });
+
+  // Passphrase state (NIP-49 at-rest encryption of fresh-Phoenix-generated nsecs)
+  const [passphrase, setPassphrase] = useState('');
+  const [passphraseConfirm, setPassphraseConfirm] = useState('');
+  const [passphraseError, setPassphraseError] = useState('');
+  const [encryptingPassphrase, setEncryptingPassphrase] = useState(false);
 
   // Login state
   const [loginNsec, setLoginNsec] = useState('');
@@ -282,18 +290,54 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
     }, 750);
   };
 
-  // Signup: download the nsec to a file and move on to the profile step.
+  // Signup: download the nsec to a file and move on to the passphrase step.
+  // The Nostrify login is deferred until the passphrase step has encrypted
+  // and stored the ncryptsec — that way the at-rest backup exists before
+  // the plaintext nsec lands in Nostrify's localStorage.
   const downloadAndProceed = () => {
     try {
       downloadNsecFile(nsec);
-      login.nsec(nsec);
-      setStep('profile');
+      setStep('passphrase');
     } catch {
       toast({
         title: 'Download failed',
         description: 'Could not download the key file. Please copy it manually.',
         variant: 'destructive',
       });
+    }
+  };
+
+  // Signup: encrypt the nsec at rest, store the ncryptsec, then start
+  // the Nostrify session. scrypt at log_n=18 takes ~400ms — yield to
+  // the event loop so the spinner paints first.
+  const handlePassphraseSubmit = async () => {
+    setPassphraseError('');
+    if (passphrase.length < 12) {
+      setPassphraseError('Use at least 12 characters.');
+      return;
+    }
+    if (passphrase !== passphraseConfirm) {
+      setPassphraseError('Passphrases do not match.');
+      return;
+    }
+    setEncryptingPassphrase(true);
+    await new Promise((r) => setTimeout(r, 0));
+    try {
+      const decoded = nip19.decode(nsec);
+      if (decoded.type !== 'nsec') throw new Error('Invalid nsec');
+      const ncryptsec = encryptNsec(decoded.data, passphrase);
+      storeUserNcryptsec(ncryptsec);
+      // Now safe to log in — the at-rest backup is in place.
+      login.nsec(nsec);
+      setPassphrase('');
+      setPassphraseConfirm('');
+      setStep('profile');
+    } catch (e) {
+      setPassphraseError(
+        e instanceof Error ? e.message : 'Encryption failed. Please try again.'
+      );
+    } finally {
+      setEncryptingPassphrase(false);
     }
   };
 
@@ -402,6 +446,8 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
         return 'Create account';
       case 'secure':
         return 'Save your key';
+      case 'passphrase':
+        return 'Set a passphrase';
       case 'profile':
         return 'Your profile';
       case 'login':
@@ -542,6 +588,82 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
               <Button onClick={downloadAndProceed} className="w-full h-12">
                 <Download className="w-4 h-4 mr-2" />
                 Download &amp; continue
+              </Button>
+            </div>
+          )}
+
+          {/* Passphrase step — NIP-49 encrypt the nsec at rest. */}
+          {step === 'passphrase' && (
+            <div className="space-y-4">
+              <div className="flex size-14 bg-primary/10 rounded-full items-center justify-center mx-auto">
+                <Lock className="w-7 h-7 text-primary" />
+              </div>
+
+              <p className="text-sm text-muted-foreground text-center leading-relaxed">
+                Set a passphrase. Phoenix will use it to encrypt your key
+                on this device, and ask for it once per browser session.
+              </p>
+
+              <div className="space-y-1.5">
+                <label htmlFor="signup-passphrase" className="text-sm font-medium">
+                  Passphrase
+                </label>
+                <Input
+                  id="signup-passphrase"
+                  type="password"
+                  value={passphrase}
+                  onChange={(e) => setPassphrase(e.target.value)}
+                  autoComplete="new-password"
+                  disabled={encryptingPassphrase}
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="signup-passphrase-confirm" className="text-sm font-medium">
+                  Confirm passphrase
+                </label>
+                <Input
+                  id="signup-passphrase-confirm"
+                  type="password"
+                  value={passphraseConfirm}
+                  onChange={(e) => setPassphraseConfirm(e.target.value)}
+                  autoComplete="new-password"
+                  disabled={encryptingPassphrase}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !encryptingPassphrase) {
+                      e.preventDefault();
+                      handlePassphraseSubmit();
+                    }
+                  }}
+                />
+              </div>
+
+              {passphraseError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{passphraseError}</AlertDescription>
+                </Alert>
+              )}
+
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                At least 12 characters. Phoenix can't recover this for you —
+                write it down somewhere offline. Losing the passphrase means
+                you must restore from your nsec backup file.
+              </p>
+
+              <Button
+                onClick={handlePassphraseSubmit}
+                disabled={encryptingPassphrase}
+                className="w-full h-12"
+              >
+                {encryptingPassphrase ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Encrypting…
+                  </>
+                ) : (
+                  'Encrypt &amp; continue'
+                )}
               </Button>
             </div>
           )}

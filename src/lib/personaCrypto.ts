@@ -1,19 +1,23 @@
 /**
  * NIP-44 encryption helpers for Phoenix persona payloads.
  *
- * The operator self-encrypts: the recipient pubkey is the operator's own
- * pubkey, so only the operator's signer can decrypt.
+ * The user self-encrypts: the recipient pubkey is the user's own
+ * pubkey, so only the user's signer can decrypt.
  *
  * The plaintext is the Phoenix envelope (app discriminator + persona
- * pubkey + persona config). The discriminator lives inside the ciphertext
- * so the encrypted event tag layout doesn't reveal Phoenix usage.
+ * config + wallet + model prefs + settings). The discriminator lives
+ * inside the ciphertext so the encrypted event tag layout doesn't
+ * reveal Phoenix usage.
  */
 
 import {
   PHOENIX_PAYLOAD_APP,
   PHOENIX_PAYLOAD_VERSION,
   parsePhoenixEnvelope,
-  type PersonaConfig,
+  type Persona,
+  type PersonaModelPrefs,
+  type PersonaSettings,
+  type PersonaWallet,
   type PhoenixEnvelope,
 } from "./persona";
 
@@ -25,23 +29,30 @@ export interface Nip44Signer {
 }
 
 /**
- * Encrypt a Phoenix envelope (operator → operator self-encryption).
+ * Encrypt a Phoenix envelope (user → user self-encryption).
  */
 export async function encryptPhoenixEnvelope(
   args: {
-    personaPubkey: string;
-    config: PersonaConfig;
+    persona: Persona;
+    wallet?: PersonaWallet;
+    model_prefs?: PersonaModelPrefs;
+    settings?: PersonaSettings;
   },
-  operatorPubkey: string,
+  userPubkey: string,
   signer: Nip44Signer
 ): Promise<string> {
   const envelope: PhoenixEnvelope = {
     app: PHOENIX_PAYLOAD_APP,
     version: PHOENIX_PAYLOAD_VERSION,
-    personaPubkey: args.personaPubkey.toLowerCase(),
-    config: args.config,
+    persona: {
+      ...args.persona,
+      pubkey: args.persona.pubkey.toLowerCase(),
+    },
+    wallet: args.wallet,
+    model_prefs: args.model_prefs,
+    settings: args.settings,
   };
-  return await signer.nip44.encrypt(operatorPubkey, JSON.stringify(envelope));
+  return await signer.nip44.encrypt(userPubkey, JSON.stringify(envelope));
 }
 
 /**
@@ -54,12 +65,12 @@ export async function encryptPhoenixEnvelope(
  */
 export async function tryDecryptPhoenixEnvelope(
   ciphertext: string,
-  operatorPubkey: string,
+  userPubkey: string,
   signer: Nip44Signer
 ): Promise<PhoenixEnvelope | null> {
   let plaintext: string;
   try {
-    plaintext = await signer.nip44.decrypt(operatorPubkey, ciphertext);
+    plaintext = await signer.nip44.decrypt(userPubkey, ciphertext);
   } catch {
     return null;
   }

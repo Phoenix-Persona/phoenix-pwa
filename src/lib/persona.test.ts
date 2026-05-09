@@ -18,21 +18,15 @@ function makeValidEnvelope(overrides: Partial<PhoenixEnvelope> = {}): PhoenixEnv
   const base: PhoenixEnvelope = {
     app: PHOENIX_PAYLOAD_APP,
     version: PHOENIX_PAYLOAD_VERSION,
-    personaPubkey: pk,
-    config: {
+    persona: {
+      pubkey: pk,
+      nsec,
       name: "Voice of Test",
-      region: "RW",
-      cause: "human-rights",
+      system_prompt: "You are a test persona.",
+      voice_id: "alloy",
       languages: ["en"],
-      tone: "measured",
-      frequencySec: 3600,
-      sources: [{ kind: "url", url: "https://example.org" }],
-      focus: ["press freedom"],
-      model: "anthropic/claude-sonnet-4.5",
-      systemPrompt: "You are a test persona.",
-      personality: "calm",
-      bio: "An AI-assisted test voice.",
-      personaNsec: nsec,
+      tags: ["press-freedom"],
+      created_at: Math.floor(Date.now() / 1000),
     },
   };
   return { ...base, ...overrides };
@@ -41,13 +35,16 @@ function makeValidEnvelope(overrides: Partial<PhoenixEnvelope> = {}): PhoenixEnv
 describe("parsePhoenixEnvelope", () => {
   it("accepts a minimally valid envelope and normalizes pubkey casing", () => {
     const env = makeValidEnvelope();
-    const upperPub = env.personaPubkey.toUpperCase();
-    const json = JSON.stringify({ ...env, personaPubkey: upperPub });
+    const upperPub = env.persona.pubkey.toUpperCase();
+    const json = JSON.stringify({
+      ...env,
+      persona: { ...env.persona, pubkey: upperPub },
+    });
 
     const parsed = parsePhoenixEnvelope(json);
     expect(parsed).not.toBeNull();
-    expect(parsed!.personaPubkey).toBe(env.personaPubkey.toLowerCase());
-    expect(parsed!.config.personaNsec).toBe(env.config.personaNsec);
+    expect(parsed!.persona.pubkey).toBe(env.persona.pubkey.toLowerCase());
+    expect(parsed!.persona.nsec).toBe(env.persona.nsec);
   });
 
   it("rejects non-JSON input", () => {
@@ -75,69 +72,83 @@ describe("parsePhoenixEnvelope", () => {
     expect(parsePhoenixEnvelope(JSON.stringify(v2))).toBeNull();
   });
 
-  it("rejects an envelope where personaPubkey is not 64 hex chars", () => {
+  it("rejects an envelope where persona.pubkey is not 64 hex chars", () => {
     const env = makeValidEnvelope();
-    const tampered = { ...env, personaPubkey: "not-hex" };
+    const tampered = {
+      ...env,
+      persona: { ...env.persona, pubkey: "not-hex" },
+    };
     expect(parsePhoenixEnvelope(JSON.stringify(tampered))).toBeNull();
   });
 
-  it("rejects an envelope where personaPubkey doesn't match the embedded nsec", () => {
+  it("rejects an envelope where persona.pubkey doesn't match the embedded nsec", () => {
     const envA = makeValidEnvelope();
     const envB = makeValidEnvelope();
     // Take envelope A's metadata but inject envelope B's nsec — claimed
-    // personaPubkey will no longer derive from the embedded key.
+    // persona.pubkey will no longer derive from the embedded key.
     const tampered = {
       ...envA,
-      config: {
-        ...envA.config,
-        personaNsec: envB.config.personaNsec,
+      persona: {
+        ...envA.persona,
+        nsec: envB.persona.nsec,
       },
     };
     expect(parsePhoenixEnvelope(JSON.stringify(tampered))).toBeNull();
   });
 
-  it("rejects an envelope missing required config fields", () => {
+  it("rejects an envelope missing required persona fields", () => {
     const env = makeValidEnvelope();
     // Strip name
     const noName = {
       ...env,
-      config: { ...env.config, name: undefined },
+      persona: { ...env.persona, name: undefined },
     };
     expect(parsePhoenixEnvelope(JSON.stringify(noName))).toBeNull();
 
-    // Strip personaNsec
+    // Strip nsec
     const noNsec = {
       ...env,
-      config: { ...env.config, personaNsec: undefined },
+      persona: { ...env.persona, nsec: undefined },
     };
     expect(parsePhoenixEnvelope(JSON.stringify(noNsec))).toBeNull();
   });
 
-  it("rejects an envelope where personaNsec is not a valid nsec1 string", () => {
+  it("rejects an envelope where persona.nsec is not a valid nsec1 string", () => {
     const env = makeValidEnvelope();
     const tampered = {
       ...env,
-      config: { ...env.config, personaNsec: "definitely-not-an-nsec" },
+      persona: { ...env.persona, nsec: "definitely-not-an-nsec" },
     };
     expect(parsePhoenixEnvelope(JSON.stringify(tampered))).toBeNull();
   });
 
-  it("rejects an envelope with an invalid languages array", () => {
+  it("rejects an envelope with an empty languages array", () => {
     const env = makeValidEnvelope();
     const empty = {
       ...env,
-      config: { ...env.config, languages: [] },
+      persona: { ...env.persona, languages: [] },
     };
     expect(parsePhoenixEnvelope(JSON.stringify(empty))).toBeNull();
   });
 
-  it("rejects an envelope with negative frequencySec", () => {
+  it("accepts an envelope with optional wallet, model_prefs, settings", () => {
     const env = makeValidEnvelope();
-    const neg = {
+    const enriched = {
       ...env,
-      config: { ...env.config, frequencySec: -1 },
+      wallet: { kind: "breeze", seed: "test seed phrase" },
+      model_prefs: {
+        agent: "anthropic/claude-sonnet-4.5",
+        image: "openai/gpt-image-1",
+        tts: "openai/tts-1-hd",
+        video: null,
+      },
+      settings: { default_relays: ["wss://relay.damus.io"] },
     };
-    expect(parsePhoenixEnvelope(JSON.stringify(neg))).toBeNull();
+    const parsed = parsePhoenixEnvelope(JSON.stringify(enriched));
+    expect(parsed).not.toBeNull();
+    expect(parsed!.wallet?.kind).toBe("breeze");
+    expect(parsed!.model_prefs?.agent).toBe("anthropic/claude-sonnet-4.5");
+    expect(parsed!.settings?.default_relays).toEqual(["wss://relay.damus.io"]);
   });
 
   it("rejects another app's NIP-78 self-encrypted JSON", () => {
