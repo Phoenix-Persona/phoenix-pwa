@@ -3,12 +3,13 @@
 Manual end-to-end checks that the Phoenix ppq.ai primitives work against
 the real `https://api.ppq.ai` service.
 
-## Two scripts
+## Three scripts
 
 | Script | Purpose |
 | --- | --- |
 | [`test-all-ppq-services-e2e.ts`](./test-all-ppq-services-e2e.ts) | Walks every endpoint top to bottom (account → balance → Lightning topup → inference → image → video). Use this on a fresh machine. |
-| [`test-veo-last-frame-conditioning.ts`](./test-veo-last-frame-conditioning.ts) | Continuity proof: generates two Veo 3.1 Fast clips that share a verbatim "locked-down world" prompt block; clip 2 is image-to-video conditioned on the LAST FRAME of clip 1. Visually inspect the seam to confirm hair / lighting / posture / wardrobe hold across the join. Requires `ffmpeg` on `$PATH`. |
+| [`top-up-ppq-with-lightning.ts`](./top-up-ppq-with-lightning.ts) | Single-purpose: creates a ppq.ai Lightning invoice for the USD amount you specify, prints the BOLT11, and polls until it settles. Pay from ANY wallet (Spark, Phoenix, Wallet of Satoshi, Alby). No Spark dependency, no inference, no other side effects. |
+| [`test-veo-last-frame-conditioning.ts`](./test-veo-last-frame-conditioning.ts) | Continuity proof: generates two video clips on a singleton model that share a verbatim "locked-down world" prompt block; clip 2 is image-to-video conditioned on the LAST FRAME of clip 1. No caching — every run is a fresh end-to-end pipeline. Pre-flight balance check tells you exactly how much to top up if you're short. Requires `ffmpeg` on `$PATH`. |
 
 ## Walking every endpoint
 

@@ -651,12 +651,14 @@ async function main(): Promise<void> {
       throw new Error(
         `Insufficient ppq.ai credit. Balance is $${balanceUsd.toFixed(4)}; ` +
           `need at least $${PREFLIGHT_USD_REQUIRED.toFixed(2)}.\n\n` +
-          `Top up at least $${need} more by either:\n` +
-          `  • Running the wallet auto-topup:\n` +
-          `      npx tsx tests/wallet/test-auto-topup-and-inference.ts\n` +
-          `  • Or paying a Lightning invoice manually:\n` +
-          `      npx tsx tests/ai-services/test-all-ppq-services-e2e.ts\n` +
-          `      (answer 'y' at the topup step, skip the rest)`,
+          `Top up at least $${need} more. Recommended path (pay from any ` +
+          `Lightning wallet, no Spark dependency):\n\n` +
+          `  npx tsx tests/ai-services/top-up-ppq-with-lightning.ts --usd ${Math.ceil(parseFloat(need))}\n\n` +
+          `Other options:\n` +
+          `  • Already have sats in your Spark wallet?\n` +
+          `      npx tsx tests/wallet/test-auto-topup-and-inference.ts  (pushes Spark → ppq)\n` +
+          `  • Spark wallet empty? Fund it first:\n` +
+          `      npx tsx tests/wallet/fund-spark-wallet-with-sats.ts --amount-sats 10000`,
       );
     }
   }
