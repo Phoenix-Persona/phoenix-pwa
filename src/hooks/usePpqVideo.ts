@@ -11,11 +11,20 @@
  *      drop into a `<video>` tag.
  *
  *   const { mutateAsync: submit } = usePpqVideoSubmit();
- *   const job = await submit({ model: "veo3", prompt: "..." });
+ *   const job = await submit({ model: "seedance-2-fast", prompt: "..." });
  *   const status = usePpqVideoJob(job.id); // polls automatically
  *
- * Defaults to `veo3-fast` if the caller omits the model — Veo 3 quality is
- * available by passing `model: "veo3"` explicitly.
+ * Defaults to `seedance-2-fast` — the Seedance 2 family is empirically
+ * the only path on ppq.ai that produces all three of (a) image-to-video
+ * conditioning that actually routes (Veo i2v returns 502, Kling i2v
+ * works but is silent), (b) native lip-synced audio, and (c) character
+ * + setting continuity across the seam from a conditioning frame.
+ * `-fast` over `seedance-2` for dev iteration speed and lower cost;
+ * promote to `seedance-2` only for hero / final renders. See
+ * `tests/ai-services/probe-seedance-i2v-with-speech.ts` for the
+ * minimum-reproducible test that established this.
+ *
+ * Override via `model` on the request to use any other catalog id.
  */
 
 import { useMutation, useQuery, type UseMutationResult } from "@tanstack/react-query";
@@ -28,7 +37,7 @@ import type {
   PpqVideoSubmitResponse,
 } from "@/lib/ppq/types";
 
-export const DEFAULT_VIDEO_MODEL = "veo3-fast";
+export const DEFAULT_VIDEO_MODEL = "seedance-2-fast";
 
 async function ensureAccountForCall() {
   const existing = ppqAccountStore.load();

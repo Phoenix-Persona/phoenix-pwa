@@ -5,11 +5,11 @@
  * Originally we wanted Veo 3.1 Fast for both clips. ppq.ai's catalog
  * doesn't expose Veo 3.1, AND `veo3-fast` on ppq.ai is text-to-video
  * only — passing `image_url` returns 502 ("No providers available for
- * this model"). Defaults now resolve to an i2v-capable family
- * (kling-2.5-turbo by preference), with the same id used for both
- * clips so the aesthetic doesn't flip at the seam. You can opt back
- * into Veo for clip 1 with `--text-model veo3-fast` if you want to
- * see how mixing lineages affects the join.
+ * this model"). After empirical testing, **`seedance-2-fast` is the
+ * proven path** on ppq.ai today: it accepts `image_url`, produces
+ * lip-synced audio, AND holds character + setting continuity across
+ * the seam. Defaults now resolve to seedance-2-fast first, with Kling
+ * variants as silent-video fallbacks.
  *
  * The technique under test:
  *
@@ -57,14 +57,16 @@
  * Flags:
  *   --list-models            List all video models advertised by ppq.ai and exit.
  *   --model <id>             Override the singleton model used for BOTH clips.
- *                            Default: auto-resolve to the best available from
- *                            `/v1/models?type=video` (preference: kling-3.0 →
- *                            kling-2.1-master → kling-2.1-pro → runway-gen4 →
- *                            luma-dream-machine → seedance-2 → hailuo-02-pro).
- *                            Both clips MUST use the same model — mixing
- *                            families is the #1 cause of broken continuity.
- *                            Don't point this at `veo3-fast`: ppq.ai's Veo
- *                            route doesn't accept `image_url` (returns 502).
+ *                            Default: auto-resolve from `/v1/models?type=video`
+ *                            (preference: seedance-2-fast → seedance-2 →
+ *                            kling-3.0 → kling-2.1-master → kling-2.1-pro →
+ *                            runway-gen4 → luma-dream-machine → hailuo-02-pro).
+ *                            seedance-2-fast is the only entry that delivers
+ *                            BOTH continuity AND lip-synced audio. Both clips
+ *                            MUST use the same model — mixing families is the
+ *                            #1 cause of broken continuity. Don't point this
+ *                            at `veo3-fast`: ppq.ai's Veo route doesn't
+ *                            accept `image_url` (returns 502).
  *   --aspect <ratio>         "9:16" (default), "16:9", "1:1".
  *   --duration <secs>        Per-clip duration (default 8).
  *   --quality <p>            "720p" (default) or "1080p".
@@ -210,22 +212,23 @@ function printPrompt(label: string, prompt: string): void {
  * catalog and stop.
  */
 const BEST_SINGLETON_PREFERENCE = [
-  // Kling 3.0 — flagship, marketed for "3-15s multi-shot sequences with
-  // subject consistency". Highest theoretical compliance.
-  "kling-3.0",
-  // Kling 2.1 Master — proven to work in our runs (passed processing
-  // for both T2V and I2V on ppq.ai's route).
-  "kling-2.1-master",
-  // Kling 2.1 Pro — sibling to Master, slightly different tuning.
-  "kling-2.1-pro",
-  // Runway Gen-4 — Runway's flagship, strongest character-reference
-  // consistency in their family (40% better than Gen-3 per Runway).
-  "runway-gen4",
-  // Luma Dream Machine — strong realism, native start-frame conditioning.
-  "luma-dream-machine",
-  // Seedance 2 — solid quality, fast.
+  // Seedance 2 Fast — empirically PROVEN to deliver all three of
+  // (a) image-to-video conditioning, (b) native lip-synced audio, and
+  // (c) character + setting continuity across the seam. THIS is the
+  // path for Phoenix's multi-clip talking-head videos. `-fast` first
+  // for dev iteration; promote to `seedance-2` only for finals.
+  "seedance-2-fast",
   "seedance-2",
-  // Hailuo 02 Pro.
+  // Kling 3.0 — accepts i2v with strong continuity, but produces
+  // SILENT video. Use only when audio isn't part of the requirement.
+  "kling-3.0",
+  "kling-2.1-master",
+  "kling-2.1-pro",
+  // Runway Gen-4 — silent, strong character-reference consistency.
+  "runway-gen4",
+  // Luma Dream Machine — silent, native start-frame conditioning.
+  "luma-dream-machine",
+  // Hailuo 02 Pro — silent fallback.
   "hailuo-02-pro",
 ];
 
@@ -768,7 +771,7 @@ async function main(): Promise<void> {
     `  params:             ${profile.aspect}, ${profile.duration}s, ${profile.quality}`,
   );
   printPrompt("CLIP2_PROMPT", CLIP2_PROMPT);
-  let clip2;
+  let clip2: Awaited<ReturnType<typeof generateClip>>;
   try {
     clip2 = await generateClip({
       apiKey: ppq.api_key,
