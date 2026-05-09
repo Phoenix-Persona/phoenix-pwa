@@ -23,6 +23,8 @@ import { useNostrLogin } from "@nostrify/react/login";
 import { nip19 } from "nostr-tools";
 
 import { AppHeader } from "@/components/AppHeader";
+import { ChangePassphraseDialog } from "@/components/ChangePassphraseDialog";
+import { DownloadBackupDialog } from "@/components/DownloadBackupDialog";
 import { FlagStripe } from "@/components/ImigongoBand";
 import { RelayListManager } from "@/components/RelayListManager";
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,6 +63,15 @@ const Settings = () => {
 
   const userNpub = user ? nip19.npubEncode(user.pubkey) : "";
   const phoenixManaged = hasUserNcryptsec();
+
+  // Pull the current login's nsec for the export-backup flow. Only
+  // available for nsec-type logins; bunker / extension users hold
+  // their key in an external signer that Feniksi never sees.
+  const currentLogin = logins[0];
+  const exportableNsec =
+    currentLogin && currentLogin.type === "nsec"
+      ? currentLogin.data.nsec
+      : null;
 
   function handleLockNow() {
     // Clear the Nostrify session — the next signer use prompts for the
@@ -148,8 +159,15 @@ const Settings = () => {
                   </div>
 
                   <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                    {/* Backup is meaningful for any nsec-type login,
+                        Phoenix-managed or pasted. Bunker/extension
+                        users export their key from their own signer. */}
+                    {exportableNsec && (
+                      <DownloadBackupDialog nsec={exportableNsec} />
+                    )}
                     {phoenixManaged && (
                       <>
+                        <ChangePassphraseDialog />
                         <Button
                           variant="outline"
                           size="sm"
