@@ -52,7 +52,7 @@ A harness is "done" when:
 
 | Phase | Hours | Output |
 |-------|-------|--------|
-| 0 — Spikes | 0–4 | `docs/spike-<name>.md` × 3; PPQ, pi-mono, Nostr+Breeze decisions made |
+| 0 — Spikes | 0–4 | `docs/spike-<name>.md` × 3; PPQ, pi-mono, Nostr+Spark decisions made |
 | 1 — Independent harnesses | 4–20 | 13 `/dev/*` routes demoable in isolation |
 | 2 — Composite harnesses | 20–28 | `/dev/persona-create`, `/dev/persona-restore` |
 | 3 — Main UI integration | 28–34 | Onboard, Dashboard, MyPersonas, PersonaFeed, Verify, Wallet, Settings |
@@ -99,14 +99,14 @@ Sequence:
 
 ## Stream C — Derek (Nostr + Frontend)
 
-**Spike:** Nostr crypto + Breeze → `docs/spike-nostr-breeze.md` (Breeze part hands off to Jim's `/dev/wallet`)
+**Spike:** Nostr crypto + Breez Spark → `docs/spike-nostr.md` (Spark wallet part landed via Jim's PR #2 directly)
 **Independent harnesses:** persona-crypto, operator, publish, feed (specs §C1–C4)
 **Composite leads:** persona-create, persona-restore (specs §C5–C6)
 **Main UI:** Onboard wizard, MyPersonas, PersonaFeed, Verify
 
 Sequence:
 
-1. **Phase 0 (3h):** Nostr crypto spike (~1h: NIP-44 self / NIP-49 / kind 30078 round-trip) + Breeze browser spike (~2h: variant choice, init, invoice, pay).
+1. **Phase 0 (3h):** Nostr crypto spike (~1h: NIP-44 self / NIP-49 / kind 30078 round-trip) + Breez Spark browser spike (~2h: variant choice, init, invoice, pay) — Breez Spark portion shipped via Jim's PR #2.
 2. **Phase 1 (12h):** harnesses §C1–C4.
 3. **Phase 2 (8h):** composite harnesses §C5 + §C6.
 4. **Phase 3 (5h):** Onboard ← `<CharacterCreator>` from C5; MyPersonas ← `<PersonaList>` from C6; PersonaFeed ← C4 + B5 components; Verify rebuilt against §5 schema; PWA polish (install prompt, service worker, manifest icons).
@@ -130,7 +130,7 @@ Headline items (full list in `../tasks/todo.md`):
 
 | From | To | Artifact | When |
 |------|----|----------|------|
-| Derek (Nostr+Breeze spike, Breeze part) | Jim (`/dev/wallet`) | Breeze section of `docs/spike-nostr-breeze.md` | End of Phase 0 |
+| Jim (PR #2 — Breez Spark wallet) | Stream A integration (`/dev/wallet`) | `src/lib/wallet/{client,init,types,autoTopup}.ts` | Already merged |
 | Jim (`/dev/ppq`) | Topher (B1–B4 all consume PPQ) | `src/lib/ppq/client.ts` | ~hour +6 |
 | Derek (`/dev/persona-crypto`) | Jim (`/dev/settings`) | `src/lib/persona/event.ts` | ~hour +10 |
 | All independent harnesses | Derek (`/dev/persona-create`) | reusable libs/hooks/components | ~hour +20 |
@@ -160,10 +160,10 @@ Each spec: owner, goal, dependencies, files, demo flow, definition of done.
 ### A2 — `/dev/wallet`
 
 - **Owner:** Jim
-- **Goal:** Stand up a Breeze wallet in the PWA: generate seed → init → balance → invoice → send/receive → tx history.
-- **Dependencies:** Breeze part of `docs/spike-nostr-breeze.md`
+- **Goal:** Stand up a Breez Spark wallet in the PWA: generate seed → init → balance → invoice → send/receive → tx history. (Headless wallet code shipped via PR #2; this harness is the in-app `/dev/wallet` route.)
+- **Dependencies:** PR #2's `src/lib/wallet/*` (already on main)
 - **Files:**
-  - `src/lib/wallet/breeze.ts` — SDK wrapper
+  - `src/lib/wallet/client.ts` — Breez Spark SDK wrapper (PR #2)
   - `src/lib/wallet/types.ts`
   - `src/components/wallet/WalletPanel.tsx` — reusable balance + actions panel
   - `src/hooks/useWallet.ts`
@@ -258,7 +258,7 @@ Each spec: owner, goal, dependencies, files, demo flow, definition of done.
 
 - **Owner:** Derek
 - **Goal:** Round-trip the persona-backup crypto: NIP-44 self-encrypt + NIP-49 + kind 30078 publish/decrypt.
-- **Dependencies:** Nostr part of `docs/spike-nostr-breeze.md`
+- **Dependencies:** `docs/spike-nostr.md` (Derek's Phase 0 deliverable)
 - **Files:**
   - `src/lib/persona/schema.ts` — types matching PROJECT.md §5.2
   - `src/lib/persona/crypto.ts` — NIP-44 self-encrypt + NIP-49

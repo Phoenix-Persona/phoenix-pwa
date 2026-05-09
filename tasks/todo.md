@@ -12,7 +12,7 @@
 ## Locked decisions (carried in from PROJECT.md and STREAMS.md)
 
 - Two-level user/persona identity; user signs encrypted kind 30078 with a random per-publish d-tag and no app-specific tags (discovery is scan-and-decrypt for stronger anti-fingerprinting)
-- Per-persona Breeze Lightning wallet; seed inside the encrypted backup
+- Per-persona Breez Spark Lightning wallet (`@breeztech/breez-sdk-spark`); seed inside the encrypted backup
 - AI inference via PPQ exclusively, paid in sats; agent harness via `pi-mono`
 - All persistent code lives in main app paths (`src/lib/<feature>`, `src/components/<feature>`); demo surfaces are `/dev/<feature>` routes
 - Compartmentalize first, integrate later — see `dev/STREAMS.md` for the harness inventory
@@ -24,7 +24,7 @@
 
 | Phase | Hours | What |
 |-------|-------|------|
-| 0 — Spikes | 0–4 | PPQ, pi-mono, Nostr+Breeze decisions made |
+| 0 — Spikes | 0–4 | PPQ, pi-mono, Nostr+Spark decisions made |
 | 1 — Independent harnesses | 4–20 | 13 `/dev/*` routes demoable in isolation |
 | 2 — Composite harnesses | 20–28 | persona-create + persona-restore |
 | 3 — Main UI integration | 28–34 | Onboard, Dashboard, MyPersonas, PersonaFeed, Verify wired |
@@ -55,11 +55,11 @@ The wallet → PPQ end-to-end demo lives entirely in this stream.
 - [ ] PPQ from a TS client (chat, image, TTS) paid in sats (in flight: commits `96c0f98`, `b7b45d4`, `d06adeb`)
 - [ ] Document payment flow, model availability, costs, latency in `docs/spike-ppq.md`
 - [ ] Pre-fund demo wallet seed (~50 chats / 10 images / 5 TTS / live-zap cushion) → `docs/demo-funding.md`
-- [ ] Co-author `docs/breeze-decision.md` with Derek's Phase 0 Breeze findings
+- [x] Wallet SDK locked to Breez Spark (`@breeztech/breez-sdk-spark`) — see commit `287c091`; no separate decision doc needed
 
 ### Phase 1 — Independent harnesses (~10h)
 - [ ] **`/dev/ppq`** (A1, ~1h) — formalize spike code into a `pi-ai` PPQ client + harness page
-- [ ] **`/dev/wallet`** (A2, ~4h) — Breeze SDK init, balance, invoice, send/receive, tx history
+- [ ] **`/dev/wallet`** (A2, ~4h) — Breez Spark SDK init, balance, invoice, send/receive, tx history (headless code already in `src/lib/wallet/` per PR #2 — wire into `/dev/wallet` route)
 - [ ] **`/dev/ppq-pay`** (A3, ~3h) — wallet pays a PPQ request end-to-end
 - [ ] **`/dev/settings`** (A4, ~2h) — model picker reading PPQ `/v1/models`, persists to encrypted backup
 
@@ -126,9 +126,8 @@ If pressed for time at hour +20, trim voice-gen to a hardcoded sample or push za
 
 ### Phase 0 — Spike (3h)
 - [ ] Spike — Nostr crypto (NIP-44 self / NIP-49 / kind 30078) — ~1h
-- [ ] Spike — Breeze SDK in browser (variant choice, init, invoice, pay) — ~2h
-- [ ] Document both in `docs/spike-nostr-breeze.md`
-- [ ] Hand off Breeze findings to Jim for `/dev/wallet`
+- [x] Spike — Breez Spark SDK in browser (variant choice, init, invoice, pay) — landed via Jim's PR #2 (headless wallet shipped to `src/lib/wallet/`)
+- [x] Nostr crypto spike documented in `docs/spike-nostr.md`
 
 ### Phase 1 — Independent harnesses (12h)
 - [ ] **`/dev/persona-crypto`** (C1, ~3h) — adapt existing `src/lib/persona*` to PROJECT.md §5.2 schema; full round-trip
