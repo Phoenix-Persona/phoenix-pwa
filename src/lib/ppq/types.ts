@@ -21,9 +21,19 @@ export interface PpqAccount {
   api_key: string;
 }
 
-/** Response of `POST /credits/balance`. */
+/**
+ * Response of `POST /credits/balance`.
+ *
+ * The doc reference advertises a top-level `balance_usd: number`, but the
+ * live response shape isn't fully nailed down — we've observed payloads
+ * where the value is nested under `data` or named differently. The client
+ * probes the common keys and surfaces the raw payload under `raw` for
+ * debugging when the extraction misses.
+ */
 export interface PpqBalance {
-  balance_usd: number;
+  balance_usd?: number;
+  /** Pass-through for the raw response — useful when the schema surprises us. */
+  raw?: unknown;
 }
 
 /* ---------- Chat / inference ---------- */
@@ -165,7 +175,21 @@ export type PpqTopupCurrency =
   | "LTC"
   | "LBTC"
   | "XMR";
-export type PpqTopupStatus = "pending" | "completed" | "expired";
+/**
+ * Observed live values are `"New"` (pending) and `"Settled"` (paid). Earlier
+ * docs use `"pending" / "completed" / "expired"`. Treat as a hint, not a
+ * tight union — use `isTopupSettled()` / `isTopupExpired()` from `./client`
+ * to branch safely.
+ */
+export type PpqTopupStatus =
+  | "New"
+  | "Settled"
+  | "Expired"
+  | "Invalid"
+  | "pending"
+  | "completed"
+  | "expired"
+  | (string & {});
 
 /**
  * Response of `POST /topup/create/{method}`.
@@ -178,13 +202,21 @@ export type PpqTopupStatus = "pending" | "completed" | "expired";
  */
 export interface PpqTopupInvoice {
   invoice_id: string;
-  expires_at: string;
+  /** Unix seconds (observed) or ISO string. */
+  expires_at: string | number;
   amount: number | string;
   currency: PpqTopupCurrency | string;
-  /** BOLT11 string. ppq.ai may return this under several names. */
+  /**
+   * BOLT11 string. Observed live under `lightning_invoice`; earlier docs
+   * referenced `payment_request` / `invoice` / `bolt11`. Use
+   * `extractBolt11()` from `./client` rather than reading directly.
+   */
+  lightning_invoice?: string;
   payment_request?: string;
   invoice?: string;
   bolt11?: string;
+  /** Hosted checkout URL — alternative to paying the BOLT11 directly. */
+  checkout_url?: string;
   /** On-chain address for non-Lightning methods. */
   address?: string;
   /** Pass-through escape hatch — keep additional fields visible to callers. */

@@ -36,3 +36,4 @@ yarn.lock
 
 # Local ppq.ai test credentials (grants spending power — never commit)
 tests/ai-services/.account.json
+tests/ai-services/.last-invoice.json

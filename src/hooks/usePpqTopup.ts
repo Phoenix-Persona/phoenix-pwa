@@ -31,6 +31,9 @@ import {
   extractBolt11,
   getNwcAutoTopup,
   getTopupStatus,
+  isTopupTerminal,
+  isTopupSettled,
+  isTopupExpired,
 } from "@/lib/ppq/client";
 import { ppqAccountStore } from "@/lib/ppq/storage";
 import type {
@@ -97,14 +100,18 @@ export function usePpqTopupStatus(
       return getTopupStatus(acct.api_key, invoiceId, { signal });
     },
     refetchInterval: (q) => {
-      const status = q.state.data?.status;
-      if (status === "completed" || status === "expired") return false;
+      if (isTopupTerminal(q.state.data?.status)) return false;
       return intervalMs;
     },
   });
 
   const status = query.data?.status;
-  return { ...query, isTerminal: status === "completed" || status === "expired" };
+  return {
+    ...query,
+    isTerminal: isTopupTerminal(status),
+    isSettled: isTopupSettled(status),
+    isExpired: isTopupExpired(status),
+  };
 }
 
 /* ---------- NWC (Nostr Wallet Connect) auto-topup ---------- */
