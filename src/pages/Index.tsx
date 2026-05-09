@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { PhoenixHeader } from "@/components/PhoenixHeader";
 import {
@@ -42,11 +42,6 @@ const Index = () => {
 
           <div className="container relative py-20 md:py-28 grid md:grid-cols-[1fr_1.05fr] gap-10 md:gap-14 items-center">
             <div className="space-y-7 order-2 md:order-1">
-              <p className="inline-flex items-center gap-2 rounded-full border border-rw-gold/40 bg-rw-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
-                <Sparkles className="size-3.5" aria-hidden="true" />
-                Uncensorable voices on Nostr
-              </p>
-
               <h1 className="font-display text-5xl md:text-7xl font-medium tracking-tight leading-[0.98]">
                 Voices that{" "}
                 <span className="italic text-rw-gold">
@@ -94,16 +89,16 @@ const Index = () => {
                 )}
               </div>
 
-              {/* Trust ribbon */}
-              <ul className="grid grid-cols-3 gap-3 pt-6 max-w-md text-[11px] uppercase tracking-[0.14em] text-imigongo-cream/70 font-medium">
-                <li className="border-l-2 border-imigongo-clay pl-3 leading-snug">
-                  Encrypted<br />by design
+              {/* Trust ribbon — outcome-focused promises */}
+              <ul className="grid grid-cols-3 gap-3 pt-6 max-w-md text-[12px] tracking-tight text-imigongo-cream/85 font-medium leading-snug">
+                <li className="border-l-2 border-imigongo-clay pl-3">
+                  Your identity<br />stays hidden
                 </li>
-                <li className="border-l-2 border-rw-gold pl-3 leading-snug">
-                  Signed by<br />persona key
+                <li className="border-l-2 border-rw-gold pl-3">
+                  A voice<br />fully its own
                 </li>
-                <li className="border-l-2 border-rw-green pl-3 leading-snug">
-                  Replicated<br />to N relays
+                <li className="border-l-2 border-rw-green pl-3">
+                  Impossible<br />to silence
                 </li>
               </ul>
             </div>
@@ -225,12 +220,14 @@ const Index = () => {
                 <span className="italic text-rw-green-deep">silenced cause.</span>
               </h2>
               <div className="h-1 w-24 flag-underline rounded-full" />
-              <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl">
-                The launch persona speaks from Rwanda. The aesthetic is{" "}
-                <em className="font-display">Imigongo</em> — traditional Rwandan
-                geometric art. Every persona inherits the visual heritage of its
-                region.
-              </p>
+              <div className="rounded-2xl bg-card border border-imigongo-clay/15 shadow-sm p-6 max-w-2xl">
+                <p className="text-lg text-foreground leading-relaxed">
+                  The launch persona speaks from Rwanda. The aesthetic is{" "}
+                  <em className="font-display text-imigongo-clay">Imigongo</em> —
+                  traditional Rwandan geometric art. Every persona inherits the
+                  visual heritage of its region.
+                </p>
+              </div>
             </div>
 
             <div className="relative hidden md:block">
