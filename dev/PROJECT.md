@@ -74,19 +74,19 @@ gracefully disable when the wallet is empty.
 
 Phoenix uses a **two-level identity** model.
 
-**User keypair.** A single Nostr keypair owned by the human running the
+**Operator.** A single Nostr keypair owned by the human running the
 app. It never posts publicly under Phoenix. Its only job is to sign
-encrypted backups (kind 30078, §5.2) for the personas this user has
-created. The user keypair can be:
+encrypted backups (kind 30078, §5.2) for the personas this operator
+has created. The operator keypair can be:
 
 - An existing Nostr identity (NIP-07 extension, NIP-46 remote signer, or
-  pasted nsec) — useful for users who already have a Nostr account and
-  want one place to manage everything.
-- A fresh Phoenix-generated keypair — useful for users who want their
-  Phoenix activity unlinkable from any other Nostr identity. In this case
-  Phoenix never publishes a kind 0 profile under the user keypair, so to
-  outside observers the user pubkey is just a publisher of opaque
-  ciphertext.
+  pasted nsec) — useful for operators who already have a Nostr account
+  and want one place to manage everything.
+- A fresh Phoenix-generated keypair — useful for operators who want
+  their Phoenix activity unlinkable from any other Nostr identity. In
+  this case Phoenix never publishes a kind 0 profile under the operator
+  keypair, so to outside observers the operator pubkey is just a
+  publisher of opaque ciphertext.
 
 **Persona keypairs.** Each persona is a separate Nostr keypair generated
 during the character-creator wizard. The persona's nsec publishes kind 0
@@ -94,67 +94,68 @@ during the character-creator wizard. The persona's nsec publishes kind 0
 voices.
 
 **The relationship is encrypted-only.** A persona's nsec is stored only
-inside the user's encrypted kind 30078 backup event (NIP-44'd to the user
-keypair). To outside observers, relays show:
+inside the operator's encrypted kind 30078 backup event (NIP-44'd to the
+operator keypair). To outside observers, relays show:
 
 - N persona pubkeys posting publicly, each independently
-- The user pubkey publishing N opaque ciphertext events
+- The operator pubkey publishing N opaque ciphertext events
 
-Linking a specific persona to its user requires the user's nsec. As long
-as the user keypair is safe, *which* personas are this user's is
-unknowable.
+Linking a specific persona to its operator requires the operator's nsec.
+As long as the operator keypair is safe, *which* personas are this
+operator's is unknowable.
 
-**Externally indistinguishable.** Phoenix backup events carry no
-Phoenix-identifying tags — `d` is a fresh random UUID per publish, no
-`t`/`alt`. They look identical to any other NIP-78 application-data
-event a user might publish (Coracle settings, Damus prefs, etc.). An
-observer who sees the user pubkey's kind 30078 events cannot tell
-which (or how many) are Phoenix backups without decrypting them; the
-persona count itself does not leak. The user's *participation in
-Phoenix* is only knowable to anyone who already has the user nsec.
+**What does leak: the persona count.** A relay observer can see that
+`operator_pubkey` has authored N kind-30078 events with N distinct
+d-tag values, and infer "this operator runs N addressable items."
+Phoenix backup events carry no Phoenix-identifying tags (no `t`, no
+`alt`), so the observer cannot tell those items are Phoenix backups
+specifically — they look identical to any other NIP-78
+application-data event. Phoenix participation is only knowable to
+anyone who already has the operator's nsec.
 
-**Compartmentalization.** All personas under a single user keypair share
-one fate: anyone who compromises that user nsec can decrypt every
-persona's backup and operate every voice. For activists who need persona
-groups that can't fall together, the answer is **separate user keypairs
-per group**. The app supports multiple user accounts via the same
-multi-account flow Nostrify already provides (MKStack's `LoginArea` /
-`useLoggedInAccounts`).
+**Compartmentalization.** All personas under a single operator share
+one fate: anyone who compromises that operator nsec can decrypt every
+persona's backup and operate every voice. For activists who need
+persona groups that can't fall together, the answer is **separate
+operator keypairs per group** — but multi-operator complexity is V2.
+For V1, Phoenix is **one operator per device**.
 
-**Multi-persona UX.** When the user is logged in, the app fetches all
-kind 30078 events authored by the current user pubkey, attempts NIP-44
-self-decryption on each, keeps the ones whose plaintext validates as a
-Phoenix envelope (events from other apps fail decryption or schema
-validation and are discarded), and presents the persona list. Switching personas swaps
-which persona nsec the composer signs with — no separate "login" per
-persona.
+**Multi-persona UX.** When the operator is logged in, the app fetches
+all kind 30078 events authored by the current operator pubkey,
+attempts NIP-44 self-decryption on each, keeps the ones whose
+plaintext validates as a Phoenix envelope (events from other apps
+fail decryption or schema validation and are discarded), and presents
+the persona list. Switching personas swaps which persona nsec the
+composer signs with — no separate "login" per persona.
 
 **Key custody.**
 
-- *User nsec*. For users bringing an existing Nostr identity, custody is
-  whatever signer they use (NIP-07, NIP-46, etc.). For fresh
-  Phoenix-generated user keypairs, stored locally as NIP-49
-  (passphrase-encrypted).
-- *Persona nsec*. Never written to disk by Phoenix. Lives only inside the
-  user's encrypted kind 30078 backup. When the user opens a persona,
-  Phoenix fetches the event from relays, decrypts it via the user's
-  signer (NIP-44 self-decrypt), holds the persona nsec in memory, and
-  uses it to sign that session's posts.
-- *Recovery on a new device*. User logs in with the user nsec; app
-  re-fetches all kind 30078 events authored by them, decrypts each,
-  filters to valid Phoenix envelopes; every persona is re-hydrated in
-  one step.
-- *Loss of user nsec*. Every persona under that user is unrecoverable.
-  The wizard surfaces a one-time "download user backup" affordance.
+- *Operator nsec*. For operators bringing an existing Nostr identity,
+  custody is whatever signer they use (NIP-07, NIP-46, etc.). For
+  fresh Phoenix-generated operator keypairs, stored locally as NIP-49
+  (passphrase-encrypted) — **one passphrase per device**, applied to
+  the operator nsec.
+- *Persona nsec*. Never written to disk by Phoenix. Lives only inside
+  the operator's encrypted kind 30078 backup. When the operator opens
+  a persona, Phoenix fetches the event from relays, decrypts it via
+  the operator's signer (NIP-44 self-decrypt), holds the persona nsec
+  in memory, and uses it to sign that session's posts.
+- *Recovery on a new device*. Operator logs in with the operator nsec;
+  app re-fetches all kind 30078 events authored by them, decrypts
+  each, filters to valid Phoenix envelopes; every persona is
+  re-hydrated in one step.
+- *Loss of operator nsec*. Every persona under that operator is
+  unrecoverable. The wizard surfaces a one-time "download operator
+  backup" affordance.
 
 **Why two-level rather than persona-only.** A persona-only model would
-mean each persona has its own root nsec the user must safeguard
+mean each persona has its own root nsec the operator must safeguard
 separately, multi-device sync requires copying every persona's nsec to
-every device, and losing one persona's nsec loses that persona's wallet
-entirely. The two-level model collapses safekeeping to one root secret
-while preserving the public unlinkability of personas. The trade-off is
-shared fate among personas under the same user keypair; mitigated with
-separate user keypairs per unlinkable group.
+every device, and losing one persona's nsec loses that persona's
+wallet entirely. The two-level model collapses safekeeping to one
+root secret while preserving the public unlinkability of personas.
+The trade-off is shared fate among personas under the same operator;
+mitigated (V2) with separate operator keypairs per unlinkable group.
 
 ---
 
@@ -175,7 +176,7 @@ separate user keypairs per unlinkable group.
 │  │   - pi-agent-core   (agent loop, tool calling)             │  │
 │  │   - pi-ai           (LLM client → PPQ)                     │  │
 │  │   - Nostrify        (Nostr publish/query, NIP-44, NIP-49)  │  │
-│  │   - Breeze SDK      (Lightning wallet, LNURL, zap pay)     │  │
+│  │   - Breez Spark SDK (Lightning wallet, LN address, zaps)   │  │
 │  │   - Blossom client  (media uploads — voice, images)        │  │
 │  └──┬──────────────┬───────────────┬───────────────┬──────────┘  │
 └─────┼──────────────┼───────────────┼───────────────┼─────────────┘
@@ -184,7 +185,7 @@ separate user keypairs per unlinkable group.
   ┌────────┐   ┌──────────┐   ┌──────────────┐  ┌──────────────┐
   │  PPQ   │   │  Nostr   │   │   Lightning  │  │   Blossom    │
   │ ppq.ai │   │  relays  │   │   network    │  │   servers    │
-  │        │   │          │   │ (via Breeze) │  │              │
+  │        │   │          │   │  (via Spark) │  │              │
   └────────┘   └──────────┘   └──────────────┘  └──────────────┘
    AI infer.   Identity,        Donations,        Voice sample,
    paid in     publishing,      AI payments,      profile image,
@@ -200,7 +201,7 @@ separate user keypairs per unlinkable group.
 | Agent chat UI    | `pi-web-ui`                          | Drop-in components for the wizard chat surface               |
 | Nostr            | `@nostrify/nostrify`, `@nostrify/react` | Already in `package.json`                                 |
 | Encryption       | `nostr-tools` (NIP-44, NIP-49)       | Already pulled in                                            |
-| Lightning wallet | `@breeztech/breeze-sdk` (Liquid SDK or Greenlight; choice TBD — see §10) | Per-persona wallet, seed phrase backup     |
+| Lightning wallet | `@breeztech/breez-sdk-spark` (Breez SDK — Spark / Nodeless variant) | Per-persona wallet, BIP-39 seed inside the encrypted backup. WASM in browser; needs `await init()` before any SDK call. Native Lightning Address (no self-hosted LNURL endpoint). API key via `VITE_BREEZ_API_KEY`. |
 | Media            | Blossom upload (`useUploadFile`)     | Already in scaffold                                          |
 
 There is no Phoenix-owned backend. Everything runs in the PWA against
@@ -239,31 +240,34 @@ generic Nostr clients without breaking them.
 `phoenix.*` is a Phoenix-specific namespace clients can ignore. Everything
 above it is standard.
 
-### 5.2 kind 30078 — encrypted persona backup (signed by *user*, one per persona-update)
+### 5.2 kind 30078 — encrypted persona backup (signed by *operator*, one per persona)
 
-Kind-30078 event published by the **user keypair** (not the persona).
-Kind 30078 is in NIP-01's addressable range, so the `d` tag is required;
-Phoenix uses a fresh random d-tag per publish (rather than a stable one)
-to avoid leaking metadata — see "Tags" and "Updating a persona" below.
+Addressable replaceable event published by the **operator** (the human
+keypair, see §3). One event per persona; updates to a persona republish
+its event with the **same** `d` tag, so addressable-event semantics
+apply and relays keep only the latest version.
 
 Tags:
 
-- `["d", "<random uuid>"]` — generated fresh per publish. The `d` tag
-  is **required** by NIP-01 for kind 30078 (addressable range
-  30000–39999), but its value carries no semantics here: a fresh UUID
-  for every publish prevents relay observers from grouping a user's
-  kind-30078 events by persona, and gives no signal that the event is
-  Phoenix-related.
+- `["d", "<random opaque uuid>"]` — **stable per persona**, generated
+  once at persona creation, stored inside the encrypted plaintext as
+  `persona.dTag`, and reused on every update. The `d` tag is required
+  by NIP-01 for kind 30078 (addressable range 30000–39999); its value
+  here is **opaque** — it carries no Phoenix-identifying signal and
+  no link to the persona pubkey. Each persona under an operator gets
+  its own d-tag, so the relay sees N distinct addressable items
+  (= the operator's persona count); this count leak is acknowledged
+  in §3.
 
-**No other tags.** A `t` tag would advertise Phoenix usage; an `alt` tag
-would advertise "encrypted backup"; both would help an observer cluster
-a user's events. Neither is needed — discovery and per-persona dedup
-happen on the **decrypted** payload (`persona.pubkey`), not on tags.
-Externally a Phoenix kind-30078 event is indistinguishable from any
-other app's encrypted-app-data event.
+**No other tags.** A `t` tag would advertise Phoenix usage; an `alt`
+tag would advertise "encrypted backup"; both would help observers
+fingerprint Phoenix events. Externally a Phoenix kind-30078 event is
+indistinguishable from any other NIP-78 application-data event
+(Coracle settings, Damus prefs, etc.).
 
-Content: NIP-44 ciphertext encrypted to the **user's own pubkey** (self-
-encryption: author and conversation key derive from the same keypair).
+Content: NIP-44 ciphertext encrypted to the **operator's own pubkey**
+(self-encryption: author and conversation key derive from the same
+keypair).
 
 Plaintext payload:
 
@@ -273,24 +277,23 @@ Plaintext payload:
   "persona": {
     "pubkey": "<persona pubkey, hex>",
     "nsec": "<persona private key, hex>",
+    "dTag": "<opaque random uuid; generated once at creation, reused on every update>",
     "name": "Imani Uwase",
     "system_prompt": "...full persona system prompt...",
-    "voice_id": "alloy",
-    "voice_sample_url": "https://blossom.example/<sha256>.mp3",
     "reference_image_url": "https://blossom.example/<sha256>.png",
     "languages": ["en", "rw"],
     "tags": ["rwanda", "press-freedom"],
     "created_at": 1715212800
   },
   "wallet": {
-    "kind": "breeze",
+    "kind": "spark",
     "seed": "<bip39 mnemonic>",
+    "lightning_address": "imani@spark.money",
     "lnurl": "lnurl1..."
   },
   "model_prefs": {
-    "agent": "claude-sonnet-4.5",
+    "styling": "claude-sonnet-4.5",
     "image": "gpt-image-1",
-    "tts": "tts-1-hd",
     "video": null
   },
   "settings": {
@@ -301,31 +304,29 @@ Plaintext payload:
 
 **Loading personas on a fresh device.**
 
-1. User logs in with their user nsec (NIP-07 / NIP-46 / paste).
-2. App queries `{ kinds: [30078], authors: [user_pubkey] }` — no
-   Phoenix-specific filter, since adding one would leak app usage.
-   The query may surface kind-30078 events from other apps the user
-   uses; they will fail decryption (different conversation key) or
-   fail Phoenix's payload schema, and are discarded.
-3. For each event, decrypt content via the user's signer (NIP-44
+1. Operator logs in with their operator nsec (NIP-07 / NIP-46 / paste).
+2. App queries `{ kinds: [30078], authors: [operator_pubkey] }` — no
+   Phoenix-specific filter, since adding one would leak app usage. The
+   query may surface kind-30078 events from other apps (Coracle
+   settings, Damus prefs, etc.); they fail decryption (different
+   conversation key) or fail Phoenix's payload schema and are
+   discarded.
+3. For each event, decrypt content via the operator's signer (NIP-44
    self-decrypt) and validate against Phoenix's payload schema.
-4. Group surviving events by `persona.pubkey` from the decrypted
-   plaintext; keep the newest event per persona pubkey. Each
-   persona-update creates a new event with a fresh d-tag — relays do
-   not replace.
+4. Surviving events are already deduplicated by relay (addressable
+   semantics: one event per `(operator_pubkey, kind, d-tag)` triple),
+   so each persona is represented exactly once. Group by
+   `persona.pubkey` from the decrypted plaintext.
 5. The decrypted payload yields the persona keypair, wallet seed,
-   voice URL, etc.
+   reference image URL, `persona.dTag`, etc.
 6. Persona nsec is held in memory for the session; never written to
    disk by Phoenix.
 
-**Updating a persona.** Publish a new kind 30078 event with a fresh
-random d-tag and the new ciphertext. Old versions remain on relays as
-opaque ciphertext; the discovery loop above groups by decrypted
-`persona.pubkey` and surfaces only the newest event per persona, so
-the app sees only the current state. Trade-off: relay storage grows
-over time. For hackathon-scale traffic this is fine; if cleanup
-matters later, switch to a stable per-persona d-tag derived from a
-user secret — at the cost of exposing the persona count externally.
+**Updating a persona.** Republish a kind 30078 event with the **same**
+d-tag as the prior event (read from the decrypted `persona.dTag`) and
+the new ciphertext. Relays replace the prior version per
+addressable-event semantics; only the latest is stored. The d-tag
+never changes for the lifetime of a persona.
 
 **Why one event per persona instead of one event holding all personas.**
 Per-persona events keep updates surgical (changing one persona's wallet
@@ -335,16 +336,21 @@ blocking on a single large payload.
 
 ### 5.3 kind 1 — posts (NIP-01, signed by persona)
 
-Public, signed by the persona keypair. Standard kind-1 with attribution
-tags:
+Public, signed by the persona keypair. **No Phoenix-identifying tags.**
+A Phoenix-published persona post is indistinguishable on the wire from
+any other kind-1 note. Tags are limited to content-discovery and
+attribution:
 
-- `["t", "phoenix"]` — discoverability
-- `["t", "<region or cause>"]` — e.g. `rwanda`, `press-freedom`
-- `["client", "phoenix"]` — client tag (auto-added by `useNostrPublish`)
-- `["alt", "<short summary>"]` — accessibility/preview text
+- `["t", "<region>"]` — e.g. `rwanda` (topical discovery only).
+- `["t", "<cause>"]` — e.g. `press-freedom` (topical discovery only).
+- `["r", "<source-url>"]` (repeatable) — source attribution.
+- `["imeta", ...]` — per-attachment metadata for posts with media
+  (NIP-92, pointing at Blossom URLs).
 
-Posts with images use NIP-92 / NIP-94 `imeta` tags pointing at Blossom
-URLs.
+Deliberately omitted: `t=phoenix`, `client=phoenix`, operator pubkey
+tags, persona name in `alt`, any other Phoenix-fingerprinting tag. The
+persona's kind 0 bio is the right place to disclose AI usage;
+individual posts stay metadata-clean. See `src/lib/personaPost.ts:1-19`.
 
 ### 5.4 Media
 
