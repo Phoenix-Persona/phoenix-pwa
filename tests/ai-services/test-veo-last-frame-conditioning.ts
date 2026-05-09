@@ -1,9 +1,21 @@
 /**
- * Test: does Veo 3.1 Fast preserve continuity across two clips when
+ * Test: does last-frame conditioning preserve continuity across two
+ * video clips when the user supplies a "locked-down world"?
+ *
+ * Originally we wanted Veo 3.1 Fast for both clips. ppq.ai's catalog
+ * doesn't expose Veo 3.1, AND `veo3-fast` on ppq.ai is text-to-video
+ * only — passing `image_url` returns 502 ("No providers available for
+ * this model"). Defaults now resolve to an i2v-capable family
+ * (kling-2.5-turbo by preference), with the same id used for both
+ * clips so the aesthetic doesn't flip at the seam. You can opt back
+ * into Veo for clip 1 with `--text-model veo3-fast` if you want to
+ * see how mixing lineages affects the join.
+ *
+ * The technique under test:
  *
  *   (a) the user provides a "locked-down world" — verbatim character +
  *       setting + wardrobe + lighting + camera-language block in both
- *       prompts, and
+ *       prompts; and
  *
  *   (b) the second clip is image-to-video, conditioned on the LAST FRAME
  *       of the first clip?
@@ -42,17 +54,17 @@
  *   --skip-clip1             Use a previously generated clip 1 (must be cached).
  *   --skip-clip2             Stop after extracting + uploading the last frame.
  *   --list-models            List all video models advertised by ppq.ai and exit.
- *   --text-model <id>        Override clip 1 model. Default: auto-resolve the
- *                            best available Veo from `/v1/models?type=video`
- *                            (Veo 3 fast preferred; ppq.ai's API doesn't
- *                            expose Veo 3.1 yet even when their UI does).
+ *   --text-model <id>        Override clip 1 model. Default: auto-resolve an
+ *                            i2v-capable family from `/v1/models?type=video`
+ *                            (kling-2.5-turbo > kling-2.1-master >
+ *                            kling-2.1-pro > runway-gen4 > luma-dream-machine
+ *                            > seedance-2-fast > hailuo-02-pro > pika-v2.2 >
+ *                            pixverse-v4.5). Pass `veo3-fast` to use Veo for
+ *                            clip 1 (clip 2 will be a different lineage and
+ *                            the seam will show).
  *   --i2v-model <id>         Override clip 2 model. Default: same id as clip 1.
- *                            ppq.ai consolidated i2v into the polymorphic
- *                            `image_url` parameter — there's no separate -i2v
- *                            variant in the catalog anymore. Pass this only if
- *                            you want clip 2 on a different family (e.g.
- *                            `pika-v2.2` for Pikaframes-style first-and-last
- *                            interpolation).
+ *                            ppq.ai's `veo3-fast` does NOT accept `image_url`
+ *                            today (returns 502), so don't point this at Veo.
  *   --aspect <ratio>         "9:16" (default), "16:9", "1:1".
  *   --duration <secs>        Per-clip duration (default 8).
  *   --quality <p>            "720p" (default) or "1080p".
@@ -120,9 +132,9 @@ const LAST_FRAME_PATH = path.join(CACHE_DIR, "last-frame.png");
 const PPQ_ACCOUNT_PATH = path.join(SCRIPT_DIR, ".account.json");
 
 interface State {
-  clip1?: { id: string; url: string };
+  clip1?: { id: string; url: string; model?: string };
   uploadedFrameUrl?: string;
-  clip2?: { id: string; url: string };
+  clip2?: { id: string; url: string; model?: string };
 }
 
 async function loadState(): Promise<State> {
@@ -186,25 +198,58 @@ function printPrompt(label: string, prompt: string): void {
 /* ---------- model discovery ---------- */
 
 /**
- * ppq.ai consolidated image-to-video into a polymorphic `image_url`
- * parameter on the same model id, rather than separate `-i2v` model
- * variants like the earlier docs described (`veo3-i2v`,
- * `kling-2.5-turbo-i2v` are no longer advertised). So:
+ * Veo on ppq.ai is text-to-video only today — passing `image_url` to
+ * `veo3-fast` returns 502 "No providers available for this model".
+ * The earlier `veo3-i2v` model id has been dropped from the catalog
+ * and ppq.ai hasn't routed Veo's image-to-video variant in its place.
  *
- *   - Clip 1 (text-to-video): submit with no `image_url`.
- *   - Clip 2 (image-to-video, conditioned on clip 1's last frame):
- *     submit the SAME model id with `image_url` set.
+ * To test last-frame conditioning end to end we need a model that DOES
+ * support i2v. Curated preference list below — talking-head-friendly
+ * families with native i2v support, ordered by quality + maturity.
  *
- * The resolver below just finds the best available Veo id (Veo 3 fast
- * preferred, falling back to plain Veo 3, then any Veo). Both clips
- * default to the same id; users can split via --text-model / --i2v-model
- * if they want to test cross-model continuity.
- *
- * Note: the live ppq.ai API doesn't expose Veo 3.1 yet even when their
- * UI does. We pick the closest available substitute.
+ * Both clips default to the same auto-resolved id so the aesthetic
+ * matches across the seam (Veo 3 Fast for clip 1 + Kling for clip 2
+ * makes the i2v join visibly different lineage). Users can split via
+ * --text-model / --i2v-model to deliberately test cross-model behavior.
  */
 
-function resolveVeoModel(ids: string[], preferRequested: string): string {
+const I2V_CAPABLE_PREFERENCE = [
+  // Kling 2.5 Turbo — modern, talking-head friendly, native i2v.
+  "kling-2.5-turbo",
+  // Kling 2.x line — high quality, slower.
+  "kling-2.1-master",
+  "kling-2.1-pro",
+  "kling-2.1-standard",
+  "kling-3.0",
+  // Runway Gen-4 — strong reference-image consistency.
+  "runway-gen4",
+  // Luma — supports start- and end-frame conditioning.
+  "luma-dream-machine",
+  // ByteDance Seedance — fast, decent realism, native i2v.
+  "seedance-2-fast",
+  "seedance-2",
+  // Hailuo (MiniMax).
+  "hailuo-02-pro",
+  "hailuo-02-standard",
+  // Pika 2.2 — Pikaframes (first+last frame interpolation) is a related
+  // primitive; here we just use plain i2v with the last frame of clip 1.
+  "pika-v2.2",
+  // PixVerse v4.5 — supports i2v.
+  "pixverse-v4.5",
+];
+
+const I2V_CAPABLE_FAMILIES = [
+  "kling",
+  "runway",
+  "luma",
+  "seedance",
+  "hailuo",
+  "pika",
+  "pixverse",
+  "minimax",
+];
+
+function resolveI2vCapableModel(ids: string[], preferRequested: string): string {
   if (preferRequested) {
     if (ids.includes(preferRequested)) return preferRequested;
     throw new Error(
@@ -213,27 +258,22 @@ function resolveVeoModel(ids: string[], preferRequested: string): string {
     );
   }
 
-  const lc = ids.map((id) => ({ id, lc: id.toLowerCase() }));
-  const matchers: Array<(e: { lc: string }) => boolean> = [
-    // 1. Veo 3.1 + fast (in case the API catches up to the UI someday)
-    (e) => /veo[\s\-_]*3[._\-]1/.test(e.lc) && /fast/.test(e.lc),
-    // 2. Veo 3.1 (any speed)
-    (e) => /veo[\s\-_]*3[._\-]1/.test(e.lc),
-    // 3. Veo 3 + fast
-    (e) => /veo[\s\-_]*3(?!\d)/.test(e.lc) && /fast/.test(e.lc),
-    // 4. Veo 3 (any speed)
-    (e) => /veo[\s\-_]*3(?!\d)/.test(e.lc),
-    // 5. Any veo
-    (e) => /veo/.test(e.lc),
-  ];
+  // 1. Curated exact-match preference list.
+  for (const candidate of I2V_CAPABLE_PREFERENCE) {
+    if (ids.includes(candidate)) return candidate;
+  }
 
-  for (const matcher of matchers) {
-    const hit = lc.find(matcher);
+  // 2. Fuzzy fallback: anything that contains a known i2v-capable family
+  // marker. (We deliberately exclude Veo here — Veo on ppq.ai doesn't
+  // accept image_url today.)
+  const lc = ids.map((id) => ({ id, lc: id.toLowerCase() }));
+  for (const family of I2V_CAPABLE_FAMILIES) {
+    const hit = lc.find((e) => e.lc.includes(family));
     if (hit) return hit.id;
   }
 
   throw new Error(
-    `Could not auto-resolve a Veo model. Available video models:\n  - ${ids.join("\n  - ")}\n\n` +
+    `No i2v-capable model found in catalog. Available:\n  - ${ids.join("\n  - ")}\n\n` +
       `Pass --text-model <id> and --i2v-model <id> explicitly.`,
   );
 }
@@ -530,22 +570,33 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Both clips default to the same auto-resolved Veo id. ppq.ai uses the
-  // presence/absence of `image_url` (not a separate `-i2v` model) as the
-  // text-to-video / image-to-video switch.
-  const resolvedTextModel = resolveVeoModel(videoModelIds, flags.textModel);
+  // Both clips default to the same auto-resolved i2v-capable model so
+  // the aesthetic matches across the seam. Veo on ppq.ai today is
+  // text-to-video only — passing `image_url` to `veo3-fast` returns
+  // 502, so we deliberately steer away from Veo here. Override via
+  // --text-model if you want to mix lineages.
+  const resolvedTextModel = resolveI2vCapableModel(
+    videoModelIds,
+    flags.textModel,
+  );
   const resolvedI2vModel = flags.i2vModel
-    ? resolveVeoModel(videoModelIds, flags.i2vModel)
+    ? resolveI2vCapableModel(videoModelIds, flags.i2vModel)
     : resolvedTextModel;
   console.log(`\n  text-to-video  (clip 1) → ${resolvedTextModel}`);
   console.log(`  image-to-video (clip 2) → ${resolvedI2vModel}`);
   if (resolvedI2vModel === resolvedTextModel) {
     console.log(
-      `  (clip 2 reuses the same model; image_url is the i2v switch)`,
+      `  (both clips on the same model — i2v switch is just whether we pass image_url)`,
+    );
+  } else {
+    console.log(
+      `  (clips on different models — expect a visible aesthetic shift at the seam)`,
     );
   }
   if (!flags.textModel && !flags.i2vModel) {
-    console.log(`  (override with --text-model / --i2v-model)`);
+    console.log(
+      `  (auto-resolved; override with --text-model / --i2v-model — see --list-models for the catalog)`,
+    );
   }
 
   header("World block (verbatim in both prompts)");
@@ -561,8 +612,25 @@ async function main(): Promise<void> {
 
   if (state.clip1 && !flags.reset) {
     header("1. Clip 1 (text-to-video) — cached");
-    console.log(`  id:  ${state.clip1.id}`);
-    console.log(`  url: ${state.clip1.url}`);
+    console.log(`  id:    ${state.clip1.id}`);
+    console.log(`  url:   ${state.clip1.url}`);
+    if (state.clip1.model) {
+      console.log(`  model: ${state.clip1.model}`);
+      if (state.clip1.model !== resolvedTextModel) {
+        console.warn(
+          `  ⚠ cached clip 1 was generated with ${state.clip1.model}, but ` +
+            `the current text-to-video resolution is ${resolvedTextModel}. ` +
+            `Clip 2 will be on ${resolvedI2vModel} — expect an aesthetic ` +
+            `shift at the seam. Run with --reset to regenerate clip 1.`,
+        );
+      }
+    } else {
+      console.warn(
+        `  ⚠ cached clip 1 has no model record (older run). It may have ` +
+          `been generated on a different model than ${resolvedTextModel}. ` +
+          `Run with --reset to be sure.`,
+      );
+    }
   } else if (flags.skipClip1) {
     throw new Error(
       "--skip-clip1 set, but no clip 1 is cached. Run without --skip-clip1 first.",
@@ -580,7 +648,11 @@ async function main(): Promise<void> {
     if (clip1.costUsd !== undefined) {
       console.log(`  ✓ clip 1 cost:     $${clip1.costUsd.toFixed(4)}`);
     }
-    state.clip1 = { id: clip1.id, url: clip1.url };
+    state.clip1 = {
+      id: clip1.id,
+      url: clip1.url,
+      model: resolvedTextModel,
+    };
     await saveState(state);
   }
 
@@ -658,7 +730,11 @@ async function main(): Promise<void> {
     if (clip2.costUsd !== undefined) {
       console.log(`  ✓ clip 2 cost:     $${clip2.costUsd.toFixed(4)}`);
     }
-    state.clip2 = { id: clip2.id, url: clip2.url };
+    state.clip2 = {
+      id: clip2.id,
+      url: clip2.url,
+      model: resolvedI2vModel,
+    };
     await saveState(state);
   }
 
