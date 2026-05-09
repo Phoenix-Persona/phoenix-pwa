@@ -252,6 +252,62 @@
   opacity: 0.55;
 }
 
+/* Bold pattern overlay — denser tile, full strength. Use over solid color
+   sections to add Rwandan-rooted texture without losing legibility. */
+@utility imigongo-pattern-bold {
+  background-image: url("/imigongo-pattern.svg");
+  background-repeat: repeat;
+  background-size: 96px 96px;
+}
+
+/* Warm gradient mat for hero / persona-header surfaces. Charcoal base
+   with a warm clay glow from the top-right — feels lit, not blank. */
+@utility hero-mat {
+  background:
+    radial-gradient(
+      ellipse 80% 60% at 100% 0%,
+      hsl(8 65% 38% / 0.55),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 60% 80% at 0% 100%,
+      hsl(28 70% 48% / 0.35),
+      transparent 55%
+    ),
+    var(--imigongo-charcoal);
+}
+
+/* Warm cream-to-ochre wash for sections that should feel sunlit but
+   still hold ornament. Used between dark sections to keep rhythm. */
+@utility cream-wash {
+  background:
+    radial-gradient(
+      ellipse 70% 50% at 50% 0%,
+      hsl(46 92% 52% / 0.12),
+      transparent 60%
+    ),
+    linear-gradient(
+      180deg,
+      hsl(38 35% 96%),
+      hsl(38 38% 99%) 60%,
+      hsl(38 35% 96%)
+    );
+}
+
+/* Hand-drawn ridge under section eyebrows — three Rwandan-flag bands
+   stacked, used as a 3px decorative underline on display headings. */
+@utility flag-underline {
+  background-image: linear-gradient(
+    90deg,
+    var(--imigongo-clay) 0%,
+    var(--imigongo-clay) 33.3%,
+    var(--rw-gold) 33.3%,
+    var(--rw-gold) 66.6%,
+    var(--rw-green) 66.6%,
+    var(--rw-green) 100%
+  );
+}
+
 @layer base {
   *,
   ::after,

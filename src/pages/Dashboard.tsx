@@ -10,14 +10,15 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Send, Sparkles, ExternalLink } from "lucide-react";
 
 import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
 import { PostCard } from "@/components/PostCard";
-import { PersonaHeaderSkeleton, PostListSkeleton } from "@/components/Skeletons";
+import { PostListSkeleton } from "@/components/Skeletons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/useToast";
 import { useAuthor } from "@/hooks/useAuthor";
@@ -50,6 +51,7 @@ const Dashboard = () => {
   const personaHex = useMemo(() => npubToHex(npub), [npub]);
   const author = useAuthor(personaHex ?? undefined);
   const publicBio = author.data?.metadata?.about ?? "";
+  const picture = author.data?.metadata?.picture;
 
   const [raw, setRaw] = useState("");
 
@@ -85,170 +87,249 @@ const Dashboard = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <PhoenixHeader />
 
-      <main
-        id="main-content"
-        className="flex-1 container py-8 max-w-4xl space-y-8"
-      >
-        {/* Persona header */}
+      <main id="main-content" className="flex-1">
+        {/* Persona cover header — charcoal mat with avatar + tags */}
         {!user ? (
-          <Card className="border-dashed">
-            <CardContent className="py-12 text-center text-muted-foreground">
-              Sign in to access this persona's dashboard.
-            </CardContent>
-          </Card>
+          <section className="cream-wash py-20">
+            <div className="container max-w-3xl">
+              <Card className="border-dashed border-imigongo-clay/30 bg-imigongo-cream/40">
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  Sign in to access this persona's dashboard.
+                </CardContent>
+              </Card>
+            </div>
+          </section>
         ) : persona.isLoading ? (
-          <PersonaHeaderSkeleton />
+          <section className="hero-mat text-imigongo-cream">
+            <div className="container py-12 md:py-16 max-w-4xl flex items-center gap-6">
+              <div className="w-28 h-28 rounded-full bg-imigongo-cream/10 animate-pulse" />
+              <div className="flex-1 space-y-3">
+                <div className="h-3 w-24 bg-imigongo-cream/15 rounded animate-pulse" />
+                <div className="h-10 w-72 bg-imigongo-cream/15 rounded animate-pulse" />
+                <div className="h-4 w-96 max-w-full bg-imigongo-cream/10 rounded animate-pulse" />
+              </div>
+            </div>
+            <FlagStripe height={4} />
+          </section>
         ) : personaConfig ? (
-          <div className="rounded-2xl border border-border bg-card p-6 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-imigongo-clay via-rw-gold to-rw-green" />
-            <div className="flex items-start justify-between gap-4 flex-wrap relative">
-              <div className="space-y-2">
-                {personaConfig.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
+          <section className="relative overflow-hidden hero-mat text-imigongo-cream">
+            <div
+              className="absolute inset-0 imigongo-pattern-bold text-imigongo-cream opacity-[0.05] pointer-events-none"
+              aria-hidden="true"
+            />
+            <div
+              className="absolute -top-40 -right-32 w-[36rem] h-[36rem] rounded-full bg-rw-gold/10 blur-3xl pointer-events-none"
+              aria-hidden="true"
+            />
+
+            <div className="container relative py-10 md:py-14 max-w-4xl">
+              <div className="flex items-start gap-6 flex-wrap md:flex-nowrap">
+                <div className="relative flex-shrink-0">
+                  <div
+                    className="absolute -inset-2 rounded-full bg-gradient-to-br from-rw-gold/40 via-imigongo-ochre/40 to-imigongo-clay/40 blur-2xl"
+                    aria-hidden="true"
+                  />
+                  <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden ring-2 ring-rw-gold/40 shadow-2xl shadow-black/40 bg-imigongo-charcoal flex items-center justify-center">
+                    {picture ? (
+                      <img
+                        src={picture}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        loading="eager"
+                      />
+                    ) : (
+                      <ImigongoSeal size={56} colorClass="text-rw-gold/80" />
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex-1 min-w-0 space-y-3">
+                  <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
+                    <span className="h-px w-6 bg-rw-gold" />
+                    Composer
+                  </p>
+                  <h1 className="font-display text-3xl md:text-5xl font-medium tracking-tight leading-tight">
+                    {personaConfig.name}
+                  </h1>
+                  {publicBio && (
+                    <p className="text-imigongo-cream/80 max-w-2xl leading-relaxed">
+                      {publicBio}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2 pt-1 items-center">
                     {personaConfig.tags.slice(0, 4).map((t) => (
                       <Badge
                         key={t}
                         variant="secondary"
-                        className="text-[10px]"
+                        className="text-[10px] bg-imigongo-cream/15 text-imigongo-cream border-0"
                       >
                         {t}
                       </Badge>
                     ))}
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full border-imigongo-cream/30 text-imigongo-cream bg-transparent hover:bg-imigongo-cream/10 hover:text-imigongo-cream"
+                    >
+                      <Link to={`/p/${npub}`}>
+                        <ExternalLink className="mr-2 size-3.5" />
+                        Public feed
+                      </Link>
+                    </Button>
                   </div>
-                )}
-                <h1 className="font-display text-3xl md:text-4xl font-medium tracking-tight">
-                  {personaConfig.name}
-                </h1>
-                {publicBio && (
-                  <p className="text-muted-foreground mt-3 max-w-2xl">
-                    {publicBio}
-                  </p>
-                )}
-              </div>
-              <Button asChild variant="outline" size="sm">
-                <Link to={`/p/${npub}`}>View public feed →</Link>
-              </Button>
-            </div>
-          </div>
-        ) : persona.isError ? (
-          <Card className="border-dashed">
-            <CardContent className="py-12 px-8 text-center text-muted-foreground space-y-2">
-              <p>
-                Couldn't decrypt this persona. Either it isn't yours, or your
-                signer rejected the decryption request.
-              </p>
-              <p className="text-xs">{String(persona.error)}</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-dashed">
-            <CardContent className="py-12 px-8 text-center text-muted-foreground">
-              No persona found at this npub for your account. It may not
-              have published yet, or the relays haven't seen it.
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Composer (Phase 1: raw publish; Phase 2: PPQ styling) */}
-        {personaConfig && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 font-display text-2xl font-medium">
-                <Send className="size-5 text-primary" aria-hidden="true" />
-                Compose
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label htmlFor="composer-raw" className="text-sm font-medium">
-                    Post body
-                  </label>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {raw.length} chars
-                  </span>
                 </div>
-                <Textarea
-                  id="composer-raw"
-                  rows={5}
-                  value={raw}
-                  onChange={(e) => setRaw(e.target.value)}
-                  placeholder="Phase 1: publishes as-is. Phase 2: AI styling will run before publish."
-                  onKeyDown={(e) => {
-                    if (
-                      (e.metaKey || e.ctrlKey) &&
-                      e.key === "Enter" &&
-                      raw.trim() &&
-                      !publish.isPending
-                    ) {
-                      e.preventDefault();
-                      onPost();
-                    }
-                  }}
-                  className="resize-y min-h-[8rem]"
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  Press{" "}
-                  <kbd className="font-mono px-1 py-0.5 rounded bg-muted border border-border text-[10px]">
-                    ⌘ Enter
-                  </kbd>{" "}
-                  to publish.
-                </p>
               </div>
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => setRaw("")}
-                  disabled={publish.isPending}
-                >
-                  Discard
-                </Button>
-                <Button
-                  onClick={onPost}
-                  disabled={publish.isPending || !raw.trim()}
-                >
-                  {publish.isPending ? (
-                    <>
-                      <Loader2
-                        className="mr-2 size-4 animate-spin"
-                        aria-hidden="true"
-                      />
-                      Publishing…
-                    </>
-                  ) : (
-                    <>
-                      <Send className="mr-2 size-4" aria-hidden="true" />
-                      Publish to relays
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+            <FlagStripe height={4} />
+          </section>
+        ) : persona.isError ? (
+          <section className="cream-wash py-12">
+            <div className="container max-w-3xl">
+              <Card className="border-dashed border-destructive/30 bg-destructive/5">
+                <CardContent className="py-12 px-8 text-center text-muted-foreground space-y-2">
+                  <p>
+                    Couldn't decrypt this persona. Either it isn't yours, or your
+                    signer rejected the decryption request.
+                  </p>
+                  <p className="text-xs">{String(persona.error)}</p>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        ) : (
+          <section className="cream-wash py-12">
+            <div className="container max-w-3xl">
+              <Card className="border-dashed border-imigongo-clay/30">
+                <CardContent className="py-12 px-8 text-center text-muted-foreground">
+                  No persona found at this npub for your account. It may not
+                  have published yet, or the relays haven't seen it.
+                </CardContent>
+              </Card>
+            </div>
+          </section>
         )}
 
-        {/* Recent posts */}
-        <div className="space-y-4">
-          <h2 className="font-display text-2xl font-medium tracking-tight">
-            Recent posts
-          </h2>
-          {posts.isLoading ? (
-            <PostListSkeleton count={2} />
-          ) : posts.data && posts.data.length > 0 ? (
-            <ul className="space-y-3">
-              {posts.data.map((p) => (
-                <li key={p.id}>
-                  <PostCard event={p} showOperatorBadge />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Card className="border-dashed">
-              <CardContent className="py-10 px-6 text-sm text-muted-foreground text-center">
-                No posts yet. Compose the first one above.
+        {/* Composer + feed body */}
+        <div className="container py-10 max-w-4xl space-y-8">
+          {personaConfig && (
+            <Card className="border-imigongo-clay/20 bg-gradient-to-br from-card via-card to-rw-gold-soft/10 overflow-hidden">
+              <div className="bg-gradient-to-r from-imigongo-clay/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-5 text-imigongo-clay" aria-hidden="true" />
+                  <h2 className="font-display text-2xl font-medium tracking-tight">
+                    Compose
+                  </h2>
+                </div>
+                <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
+                  Phase 1 · Raw publish
+                </span>
+              </div>
+              <CardContent className="space-y-5 pt-5">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="composer-raw" className="text-sm font-medium">
+                      Post body
+                    </label>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {raw.length} chars
+                    </span>
+                  </div>
+                  <Textarea
+                    id="composer-raw"
+                    rows={5}
+                    value={raw}
+                    onChange={(e) => setRaw(e.target.value)}
+                    placeholder="Phase 1: publishes as-is. Phase 2: AI styling will run before publish."
+                    onKeyDown={(e) => {
+                      if (
+                        (e.metaKey || e.ctrlKey) &&
+                        e.key === "Enter" &&
+                        raw.trim() &&
+                        !publish.isPending
+                      ) {
+                        e.preventDefault();
+                        onPost();
+                      }
+                    }}
+                    className="resize-y min-h-[8rem] bg-background/60"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Press{" "}
+                    <kbd className="font-mono px-1 py-0.5 rounded bg-muted border border-border text-[10px]">
+                      ⌘ Enter
+                    </kbd>{" "}
+                    to publish.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setRaw("")}
+                    disabled={publish.isPending}
+                  >
+                    Discard
+                  </Button>
+                  <Button
+                    onClick={onPost}
+                    disabled={publish.isPending || !raw.trim()}
+                    className="shadow-lg shadow-primary/20"
+                  >
+                    {publish.isPending ? (
+                      <>
+                        <Loader2
+                          className="mr-2 size-4 animate-spin"
+                          aria-hidden="true"
+                        />
+                        Publishing…
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 size-4" aria-hidden="true" />
+                        Publish to relays
+                      </>
+                    )}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
+
+          {/* Recent posts */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-display text-2xl font-medium tracking-tight">
+                Recent posts
+              </h2>
+              <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-medium">
+                Live on relays
+              </span>
+            </div>
+            {posts.isLoading ? (
+              <PostListSkeleton count={2} />
+            ) : posts.data && posts.data.length > 0 ? (
+              <ul className="space-y-3">
+                {posts.data.map((p) => (
+                  <li key={p.id}>
+                    <PostCard event={p} showOperatorBadge />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Card className="border-dashed border-imigongo-clay/30 bg-gradient-to-br from-imigongo-cream/30 to-rw-gold-soft/10">
+                <CardContent className="py-12 px-6 text-center text-muted-foreground space-y-3">
+                  <ImigongoSeal
+                    size={48}
+                    colorClass="text-imigongo-clay/60"
+                    className="mx-auto"
+                  />
+                  <p className="text-sm">
+                    No posts yet. Compose the first one above.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </main>
     </div>

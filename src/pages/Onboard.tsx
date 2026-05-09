@@ -14,15 +14,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { useNostr } from "@nostrify/react";
 
 import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/useToast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
@@ -145,119 +146,163 @@ const Onboard = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <PhoenixHeader />
 
-      <main
-        id="main-content"
-        className="flex-1 container py-10 max-w-2xl space-y-6"
-      >
-        <div className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
-            Phase 1 stub
-          </p>
-          <h1 className="font-display text-4xl md:text-5xl font-medium tracking-tight">
-            Create a persona
-          </h1>
-          <p className="text-muted-foreground leading-relaxed">
-            The agent-driven wizard with image generation and voice
-            sampling lands in Phase 2. For now, this is a minimal form
-            so we can exercise the multi-persona, encrypted-backup, and
-            publish flows end-to-end.
-          </p>
+      <main id="main-content" className="flex-1">
+        {/* Cover band — charcoal mat with seal accent */}
+        <section className="relative overflow-hidden hero-mat text-imigongo-cream">
+          <div
+            className="absolute inset-0 imigongo-pattern-bold text-imigongo-cream opacity-[0.05] pointer-events-none"
+            aria-hidden="true"
+          />
+          <div
+            className="absolute -top-32 -right-24 w-[32rem] h-[32rem] rounded-full bg-rw-gold/15 blur-3xl pointer-events-none"
+            aria-hidden="true"
+          />
+
+          <div className="container relative py-12 md:py-16 max-w-3xl">
+            <div className="flex items-center gap-5">
+              <div className="relative flex-shrink-0 hidden sm:block">
+                <div
+                  className="absolute -inset-3 rounded-2xl bg-gradient-to-br from-rw-gold/40 to-imigongo-clay/30 blur-2xl"
+                  aria-hidden="true"
+                />
+                <div className="relative bg-imigongo-charcoal/60 rounded-2xl p-3 ring-1 ring-rw-gold/30">
+                  <ImigongoSeal size={64} colorClass="text-rw-gold" />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <p className="inline-flex items-center gap-2 rounded-full border border-rw-gold/40 bg-rw-gold/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
+                  <Sparkles className="size-3.5" />
+                  Phase 1 stub
+                </p>
+                <h1 className="font-display text-4xl md:text-5xl font-medium tracking-tight leading-tight">
+                  Create a persona
+                </h1>
+                <p className="text-imigongo-cream/80 leading-relaxed max-w-xl">
+                  The agent-driven wizard with image generation and voice
+                  sampling lands in Phase 2. For now, this is a minimal form
+                  so we can exercise multi-persona, encrypted-backup, and
+                  publish flows end-to-end.
+                </p>
+              </div>
+            </div>
+          </div>
+          <FlagStripe height={4} />
+        </section>
+
+        {/* Form */}
+        <div className="container py-10 max-w-2xl">
+          <Card className="border-imigongo-clay/20 bg-gradient-to-br from-card via-card to-rw-gold-soft/10 overflow-hidden">
+            <div className="bg-gradient-to-r from-imigongo-clay/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center justify-between">
+              <h2 className="font-display text-2xl font-medium tracking-tight">
+                New persona
+              </h2>
+              <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
+                Encrypted at rest
+              </span>
+            </div>
+            <CardContent className="space-y-5 pt-5">
+              <div className="space-y-2">
+                <Label htmlFor="persona-name">Name</Label>
+                <Input
+                  id="persona-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Voice of Rwanda"
+                  className="bg-background/60"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="persona-bio">
+                  Bio (public, lives on the persona's kind 0 profile)
+                </Label>
+                <Textarea
+                  id="persona-bio"
+                  rows={2}
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  className="bg-background/60"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="persona-system-prompt">
+                  System prompt (private, encrypted in the backup)
+                </Label>
+                <Textarea
+                  id="persona-system-prompt"
+                  rows={5}
+                  value={systemPrompt}
+                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  className="bg-background/60"
+                />
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="persona-tags">
+                    Topical tags (comma separated)
+                  </Label>
+                  <Input
+                    id="persona-tags"
+                    value={tagsInput}
+                    onChange={(e) => setTagsInput(e.target.value)}
+                    placeholder="rwanda, press-freedom"
+                    className="bg-background/60"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="persona-languages">
+                    Languages (comma separated)
+                  </Label>
+                  <Input
+                    id="persona-languages"
+                    value={languagesInput}
+                    onChange={(e) => setLanguagesInput(e.target.value)}
+                    placeholder="en, rw"
+                    className="bg-background/60"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="persona-voice">Voice id (placeholder)</Label>
+                <Input
+                  id="persona-voice"
+                  value={voiceId}
+                  onChange={(e) => setVoiceId(e.target.value)}
+                  placeholder="alloy"
+                  className="bg-background/60"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Voice sample generation lands in Phase 2. The id is
+                  stored now so the wizard can re-use it later.
+                </p>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <Button
+                  onClick={publishPersona}
+                  disabled={publishing || !user}
+                  size="lg"
+                  className="rounded-full px-8 shadow-lg shadow-primary/20"
+                >
+                  {publishing ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Publishing…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 size-4" />
+                      Mint persona
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display text-2xl font-medium">
-              New persona
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="persona-name">Name</Label>
-              <Input
-                id="persona-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Voice of Rwanda"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="persona-bio">
-                Bio (public, lives on the persona's kind 0 profile)
-              </Label>
-              <Textarea
-                id="persona-bio"
-                rows={2}
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="persona-system-prompt">
-                System prompt (private, encrypted in the backup)
-              </Label>
-              <Textarea
-                id="persona-system-prompt"
-                rows={5}
-                value={systemPrompt}
-                onChange={(e) => setSystemPrompt(e.target.value)}
-              />
-            </div>
-
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="persona-tags">
-                  Topical tags (comma separated)
-                </Label>
-                <Input
-                  id="persona-tags"
-                  value={tagsInput}
-                  onChange={(e) => setTagsInput(e.target.value)}
-                  placeholder="rwanda, press-freedom"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="persona-languages">
-                  Languages (comma separated)
-                </Label>
-                <Input
-                  id="persona-languages"
-                  value={languagesInput}
-                  onChange={(e) => setLanguagesInput(e.target.value)}
-                  placeholder="en, rw"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="persona-voice">Voice id (placeholder)</Label>
-              <Input
-                id="persona-voice"
-                value={voiceId}
-                onChange={(e) => setVoiceId(e.target.value)}
-                placeholder="alloy"
-              />
-              <p className="text-xs text-muted-foreground">
-                Voice sample generation lands in Phase 2. The id is
-                stored now so the wizard can re-use it later.
-              </p>
-            </div>
-
-            <div className="flex justify-end">
-              <Button onClick={publishPersona} disabled={publishing || !user}>
-                {publishing ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                    Publishing…
-                  </>
-                ) : (
-                  "Mint persona"
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </main>
     </div>
   );
