@@ -3,19 +3,20 @@
 **Project:** Phoenix Persona — Anonymity-preserving AI personas, sustained by Lightning donations
 **Event:** HRF AI Hack for Freedom
 **Timeline:** 36 hours
-**Team:** Anaïse (Captain + Product), Derek (Frontend + Nostr + PWA), Jim (LLM + Agent), Topher (Wallet + Infra)
+**Team:** Anaïse (Captain + Product), Derek (Frontend + Nostr + PWA), Jim (PPQ + Wallet + Payments), Topher (Agent + LLM Consumers + Donations)
 
-> The authoritative design is [`PROJECT.md`](../dev/PROJECT.md). The parallel-work coordination doc is [`dev/streams.md`](../dev/streams.md). When the plan and this file disagree, **PROJECT.md wins** — update this file to match.
+> The authoritative design is [`PROJECT.md`](../dev/PROJECT.md). The parallel-work coordination doc is [`STREAMS.md`](../dev/STREAMS.md). When the plan and this file disagree, **PROJECT.md wins** — update this file to match.
 
 ---
 
-## Locked decisions (carried in from PROJECT.md and streams.md)
+## Locked decisions (carried in from PROJECT.md and STREAMS.md)
 
 - Two-level user/persona identity; user signs encrypted kind 30078 with `d=phoenix-persona:<pubkey>`, `t=phoenix-persona`
 - Per-persona Breeze Lightning wallet; seed inside the encrypted backup
 - AI inference via PPQ exclusively, paid in sats; agent harness via `pi-mono`
 - All persistent code lives in main app paths (`src/lib/<feature>`, `src/components/<feature>`); demo surfaces are `/dev/<feature>` routes
-- Compartmentalize first, integrate later — see `dev/streams.md` for the harness inventory
+- Compartmentalize first, integrate later — see `dev/STREAMS.md` for the harness inventory
+- **Stream A (Jim) owns the wallet → PPQ end-to-end demo** — PPQ + Wallet + Payments + Settings together, single owner so the seam can be debugged in one head
 
 ---
 
@@ -33,7 +34,7 @@
 
 ## Cross-cutting kickoff (Hours 0–1)
 
-- [ ] **(All)** Read PROJECT.md and dev/streams.md end-to-end
+- [ ] **(All)** Read PROJECT.md and STREAMS.md end-to-end
 - [ ] **(All)** Confirm role split, schedule, sleep windows, demo slot time
 - [ ] **(All)** Lock the persona event schema (PROJECT.md §5) — final field list before anyone writes code
 - [ ] **(All)** Lock the wizard agent tool set (PROJECT.md §6) — final tool names and signatures
@@ -44,21 +45,61 @@ Sync at ~hour +1 — kick streams off in parallel.
 
 ---
 
-## Stream A — Jim (LLM + Agent)
+## Stream A — Jim (PPQ + Wallet + Payments)
 
-**Owns:** `/dev/ppq`, `/dev/agent`, `/dev/styling`, `/dev/image-gen`, `/dev/voice-gen` (specs in `dev/streams.md` §H1–H5)
+**Owns:** `/dev/ppq`, `/dev/wallet`, `/dev/ppq-pay`, `/dev/settings` (specs in `dev/STREAMS.md` §A1–A4)
+
+The wallet → PPQ end-to-end demo lives entirely in this stream.
+
+### Phase 0 — Spike (3h, partly already shipped)
+- [ ] PPQ from a TS client (chat, image, TTS) paid in sats (in flight: commits `96c0f98`, `b7b45d4`, `d06adeb`)
+- [ ] Document payment flow, model availability, costs, latency in `docs/spike-ppq.md`
+- [ ] Pre-fund demo wallet seed (~50 chats / 10 images / 5 TTS / live-zap cushion) → `docs/demo-funding.md`
+- [ ] Co-author `docs/breeze-decision.md` with Derek's Phase 0 Breeze findings
+
+### Phase 1 — Independent harnesses (~10h)
+- [ ] **`/dev/ppq`** (A1, ~1h) — formalize spike code into a `pi-ai` PPQ client + harness page
+- [ ] **`/dev/wallet`** (A2, ~4h) — Breeze SDK init, balance, invoice, send/receive, tx history
+- [ ] **`/dev/ppq-pay`** (A3, ~3h) — wallet pays a PPQ request end-to-end
+- [ ] **`/dev/settings`** (A4, ~2h) — model picker reading PPQ `/v1/models`, persists to encrypted backup
+
+### Phase 2 — Composite contributions (3h)
+- [ ] Wire `mintPersonaWallet` into Derek's `/dev/persona-create`
+- [ ] Confirm every AI-gated flow in Topher's stream routes through `ppq-pay` (no naked PPQ calls anywhere)
+- [ ] Empty-wallet UX (sticky banner + disabled buttons) wired into Dashboard
+
+### Phase 3 — Main UI integration (4h)
+- [ ] Wallet page (uses `WalletPanel` from harness)
+- [ ] Settings page (already built as harness; just routed)
+- [ ] Wallet badge in Dashboard with empty-wallet sticky banner
+
+### Phase 4 — Demo prep (2h)
+- [ ] Pre-fund demo persona wallet; stash seed securely
+- [ ] Live-zap dry run with Topher: QR on screen → external wallet → zap lands on feed within seconds
+- [ ] Backup demo wallet seed on multiple devices
+
+---
+
+## Stream B — Topher (Agent + LLM Consumers + Donations)
+
+**Owns:** `/dev/agent`, `/dev/styling`, `/dev/image-gen`, `/dev/voice-gen`, `/dev/zap` (specs in `dev/STREAMS.md` §B1–B5)
 
 ### Phase 0 — Spike (3h)
-- [ ] Spike: PPQ from a TS client (chat, image, TTS) paid in sats
-- [ ] Document payment flow, model availability, costs, latency in `docs/spike-ppq.md`
+- [ ] Spike: pi-mono in a Vite/React PWA — install, agent loop, one tool
+- [ ] Document bundle, tool-call shape, provider switching in `docs/spike-pi-mono.md`
+- [ ] (Intra-stream — output feeds your own `/dev/agent`)
 
-### Phase 1 — Independent harnesses (12h)
-- [ ] **`/dev/ppq`** (~1h) — formalize spike code into a `pi-ai` PPQ client + harness page
-- [ ] **`/dev/agent`** (~3h) — `pi-agent-core` + `pi-web-ui` chat with one wizard tool
-- [ ] **`/dev/styling`** (~2h) — system prompt + raw thought → styled output via PPQ
-- [ ] **`/dev/image-gen`** (~3h) — `gpt-image-1` with reference-image input for likeness
-- [ ] **`/dev/voice-gen`** (~2h) — TTS sample with voice picker
-- [ ] 1h buffer
+### Phase 0 — Parallel infrastructure decision (~1h)
+- [ ] Decide LNURL-pay hosting strategy → `docs/lnurl-hosting.md` (your stream consumes via `/dev/zap`)
+
+### Phase 1 — Independent harnesses (~13h, tight)
+- [ ] **`/dev/agent`** (B1, ~3h) — `pi-agent-core` + `pi-web-ui` chat with one wizard tool
+- [ ] **`/dev/styling`** (B2, ~2h) — system prompt + raw thought → styled output via PPQ
+- [ ] **`/dev/image-gen`** (B3, ~3h) — `gpt-image-1` with reference-image input for likeness
+- [ ] **`/dev/voice-gen`** (B4, ~2h) — TTS sample with voice picker
+- [ ] **`/dev/zap`** (B5, ~3h) — LNURL/lud16 mechanics, donate button, zap receipt rendering
+
+If pressed for time at hour +20, trim voice-gen to a hardcoded sample or push zap polish to Phase 3.
 
 ### Phase 2 — Composite contributions (4h)
 - [ ] Wire `agent`, `image-gen`, `voice-gen` libs into Derek's `/dev/persona-create`
@@ -69,75 +110,40 @@ Sync at ~hour +1 — kick streams off in parallel.
 - [ ] Wire `styling` into Dashboard composer
 - [ ] Wire `image-gen` into Dashboard image button
 - [ ] Voice rendering of published posts (V1.5 if time)
+- [ ] Donate button on PersonaFeed
 
 ### Phase 4 — Demo prep (1h)
 - [ ] Lock model defaults; verify prompt voices in 5 sample inputs each persona
+- [ ] Verify zap UI during Jim's live-zap dry run
 - [ ] Standby for live tweaks during practice run
-
----
-
-## Stream B — Topher (Wallet + Infra)
-
-**Owns:** `/dev/wallet`, `/dev/ppq-pay`, `/dev/zap`, `/dev/settings` (specs in `dev/streams.md` §S1–S4)
-
-### Phase 0 — Spike (3h)
-- [ ] Spike: pi-mono in a Vite/React PWA — install, agent loop, one tool
-- [ ] Document bundle, tool-call shape, provider switching in `docs/spike-pi-mono.md`
-- [ ] Hand off result to Jim for `/dev/agent` harness construction
-
-### Phase 0 — Parallel infrastructure decisions (~1h)
-- [ ] Decide LNURL-pay hosting strategy → `docs/lnurl-hosting.md`
-- [ ] Pre-fund the demo wallet seed (~50 chats / 10 images / 5 TTS / live-zap cushion) → `docs/demo-funding.md`
-- [ ] Co-author `docs/breeze-decision.md` with Derek's Phase 0 Breeze findings
-
-### Phase 1 — Independent harnesses (12h)
-- [ ] **`/dev/wallet`** (~4h) — Breeze SDK init, balance, invoice, send/receive, tx history
-- [ ] **`/dev/ppq-pay`** (~3h) — wallet pays a PPQ request end-to-end
-- [ ] **`/dev/zap`** (~3h) — LNURL/lud16 mechanics, donate button, zap receipt rendering
-- [ ] **`/dev/settings`** (~2h) — model picker reading PPQ `/v1/models`, persists to encrypted backup
-
-### Phase 2 — Composite contributions (3h)
-- [ ] Wire `mintPersonaWallet` into Derek's `/dev/persona-create`
-- [ ] Confirm every AI-gated flow routes through `ppq-pay` (no naked PPQ calls)
-- [ ] Empty-wallet UX (sticky banner + disabled buttons) wired into Dashboard
-
-### Phase 3 — Main UI integration (4h)
-- [ ] Wallet page (uses `WalletPanel` from harness)
-- [ ] Settings page (already built as harness; just routed)
-- [ ] Wallet badge in Dashboard with empty-wallet sticky banner
-
-### Phase 4 — Demo prep (2h)
-- [ ] Pre-fund demo persona wallet; stash seed securely
-- [ ] Live-zap dry run: QR on screen → external wallet → zap lands on feed within seconds
-- [ ] Backup demo wallet seed on multiple devices
 
 ---
 
 ## Stream C — Derek (Nostr + Frontend)
 
-**Owns:** `/dev/persona-crypto`, `/dev/operator`, `/dev/publish`, `/dev/feed` (specs in `dev/streams.md` §C1–C4)
+**Owns:** `/dev/persona-crypto`, `/dev/operator`, `/dev/publish`, `/dev/feed` (specs in `dev/STREAMS.md` §C1–C4)
 **Leads:** `/dev/persona-create`, `/dev/persona-restore` (composite, §C5–C6)
 
 ### Phase 0 — Spike (3h)
 - [ ] Spike — Nostr crypto (NIP-44 self / NIP-49 / kind 30078) — ~1h
 - [ ] Spike — Breeze SDK in browser (variant choice, init, invoice, pay) — ~2h
 - [ ] Document both in `docs/spike-nostr-breeze.md`
-- [ ] Hand off Breeze findings to Topher
+- [ ] Hand off Breeze findings to Jim for `/dev/wallet`
 
 ### Phase 1 — Independent harnesses (12h)
-- [ ] **`/dev/persona-crypto`** (~3h) — adapt existing `src/lib/persona*` to PROJECT.md §5.2 schema; full round-trip
-- [ ] **`/dev/operator`** (~3h) — fresh keypair / NIP-07 / NIP-46 / paste; NIP-49 backup/restore
-- [ ] **`/dev/publish`** (~3h) — kind 1 publish with full attribution tags
-- [ ] **`/dev/feed`** (~3h) — render persona profile + posts + zap receipts from a pubkey
+- [ ] **`/dev/persona-crypto`** (C1, ~3h) — adapt existing `src/lib/persona*` to PROJECT.md §5.2 schema; full round-trip
+- [ ] **`/dev/operator`** (C2, ~3h) — fresh keypair / NIP-07 / NIP-46 / paste; NIP-49 backup/restore
+- [ ] **`/dev/publish`** (C3, ~3h) — kind 1 publish with full attribution tags
+- [ ] **`/dev/feed`** (C4, ~3h) — render persona profile + posts + zap receipts from a pubkey
 
 ### Phase 2 — Composite harnesses (8h)
-- [ ] **`/dev/persona-create`** (~5h) — full wizard composing agent + wallet + persona-crypto + image-gen + voice-gen
-- [ ] **`/dev/persona-restore`** (~3h) — operator login → load all kind 30078 → present persona list
+- [ ] **`/dev/persona-create`** (C5, ~5h) — full wizard composing agent + wallet + persona-crypto + image-gen + voice-gen
+- [ ] **`/dev/persona-restore`** (C6, ~3h) — operator login → load all kind 30078 → present persona list
 
 ### Phase 3 — Main UI integration (5h)
 - [ ] `Onboard.tsx` ← `<CharacterCreator>` from C5
 - [ ] `MyPersonas.tsx` ← `<PersonaList>` from C6
-- [ ] `PersonaFeed.tsx` ← `<PersonaProfileHeader>` + `<PersonaPostList>` + `<ZapReceiptCard>` (C4 + S3)
+- [ ] `PersonaFeed.tsx` ← `<PersonaProfileHeader>` + `<PersonaPostList>` + `<ZapReceiptCard>` (C4 + B5)
 - [ ] `Verify.tsx` rebuilt against the §5 schema
 - [ ] PWA polish: install prompt, service worker, manifest icons (if time)
 
@@ -158,7 +164,7 @@ Sync at ~hour +1 — kick streams off in parallel.
 ### Phase 1–2
 - [ ] First persona created end-to-end through the wizard (Anaïse drives)
 - [ ] First 5 real posts composed via the dashboard
-- [ ] Sample post quality review with Jim
+- [ ] Sample post quality review with Topher
 
 ### Phase 3 — Polish content
 - [ ] 5–10 seed posts for the demo feed
