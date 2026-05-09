@@ -85,6 +85,7 @@ const PersonaFeed = () => {
                         alt=""
                         className="w-full h-full object-cover"
                         loading="eager"
+                        crossOrigin="anonymous"
                       />
                     ) : (
                       <ImigongoSeal size={72} colorClass="text-rw-gold/80" />

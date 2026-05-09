@@ -27,6 +27,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useUploadFile } from "@/hooks/useUploadFile";
 import { usePpqImage } from "@/hooks/usePpqImage";
 import { useToast } from "@/hooks/useToast";
+import { PpqError } from "@/lib/ppq/types";
 import { cn } from "@/lib/utils";
 
 interface PersonaPictureFieldProps {
@@ -137,9 +138,18 @@ export function PersonaPictureField({
         description: "Saved to your media server.",
       });
     } catch (e) {
-      setGenError(
-        e instanceof Error ? e.message : "Image generation failed."
-      );
+      // PPQ returns 402 when the persona's credit account has no
+      // funds. Surface that as a clear, actionable message instead of
+      // the raw status text.
+      if (e instanceof PpqError && e.status === 402) {
+        setGenError(
+          "Out of credits — top up the persona's wallet to generate images."
+        );
+      } else {
+        setGenError(
+          e instanceof Error ? e.message : "Image generation failed."
+        );
+      }
     } finally {
       setGenerating(false);
     }
@@ -158,6 +168,7 @@ export function PersonaPictureField({
               alt=""
               className="w-full h-full object-cover"
               loading="eager"
+              crossOrigin="anonymous"
             />
           </div>
           <div className="flex-1 min-w-0 space-y-2">

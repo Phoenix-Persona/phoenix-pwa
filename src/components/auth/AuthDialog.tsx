@@ -15,7 +15,7 @@ import { encryptNsec, storeUserNcryptsec } from '@/lib/nip49Storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Collapsible,
   CollapsibleContent,
@@ -476,6 +476,9 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
           <DialogTitle className="text-lg font-semibold leading-none tracking-tight text-center">
             {getTitle()}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Sign in or create a Nostr account to use Feniksi.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="px-6 pb-6 pt-4 space-y-5">

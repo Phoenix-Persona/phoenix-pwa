@@ -136,6 +136,7 @@ const Dashboard = () => {
                         alt=""
                         className="w-full h-full object-cover"
                         loading="eager"
+                        crossOrigin="anonymous"
                       />
                     ) : (
                       <ImigongoSeal size={56} colorClass="text-rw-gold/80" />

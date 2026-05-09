@@ -20,6 +20,7 @@ import { useSeoMeta } from "@unhead/react";
 import {
   ArrowLeft,
   ArrowRight,
+  HelpCircle,
   Loader2,
   Sparkles,
 } from "lucide-react";
@@ -34,6 +35,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useToast } from "@/hooks/useToast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
@@ -279,13 +285,48 @@ const Onboard = () => {
         {/* Step body */}
         <div className="container py-10 max-w-2xl">
           <Card className="border-imigongo-clay/20 bg-gradient-to-br from-card via-card to-rw-gold-soft/10 overflow-hidden">
-            <div className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center justify-between gap-3">
               <h2 className="font-display text-2xl font-medium tracking-tight">
                 {step === "details" ? "Persona details" : "Profile picture"}
               </h2>
-              <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
-                {step === "details" ? "Encrypted at rest" : "Optional"}
-              </span>
+
+              {step === "details" ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-imigongo-clay/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
+                      aria-label="How is my persona protected?"
+                    >
+                      <HelpCircle className="size-5" aria-hidden="true" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="bottom"
+                    align="end"
+                    className="w-80 text-sm leading-relaxed space-y-2"
+                  >
+                    <p className="font-medium text-foreground">
+                      How your persona is protected
+                    </p>
+                    <p className="text-muted-foreground">
+                      The configuration below is encrypted to your own Nostr
+                      key (NIP-44) before it leaves your browser. Relays
+                      store the ciphertext — only your signer can decrypt
+                      it.
+                    </p>
+                    <p className="text-muted-foreground">
+                      The persona's private key lives only inside that
+                      encrypted backup. It never touches the network, and
+                      never lands on disk in plaintext.
+                    </p>
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
+                  Optional
+                </span>
+              )}
             </div>
 
             <CardContent className="space-y-5 pt-5">

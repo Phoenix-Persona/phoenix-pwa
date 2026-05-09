@@ -18,8 +18,14 @@ export default defineConfig(() => ({
     port: 8080,
     // The Breez Spark SDK ships as WASM with threading; the dev server needs
     // these cross-origin headers so SharedArrayBuffer is available to it.
+    //
+    // `credentialless` (instead of `require-corp`) keeps SharedArrayBuffer
+    // working but lets cross-origin images load without the third-party
+    // server having to opt in via Cross-Origin-Resource-Policy. We need
+    // this because Blossom servers serving persona pictures don't ship
+    // CORP headers, and require-corp blocks them outright.
     headers: {
-      "Cross-Origin-Embedder-Policy": "require-corp",
+      "Cross-Origin-Embedder-Policy": "credentialless",
       "Cross-Origin-Opener-Policy": "same-origin",
     },
   },
