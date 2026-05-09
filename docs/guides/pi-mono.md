@@ -54,13 +54,13 @@ const finalMessage = await s.result();
 
 ### Pointing at PPQ
 
-PPQ is OpenAI-compatible (see `docs/ppq.md`). Use the OpenAI provider with
+PPQ is OpenAI-compatible (see `docs/guides/ppq.md`). Use the OpenAI provider with
 a custom base URL — the README's "Custom Models" / "OpenAI Compatibility
 Settings" section is authoritative; verify the exact override key
 (`baseURL`) before coding.
 
 ```typescript
-const model = getModel('openai', 'claude-sonnet-4-5'); // model name as exposed by PPQ
+const model = getModel('openai', 'claude-sonnet-4.5'); // model name as exposed by PPQ
 // Pass baseURL: 'https://api.ppq.ai' and apiKey: 'ppq_<token>' through
 // the per-call options or via custom-model registration.
 ```
@@ -100,7 +100,7 @@ import { getModel } from '@earendil-works/pi-ai';
 const agent = new Agent({
   initialState: {
     systemPrompt: 'You are the Phoenix character-creator agent.',
-    model: getModel('anthropic', 'claude-sonnet-4-5-20250929'),
+    model: getModel('anthropic', 'claude-sonnet-4.5-20250929'),
     thinkingLevel: 'off',
     messages: [],
     tools: [proposeName, /* ... */],

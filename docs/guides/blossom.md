@@ -58,7 +58,7 @@ image as input.
 - **kind 24242** — auth tokens (BUD-11)
 - **kind 10063** — user's preferred Blossom server list
 - **NIP-92 / NIP-94** — `imeta` tags pointing at Blossom URLs in posts.
-  See `docs/nostr-nips.md`.
+  See `docs/guides/nostr-nips.md`.
 
 ## Source
 

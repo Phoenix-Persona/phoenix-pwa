@@ -54,8 +54,12 @@ For Phoenix to **receive** zaps natively, kind 0 must advertise `lud16`
 endpoint must resolve to the Breeze wallet — see PROJECT.md §10 #2.
 
 ### NIP-78 — Application-specific data (kind 30078)
-Used for the persona's encrypted backup. `d` tag = `"phoenix-persona"`.
-Content is NIP-44 ciphertext. Schema in PROJECT.md §5.2 / `docs/persona-schema.md`.
+Used for the persona's encrypted backup. `d` tag = a fresh random UUID
+per publish; no other tags. Content is NIP-44 ciphertext encrypted to
+the user's own pubkey. The lack of any Phoenix-identifying tag means a
+backup is externally indistinguishable from any other NIP-78 app data;
+discovery is scan-and-decrypt. Schema in PROJECT.md §5.2 /
+`docs/PERSONA-SCHEMA.md`.
 
 ### NIP-92 — Media Attachments (`imeta` tag)
 Adds inline metadata to a media URL referenced in event content. Phoenix
@@ -92,7 +96,7 @@ Companion to NIP-92. Defines the field set used inside `imeta`: `url`, `m`
 
 | Tag       | Where         | Value                                            |
 | --------- | ------------- | ------------------------------------------------ |
-| `d`       | kind 30078    | `"phoenix-persona"`                              |
+| `d`       | kind 30078    | random UUID per publish (no semantic value)      |
 | `t`       | kind 1        | `"phoenix"`, region/cause (e.g. `"rwanda"`)      |
 | `client`  | kind 1        | `"phoenix"` (auto-added by `useNostrPublish`)    |
 | `alt`     | kind 1        | Short summary for accessibility                  |

@@ -44,8 +44,8 @@ encrypted kind 30078 backup under `model_prefs`.
 
 | Task                    | Default            |
 | ----------------------- | ------------------ |
-| Character-creator agent | `claude-sonnet-4-5`|
-| Persona text styling    | `claude-sonnet-4-5`|
+| Character-creator agent | `claude-sonnet-4.5`|
+| Persona text styling    | `claude-sonnet-4.5`|
 | Profile / post image    | `gpt-image-1`      |
 | Voice sample / TTS      | `tts-1-hd`         |
 | Video (V2)              | TBD                |

@@ -104,10 +104,14 @@ Linking a specific persona to its user requires the user's nsec. As long
 as the user keypair is safe, *which* personas are this user's is
 unknowable.
 
-**What does leak: the count.** A relay observer can see that
-`user_pubkey` has authored N kind 30078 phoenix-persona events and
-conclude "this user runs N personas." They cannot tell which public
-personas are those N — but the cardinality is visible.
+**Externally indistinguishable.** Phoenix backup events carry no
+Phoenix-identifying tags — `d` is a fresh random UUID per publish, no
+`t`/`alt`. They look identical to any other NIP-78 application-data
+event a user might publish (Coracle settings, Damus prefs, etc.). An
+observer who sees the user pubkey's kind 30078 events cannot tell
+which (or how many) are Phoenix backups without decrypting them; the
+persona count itself does not leak. The user's *participation in
+Phoenix* is only knowable to anyone who already has the user nsec.
 
 **Compartmentalization.** All personas under a single user keypair share
 one fate: anyone who compromises that user nsec can decrypt every
@@ -118,8 +122,10 @@ multi-account flow Nostrify already provides (MKStack's `LoginArea` /
 `useLoggedInAccounts`).
 
 **Multi-persona UX.** When the user is logged in, the app fetches all
-kind 30078 phoenix-persona events authored by the current user pubkey,
-decrypts them, and presents the persona list. Switching personas swaps
+kind 30078 events authored by the current user pubkey, attempts NIP-44
+self-decryption on each, keeps the ones whose plaintext validates as a
+Phoenix envelope (events from other apps fail decryption or schema
+validation and are discarded), and presents the persona list. Switching personas swaps
 which persona nsec the composer signs with — no separate "login" per
 persona.
 
@@ -135,8 +141,9 @@ persona.
   signer (NIP-44 self-decrypt), holds the persona nsec in memory, and
   uses it to sign that session's posts.
 - *Recovery on a new device*. User logs in with the user nsec; app
-  re-fetches all kind 30078 phoenix-persona events; every persona is
-  re-hydrated in one step.
+  re-fetches all kind 30078 events authored by them, decrypts each,
+  filters to valid Phoenix envelopes; every persona is re-hydrated in
+  one step.
 - *Loss of user nsec*. Every persona under that user is unrecoverable.
   The wizard surfaces a one-time "download user backup" affordance.
 
@@ -232,20 +239,28 @@ generic Nostr clients without breaking them.
 `phoenix.*` is a Phoenix-specific namespace clients can ignore. Everything
 above it is standard.
 
-### 5.2 kind 30078 — encrypted persona backup (signed by *user*, one per persona)
+### 5.2 kind 30078 — encrypted persona backup (signed by *user*, one per persona-update)
 
-Addressable replaceable event published by the **user keypair** (not the
-persona). One event per persona; updates to one persona republish only
-its own event.
+Kind-30078 event published by the **user keypair** (not the persona).
+Kind 30078 is in NIP-01's addressable range, so the `d` tag is required;
+Phoenix uses a fresh random d-tag per publish (rather than a stable one)
+to avoid leaking metadata — see "Tags" and "Updating a persona" below.
 
 Tags:
 
-- `["d", "phoenix-persona:<persona-pubkey-hex>"]` — uniquely addresses
-  this persona's backup.
-- `["t", "phoenix-persona"]` — discovery tag. Lets the app fetch every
-  persona for a user with one filter.
-- `["alt", "Phoenix persona backup (encrypted)"]` — NIP-31 human-readable
-  description.
+- `["d", "<random uuid>"]` — generated fresh per publish. The `d` tag
+  is **required** by NIP-01 for kind 30078 (addressable range
+  30000–39999), but its value carries no semantics here: a fresh UUID
+  for every publish prevents relay observers from grouping a user's
+  kind-30078 events by persona, and gives no signal that the event is
+  Phoenix-related.
+
+**No other tags.** A `t` tag would advertise Phoenix usage; an `alt` tag
+would advertise "encrypted backup"; both would help an observer cluster
+a user's events. Neither is needed — discovery and per-persona dedup
+happen on the **decrypted** payload (`persona.pubkey`), not on tags.
+Externally a Phoenix kind-30078 event is indistinguishable from any
+other app's encrypted-app-data event.
 
 Content: NIP-44 ciphertext encrypted to the **user's own pubkey** (self-
 encryption: author and conversation key derive from the same keypair).
@@ -273,7 +288,7 @@ Plaintext payload:
     "lnurl": "lnurl1..."
   },
   "model_prefs": {
-    "agent": "claude-sonnet-4-5",
+    "agent": "claude-sonnet-4.5",
     "image": "gpt-image-1",
     "tts": "tts-1-hd",
     "video": null
@@ -287,13 +302,30 @@ Plaintext payload:
 **Loading personas on a fresh device.**
 
 1. User logs in with their user nsec (NIP-07 / NIP-46 / paste).
-2. App queries `{ kinds: [30078], authors: [user_pubkey], "#t": ["phoenix-persona"] }`.
-3. For each event, decrypt content via the user's signer (NIP-44 self-decrypt).
-4. The decrypted payload yields the persona keypair, wallet seed, voice URL, etc.
-5. Persona nsec is held in memory for the session; never written to disk by Phoenix.
+2. App queries `{ kinds: [30078], authors: [user_pubkey] }` — no
+   Phoenix-specific filter, since adding one would leak app usage.
+   The query may surface kind-30078 events from other apps the user
+   uses; they will fail decryption (different conversation key) or
+   fail Phoenix's payload schema, and are discarded.
+3. For each event, decrypt content via the user's signer (NIP-44
+   self-decrypt) and validate against Phoenix's payload schema.
+4. Group surviving events by `persona.pubkey` from the decrypted
+   plaintext; keep the newest event per persona pubkey. Each
+   persona-update creates a new event with a fresh d-tag — relays do
+   not replace.
+5. The decrypted payload yields the persona keypair, wallet seed,
+   voice URL, etc.
+6. Persona nsec is held in memory for the session; never written to
+   disk by Phoenix.
 
-**Updating a persona.** Republish the kind 30078 event for that persona's
-d-tag. Relays replace the prior version (addressable-event semantics).
+**Updating a persona.** Publish a new kind 30078 event with a fresh
+random d-tag and the new ciphertext. Old versions remain on relays as
+opaque ciphertext; the discovery loop above groups by decrypted
+`persona.pubkey` and surfaces only the newest event per persona, so
+the app sees only the current state. Trade-off: relay storage grows
+over time. For hackathon-scale traffic this is fine; if cleanup
+matters later, switch to a stable per-persona d-tag derived from a
+user secret — at the cost of exposing the persona count externally.
 
 **Why one event per persona instead of one event holding all personas.**
 Per-persona events keep updates surgical (changing one persona's wallet
@@ -337,8 +369,8 @@ persona's Breeze wallet.
 
 | Task                    | Default model    | Notes                                                       |
 | ----------------------- | ---------------- | ----------------------------------------------------------- |
-| Character-creator agent | claude-sonnet-4-5 | Multi-turn tool calling; runs the wizard interview         |
-| Persona text styling    | claude-sonnet-4-5 | Raw thought → polished post in persona's voice             |
+| Character-creator agent | claude-sonnet-4.5 | Multi-turn tool calling; runs the wizard interview         |
+| Persona text styling    | claude-sonnet-4.5 | Raw thought → polished post in persona's voice             |
 | Profile image           | gpt-image-1      | One-shot during creation; saved as canonical reference     |
 | Post images             | gpt-image-1      | Always pass the reference image as input for likeness      |
 | Voice sample            | tts-1-hd         | One generation during creation, ~10–20 s, saved to Blossom |
@@ -530,9 +562,9 @@ adaptation, not a full rewrite. Replace what the new stack obsoletes.
 
 **Reuse with adaptation.** Architecture matches §3; update to §5 schema:
 - `src/lib/persona.ts`, `personaCrypto.ts`, `personaKey.ts`, `personaPost.ts`
-  → adapt to per-persona d-tag (`phoenix-persona:<pubkey>`), the
-  `phoenix-persona` t-tag, the embedded Breeze wallet seed, and the
-  `model_prefs` section
+  → align the persona Zod schema to the §5.2 plaintext payload
+  (embedded Breeze wallet seed, `model_prefs` section). The random-UUID
+  d-tag and no-other-tags scheme already matches §5.2.
 - `src/hooks/usePersona.ts`, `usePersonaPublish.ts`
   → query by user pubkey + t-tag; multi-persona switching surfaces
 - `src/pages/MyPersonas.tsx`, `PersonaFeed.tsx`, `Verify.tsx`
@@ -566,13 +598,16 @@ that points contributors at this document.
 
 ## 12. Team
 
-Roles from the existing whiteboard, carried forward:
+Roles after the wallet → PPQ stream merge (see `STREAMS.md`):
 
 - **Anaïse** — Captain, product voice, demo lead, persona sign-off
-- **Derek** — Frontend, Nostr integration, PWA shell
-- **Jim** — LLM, agent harness, prompt engineering, model selection
-- **Topher** — Wallet, PPQ payment plumbing, infrastructure (LNURL endpoint,
-  Blossom hosting choice)
+- **Derek** — Frontend, Nostr integration, PWA shell; persona harnesses
+  (operator, persona-crypto, publish, feed) and composite leads
+  (persona-create, persona-restore)
+- **Jim** — PPQ + Wallet + Payments + Settings (Stream A; owns the
+  wallet → PPQ end-to-end demo)
+- **Topher** — Agent (`pi-mono` runtime), LLM consumers (styling,
+  image-gen, voice-gen), donations (LNURL/zaps) — Stream B
 
 Pair up across role boundaries on anything that crosses them — the
 wallet/agent/Nostr/image-gen seams are where bugs will live.
@@ -583,8 +618,11 @@ wallet/agent/Nostr/image-gen seams are where bugs will live.
 
 - **Persona** — an AI-driven public identity with its own Nostr keypair,
   Lightning wallet, profile image, and voice. Owned and operated by one user.
-- **Operator (deprecated)** — earlier scaffold concept of a separate human
-  Nostr identity that signed for the persona. Removed in this plan.
+- **User keypair** — the human's Nostr identity. Signs encrypted persona
+  backups (kind 30078); never publishes kind 0 or kind 1 under Phoenix.
+  See §3 for the full two-level identity model.
+- **Operator** — earlier name for the user keypair, still used in some
+  source files (`src/lib/persona*.ts`). Same role.
 - **PPQ** — `ppq.ai`. OpenAI-compatible inference API priced in sats over
   Lightning. The persona's wallet pays it directly.
 - **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit. We use
