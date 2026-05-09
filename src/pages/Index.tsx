@@ -114,9 +114,9 @@ const Index = () => {
                   src="/images/hero-kigali.webp"
                   srcSet="/images/hero-kigali-sm.webp 800w, /images/hero-kigali.webp 1600w"
                   sizes="(max-width: 768px) 100vw, 600px"
-                  alt="A young creator on a rooftop in Kigali, smiling as she records into her phone."
+                  alt="A young creator at her desk in Kigali, working on her laptop."
                   width={1600}
-                  height={1346}
+                  height={1206}
                   loading="eager"
                   className="w-full h-auto block"
                 />
@@ -261,9 +261,9 @@ const Index = () => {
                   src="/images/design-board.webp"
                   srcSet="/images/design-board-sm.webp 800w, /images/design-board.webp 1400w"
                   sizes="(max-width: 768px) 100vw, 600px"
-                  alt="A design board mapping the persona-creation flow."
+                  alt="A creator at her workstation, deep in a writing session."
                   width={1400}
-                  height={1217}
+                  height={1337}
                   loading="lazy"
                   className="w-full h-auto block"
                 />
