@@ -56,9 +56,9 @@ npx tsx tests/wallet/test-auto-topup-and-inference.ts
 | --- | --- |
 | `--skip-inference` | Skip the chat completion call |
 | `--skip-disabled` | Skip the off-switch assertion |
-| `--skip-forced` | Skip the forced-topup step (it costs real sats) |
-| `--topup-target <usd>` | Override the forced-topup target (default: current + $0.50) |
-| `--topup-threshold <usd>` | Override the forced-topup threshold (default $1000 — guarantees fire) |
+| `--skip-forced` | Skip the topup pass (it costs real sats) |
+| `--topup-target <usd>` | Override topup target (default: `DEFAULT_AUTO_TOPUP_CONFIG.targetUsd`) |
+| `--topup-threshold <usd>` | Override topup threshold (default: `DEFAULT_AUTO_TOPUP_CONFIG.thresholdUsd`) |
 | `--inference-model <id>` | Override the inference model (default `claude-sonnet-4.5`) |
 
 ## Persisted credentials (gitignored)

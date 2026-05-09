@@ -12,11 +12,12 @@
  *      and asserts the policy short-circuits to `null` without paying any
  *      invoice. Validates the off switch.
  *
- *   3. Forced auto-topup path. Calls `runAutoTopupOnce` with a threshold
- *      raised above the current ppq balance so the policy *must* trigger;
- *      issues a Lightning invoice on ppq.ai, pays it from the Spark wallet,
- *      polls until settled, then re-reads the balance to prove the credit
- *      landed.
+ *   3. Auto-topup pass with the configured policy. Resolves threshold and
+ *      target from `DEFAULT_AUTO_TOPUP_CONFIG` (overridable via flags),
+ *      then calls `runAutoTopupOnce`. If the ppq balance is below the
+ *      threshold this issues a Lightning invoice, pays it from the Spark
+ *      wallet, polls until settled, and re-reads the balance to prove
+ *      the credit landed; otherwise it short-circuits to `null`.
  *
  * Run:
  *   npx tsx tests/wallet/test-auto-topup-and-inference.ts
@@ -26,9 +27,9 @@
  * Flags:
  *   --skip-inference         Don't run the chat completion call
  *   --skip-disabled          Don't run the disabled-policy assertion
- *   --skip-forced            Don't run the forced topup (it costs real sats)
- *   --topup-target <usd>     Override the forced-topup target (default 0.50 above current balance)
- *   --topup-threshold <usd>  Override the forced-topup threshold (default 1000)
+ *   --skip-forced            Don't run the topup pass (it costs real sats)
+ *   --topup-target <usd>     Override topup target (default: DEFAULT_AUTO_TOPUP_CONFIG.targetUsd)
+ *   --topup-threshold <usd>  Override topup threshold (default: DEFAULT_AUTO_TOPUP_CONFIG.thresholdUsd)
  *   --inference-model <id>   Override the inference model (default claude-sonnet-4.5)
  */
 
@@ -41,6 +42,7 @@ import {
   type WalletHandle,
 } from "../../src/lib/wallet/client";
 import { runAutoTopupOnce } from "../../src/lib/wallet/autoTopup";
+import { DEFAULT_AUTO_TOPUP_CONFIG } from "../../src/lib/wallet/types";
 import {
   chatCompletion,
   getBalance as getPpqBalance,
@@ -71,12 +73,19 @@ function flagValue(name: string): string | undefined {
   return undefined;
 }
 
+// Single source of truth: the global DEFAULT_AUTO_TOPUP_CONFIG. CLI flags
+// override per-run; absent that, we use whatever the production policy uses.
 const flags = {
   skipInference: argv.includes("--skip-inference"),
   skipDisabled: argv.includes("--skip-disabled"),
   skipForced: argv.includes("--skip-forced"),
-  topupTarget: flagValue("topup-target"),
-  topupThreshold: Number(flagValue("topup-threshold") ?? "1000"),
+  topupTarget: Number(
+    flagValue("topup-target") ?? String(DEFAULT_AUTO_TOPUP_CONFIG.targetUsd),
+  ),
+  topupThreshold: Number(
+    flagValue("topup-threshold") ??
+      String(DEFAULT_AUTO_TOPUP_CONFIG.thresholdUsd),
+  ),
   inferenceModel: flagValue("inference-model") ?? "claude-sonnet-4.5",
 };
 
@@ -185,47 +194,57 @@ async function disabledTopupStep(
   }
 }
 
-/* ---------- step: forced auto-topup ---------- */
+/* ---------- step: auto-topup using the configured policy ---------- */
 
-async function forcedTopupStep(
+async function topupStep(
   handle: WalletHandle,
   ppq: PpqAccountFile,
   startingPpqUsd: number | undefined,
   startingSparkSats: number,
 ): Promise<void> {
   if (flags.skipForced) {
-    console.log("Skipping forced topup (--skip-forced).");
+    console.log("Skipping topup pass (--skip-forced).");
     return;
   }
   if (typeof startingPpqUsd !== "number") {
-    console.warn("Cannot force a topup — ppq balance is unknown.");
+    console.warn("Cannot run topup — ppq balance is unknown.");
     return;
   }
 
-  // Default: top up by ~$0.50 above the current balance — small, but enough
-  // to see the BOLT11 round-trip end to end.
-  const defaultTarget = Math.round((startingPpqUsd + 0.5) * 100) / 100;
-  const target = Number(flags.topupTarget ?? String(defaultTarget));
-  if (!Number.isFinite(target) || target <= startingPpqUsd) {
+  const threshold = flags.topupThreshold;
+  const target = flags.topupTarget;
+
+  if (!Number.isFinite(threshold) || !Number.isFinite(target)) {
     console.warn(
-      `Skipping forced topup: target ${target} is ≤ current balance ${startingPpqUsd}.`,
+      `Skipping topup: invalid policy values (threshold=${threshold}, target=${target}).`,
     );
     return;
   }
 
+  const willFire = startingPpqUsd < threshold;
+  console.log(
+    `  policy: enabled=true threshold=${fmtMoney(threshold)} target=${fmtMoney(target)}`,
+  );
+  if (!willFire) {
+    console.log(
+      `  ppq balance ${fmtMoney(startingPpqUsd)} is already ≥ threshold ${fmtMoney(threshold)} — runAutoTopupOnce will short-circuit to null.`,
+    );
+  } else {
+    console.log(
+      `  ppq balance ${fmtMoney(startingPpqUsd)} < threshold ${fmtMoney(threshold)} — would top up to ${fmtMoney(target)} (~${fmtMoney(target - startingPpqUsd)} in sats).`,
+    );
+  }
+
+  const promptDefault: "y" | "n" = willFire ? "y" : "n";
   const wantTopup = await askYesNo(
     rl,
-    `Force a topup from ${fmtMoney(startingPpqUsd)} → ${fmtMoney(target)} (~${fmtMoney(target - startingPpqUsd)} of sats)?`,
-    "n",
+    willFire ? "Run the topup pass now?" : "Run anyway (no-op expected)?",
+    promptDefault,
   );
   if (!wantTopup) {
     console.log("Skipped by user.");
     return;
   }
-
-  console.log(
-    `  policy: enabled=true threshold=${fmtMoney(flags.topupThreshold)} target=${fmtMoney(target)}`,
-  );
 
   const result = await runAutoTopupOnce({
     wallet: handle,
@@ -233,13 +252,13 @@ async function forcedTopupStep(
     ppqBalanceUsd: startingPpqUsd,
     config: {
       enabled: true,
-      thresholdUsd: flags.topupThreshold,
+      thresholdUsd: threshold,
       targetUsd: target,
     },
   });
 
   if (!result) {
-    console.warn("  policy returned null — was the threshold not high enough?");
+    console.log("  policy returned null — balance was already at/above threshold.");
     return;
   }
   console.log(`  ✓ topped up ${fmtMoney(result.toppedUpUsd)}`);
@@ -282,8 +301,8 @@ async function main(): Promise<void> {
     header("2. Non-auto-topup (enabled=false → null)");
     await disabledTopupStep(handle, pre.ppq, start.usd);
 
-    header("3. Forced auto-topup (threshold > current balance)");
-    await forcedTopupStep(handle, pre.ppq, start.usd, start.sats);
+    header("3. Auto-topup (configured policy)");
+    await topupStep(handle, pre.ppq, start.usd, start.sats);
 
     header("Done");
   } finally {
