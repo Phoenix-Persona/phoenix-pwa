@@ -46,8 +46,121 @@
 
 **V2 (deferred per PROJECT.md §6, §8):**
 - Agent-driven character creator (`pi-agent-core` interview)
-- Video generation
 - Multi-operator-per-device
+
+**Promoted from V2 → V1.5 (product pivot, see "Cross-post + video composer" below):**
+- Video generation as the **primary** content format
+
+---
+
+## Cross-post + video composer (V1.5 / V2 — major scope, not in current PR)
+
+**Why this exists.** The product positioning is shifting: AI personas
+publish primarily as *short-form video* and the value prop is
+"one brief → one persona-signed video published everywhere at once."
+The marketing surfaces (homepage SpeakVisual, HowItWorks Chapter 02
+body copy) are updated to reflect this. The implementation lands in
+phases.
+
+### The composer pivot (Derek + Jim seam)
+
+The current Dashboard composer is text-only. The new composer takes:
+
+- **Idea** — short prompt describing the post
+- **Sources** — list of URLs to ground the message
+- **Style hints** — free-form tags (`measured`, `first-person`,
+  `cite sources`, `vertical 9:16`, etc.)
+
+Multi-step preview: text caption draft → video preview → platform
+selection → publish. Cost estimator surfaces the total bill (text
+styling + video gen + cross-post API calls). Empty-wallet UX gates.
+
+### Video generation (Topher / Jim seam)
+
+PPQ exposes Veo 3, Kling, Runway via `pi-ai`. The wiring already
+exists (`src/hooks/usePpqVideo.ts`); the composer just needs to call
+it. Output: PPQ URL → fetch → re-upload to Blossom → reference
+Blossom URL via NIP-92 imeta on the kind 1 publish.
+
+Cost concern: Veo 3 is $0.50–$2 per generation. Demo budget needs to
+fund this (Topher's `docs/spike-ppq.md` should track this; my own
+demo persona pre-fund needs ~10–15 video gens).
+
+### Blossom video upload
+
+Pattern matches the existing PersonaPictureField (PPQ → fetch → re-
+upload). Two extensions needed:
+
+- **Pick a Blossom server that accepts video/mp4 + reasonable size
+  limits** (5–50 MB typical). The current default set may need
+  curation.
+- **Extend `PostCard` imeta render** to handle videos (currently
+  images-only — `extractImetaImages()` rejects video MIME types). A
+  parallel `extractImetaVideos()` + `<video>` element with poster,
+  controls, lazy loading.
+
+### Cross-posting via OAuth — the architectural decision
+
+OAuth flows for Twitter/X/Facebook/Instagram all require a
+`client_secret` on the token-exchange step that **cannot live in a
+browser PWA**. This collides with PROJECT.md §4's "no Phoenix-owned
+backend" principle.
+
+**Four paths considered:**
+
+| Path | What | Cost |
+|---|---|---|
+| (a) Phoenix backend | Stand up an OAuth proxy service | Breaks PROJECT.md §4. Single point of failure that contradicts the entire pitch ("the voice doesn't depend on us"). **Rejected.** |
+| (b) Twitter PKCE only | OAuth 2.0 PKCE with no secret. Twitter v2 supports it. | Twitter-only. Per-user rate limits painful. ✅ for V1.5 power-user path. |
+| (c) BYO tokens in encrypted backup | User authenticates on platform's mobile/desktop app, pastes refresh tokens into Feniksi. Tokens stored in `cross_post_tokens` field of the kind 30078 plaintext. Browser uses tokens directly to publish. | Privacy-preserving, no backend. UX brutal — token expiry, refresh per platform. Long tail. |
+| (d) Webhook to a third-party aggregator | User signs up at Buffer / Hootsuite / Zapier / Make.com, creates a webhook for cross-posting, pastes the webhook URL into Feniksi. On publish, Feniksi POSTs to the webhook with the post payload. Aggregator handles cross-posting. | **No backend. No tokens stored. User owns the aggregator account.** Cleanest no-backend path. ✅ **Recommended for V1.5 default.** |
+
+**Recommended cross-post architecture:**
+
+- **V1.5 default:** option (d). User pastes a webhook URL in Settings
+  → Cross-posting. Each persona has its own webhook (or shared per
+  user). On publish, Feniksi POSTs `{caption, video_url, platforms[]}`
+  to the webhook. Aggregator does the platform fan-out.
+- **V1.5 power-user path:** option (b). For users who want a more
+  direct route, Twitter PKCE OAuth flow lets them post to X without
+  a third-party aggregator. PKCE flow runs entirely in the browser.
+  Refresh token stored in `cross_post_tokens.x` inside the kind 30078
+  plaintext.
+- **V2:** Meta (Facebook + Instagram) + TikTok + YouTube. Requires the
+  no-backend principle to be revisited at the team level OR a
+  user-signed proxy pattern (NIP-46-style "borrow my tokens").
+
+### Schema additions
+
+Encrypted persona payload (`persona.ts`) gains:
+
+```ts
+cross_post: {
+  // Webhook (option d) — the cleanest path
+  webhook_url?: string;       // POSTed on publish
+  webhook_platforms?: string[]; // labels: "twitter", "facebook", "instagram"
+  // Direct PKCE tokens (option b) — power-user only
+  x_refresh_token?: string;
+  // Future: facebook, instagram, tiktok, youtube
+}
+```
+
+`useCrossPost` hook on the composer dispatches to whichever paths are
+configured for the active persona. Failures per platform are
+non-fatal (the Nostr publish has already succeeded by then).
+
+### Roadmap entry
+
+| Item | Phase | Owner |
+|---|---|---|
+| Update marketing copy + homepage SpeakVisual to show video + cross-post | now (current branch) | Derek ✅ |
+| Composer multi-step UI (idea + sources + hints) | V1.5 | Derek + Jim seam |
+| `extractImetaVideos()` + `<video>` element in PostCard | V1.5 | Derek |
+| Video generation in compose via `usePpqVideo` | V1.5 | Derek + Jim seam |
+| Blossom video upload + size-limit-aware server pick | V1.5 | Derek |
+| Cross-post webhook (option d) — Settings UI + `useCrossPost` hook | V1.5 | Derek |
+| Twitter/X PKCE direct (option b) | V1.5 | Derek |
+| Meta / TikTok / YouTube full OAuth | V3 — needs backend decision first | TBD |
 
 ---
 
