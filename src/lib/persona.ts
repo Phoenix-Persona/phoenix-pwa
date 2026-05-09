@@ -1,5 +1,5 @@
 /**
- * Phoenix persona event schema (encrypted, untrackable).
+ * Phoenix persona event schema (encrypted, untrackable, validated).
  *
  * Privacy posture
  * ───────────────
@@ -13,17 +13,24 @@
  *   tags:
  *     ["d", <random uuid>]         unique addressing only — no semantics
  *   content: NIP-44(operator → operator) of JSON {
- *     app: "phoenix",
- *     version: 1,
+ *     app: "phoenix-persona",      magic discriminator
+ *     version: 1,                  schema version (only 1 accepted)
  *     personaPubkey: <hex>,        cross-reference to the persona's npub
- *     ...PersonaConfig             everything else (system prompt, sources,
- *                                  persona nsec, etc.)
+ *     config: { ...PersonaConfig } system prompt, sources, persona nsec, etc.
  *   }
  *
  * The Phoenix discriminator and the persona-pubkey ↔ operator link only
  * exist inside the encrypted payload. To find a persona, the operator
  * scans their own kind 30078 events and decrypts each one — successful
- * decryption + Phoenix discriminator = a Phoenix persona event.
+ * decryption + Phoenix discriminator + Zod-validated shape + derived-key
+ * match = a Phoenix persona event.
+ *
+ * Defense in depth — every layer must agree:
+ *   (a) NIP-44 decryptable by the operator's signer (else: not for me)
+ *   (b) Plaintext is valid JSON
+ *   (c) Zod schema accepts the envelope (else: malformed / wrong app)
+ *   (d) Derived pubkey from personaNsec matches the claimed personaPubkey
+ *       (else: tampered envelope)
  *
  * Persona POSTS (kind 1)
  * ──────────────────────
@@ -35,68 +42,58 @@
  * usage; individual posts stay metadata-clean.
  */
 
+import { z } from "zod";
+import { getPublicKey } from "nostr-tools/pure";
+import { nip19 } from "nostr-tools";
 import type { NostrEvent } from "@nostrify/nostrify";
 
 export const PERSONA_KIND = 30078;
-export const PHOENIX_PAYLOAD_APP = "phoenix";
-export const PHOENIX_PAYLOAD_VERSION = 1;
+export const PHOENIX_PAYLOAD_APP = "phoenix-persona";
+export const PHOENIX_PAYLOAD_VERSION = 1 as const;
 
 export type SourceKind = "rss" | "url";
 
-export interface PersonaSource {
-  kind: SourceKind;
-  url: string;
-}
+// ─────────── Zod schemas ───────────
 
-/**
- * Decrypted persona configuration. Everything an operator needs to run the
- * persona, including the persona's own nsec for cross-device recovery.
- */
-export interface PersonaConfig {
-  /** Persona display name. */
-  name: string;
-  /** ISO-3166-1 alpha-2 region code. */
-  region: string;
-  /** Cause slug. */
-  cause: string;
-  /** BCP-47 language codes. */
-  languages: string[];
-  /** Freeform tone descriptor. */
-  tone: string;
-  /** Target posting interval (seconds) — V2 brainstorm. */
-  frequencySec: number;
-  /** Source materials. */
-  sources: PersonaSource[];
-  /** Topic foci. */
-  focus: string[];
-  /** OpenRouter model id. */
-  model: string;
-  /** Editorial voice spec applied to every styled post. */
-  systemPrompt: string;
-  /** Freeform personality descriptor. */
-  personality: string;
-  /** Public-ish bio (also published as part of the persona's kind 0). */
-  bio: string;
-  /** Optional voice style notes. */
-  voiceStyle?: string;
-  /** Topics to avoid. */
-  avoidTopics?: string[];
-  /** Persona nsec — included for cross-device recovery. Never leaves the encrypted blob. */
-  personaNsec: string;
-}
+const personaSourceSchema = z.object({
+  kind: z.enum(["rss", "url"]),
+  url: z.string(),
+});
 
-/**
- * Phoenix payload wrapper (the JSON value that gets NIP-44 encrypted).
- * Includes a discriminator (so the operator's decrypt-and-scan loop knows
- * which 30078 events are Phoenix personas) and the persona pubkey (so the
- * UI can resolve a persona npub to the right encrypted event).
- */
-export interface PhoenixEnvelope {
-  app: typeof PHOENIX_PAYLOAD_APP;
-  version: number;
-  personaPubkey: string;
-  config: PersonaConfig;
-}
+const personaConfigSchema = z.object({
+  name: z.string().min(1).max(120),
+  region: z.string().min(1).max(8),
+  cause: z.string().min(1).max(120),
+  languages: z.array(z.string().min(1).max(16)).min(1).max(16),
+  tone: z.string().max(2000),
+  frequencySec: z.number().int().nonnegative().max(60 * 60 * 24 * 30),
+  sources: z.array(personaSourceSchema).max(64),
+  focus: z.array(z.string().min(1).max(120)).max(32),
+  model: z.string().min(1).max(120),
+  systemPrompt: z.string().max(20000),
+  personality: z.string().max(2000),
+  bio: z.string().max(2000),
+  voiceStyle: z.string().max(2000).optional(),
+  avoidTopics: z.array(z.string().min(1).max(240)).max(32).optional(),
+  personaNsec: z
+    .string()
+    .regex(/^nsec1[02-9ac-hj-np-z]{58,}$/i, "must be a valid nsec1… string"),
+});
+
+const phoenixEnvelopeSchema = z.object({
+  app: z.literal(PHOENIX_PAYLOAD_APP),
+  version: z.literal(PHOENIX_PAYLOAD_VERSION),
+  personaPubkey: z.string().regex(/^[0-9a-f]{64}$/i, "must be 64 hex chars"),
+  config: personaConfigSchema,
+});
+
+// ─────────── Public types (inferred from schemas) ───────────
+
+export type PersonaSource = z.infer<typeof personaSourceSchema>;
+export type PersonaConfig = z.infer<typeof personaConfigSchema>;
+export type PhoenixEnvelope = z.infer<typeof phoenixEnvelopeSchema>;
+
+// ─────────── Event template builder ───────────
 
 /**
  * Build the unsigned event template for an encrypted persona definition.
@@ -132,10 +129,33 @@ export function generatePersonaDTag(): string {
   return crypto.randomUUID();
 }
 
+// ─────────── Envelope parsing & verification ───────────
+
 /**
- * Validate a decrypted JSON string is a Phoenix persona envelope.
- * Returns the parsed envelope on success, null if it's some other app's
- * payload or malformed data.
+ * Derive the persona pubkey from an nsec. Returns the hex pubkey, or null
+ * if the nsec doesn't decode.
+ */
+function pubkeyFromNsec(nsec: string): string | null {
+  try {
+    const decoded = nip19.decode(nsec);
+    if (decoded.type !== "nsec") return null;
+    return getPublicKey(decoded.data);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Validate a decrypted JSON string is a Phoenix persona envelope and that
+ * the embedded persona nsec matches the claimed persona pubkey.
+ *
+ * Returns the parsed envelope on success, null on any validation failure.
+ * Never throws — callers in the scan-and-decrypt loop expect a null sentinel.
+ *
+ * Defense layers (in order):
+ *   1. JSON parse
+ *   2. Zod schema (app discriminator, version pin, shape, length limits)
+ *   3. Pubkey-from-nsec match
  */
 export function parsePhoenixEnvelope(plaintext: string): PhoenixEnvelope | null {
   let parsed: unknown;
@@ -144,21 +164,26 @@ export function parsePhoenixEnvelope(plaintext: string): PhoenixEnvelope | null 
   } catch {
     return null;
   }
-  if (!parsed || typeof parsed !== "object") return null;
-  const obj = parsed as Record<string, unknown>;
-  if (obj.app !== PHOENIX_PAYLOAD_APP) return null;
-  if (typeof obj.version !== "number") return null;
-  if (typeof obj.personaPubkey !== "string") return null;
-  if (!/^[0-9a-f]{64}$/i.test(obj.personaPubkey)) return null;
-  const config = obj.config as Record<string, unknown> | undefined;
-  if (!config || typeof config.name !== "string" || typeof config.personaNsec !== "string") {
+
+  const result = phoenixEnvelopeSchema.safeParse(parsed);
+  if (!result.success) return null;
+
+  const envelope = result.data;
+
+  // Derive-and-verify: the personaPubkey claim must match the public key
+  // derived from the embedded personaNsec. Defends against a tampered
+  // envelope where the operator's signer was used to encrypt a config
+  // claiming the wrong identity.
+  const derived = pubkeyFromNsec(envelope.config.personaNsec);
+  if (!derived) return null;
+  if (derived.toLowerCase() !== envelope.personaPubkey.toLowerCase()) {
     return null;
   }
+
+  // Normalize the pubkey casing for downstream comparators.
   return {
-    app: PHOENIX_PAYLOAD_APP,
-    version: obj.version,
-    personaPubkey: obj.personaPubkey.toLowerCase(),
-    config: config as unknown as PersonaConfig,
+    ...envelope,
+    personaPubkey: envelope.personaPubkey.toLowerCase(),
   };
 }
 
@@ -173,10 +198,7 @@ export function isCandidatePersonaEvent(event: NostrEvent): boolean {
   return true;
 }
 
-/**
- * Default model used for a fresh persona.
- */
-export const DEFAULT_PERSONA_MODEL = "anthropic/claude-sonnet-4.5";
+// ─────────── Defaults ───────────
 
-/** Default posting frequency (1 hour). */
+export const DEFAULT_PERSONA_MODEL = "anthropic/claude-sonnet-4.5";
 export const DEFAULT_FREQUENCY_SEC = 3600;

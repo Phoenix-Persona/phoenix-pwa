@@ -43,6 +43,14 @@ Acceptable residual leaks:
   post. This is a weak signal and is not addressed in v1.
 - Source URL patterns may correlate posts across personas if every
   persona uses identical source feeds. Not addressed in v1.
+- **Operator-key compromise = persona-key compromise.** The persona's
+  nsec lives inside the encrypted persona-config blob (so the operator
+  can recover any persona on any device they sign in on). If the
+  operator's NIP-44 key is compromised — coercion, malware, key
+  exfiltration — every persona nsec the operator has ever created is
+  also compromised. This is an explicit trade for cross-device
+  recovery; rotating to a per-device persona key would require a
+  separate sync layer that doesn't exist in v1.
 
 ---
 
@@ -57,7 +65,7 @@ tags:
   ["d", <random uuid v4>]    addressing only — no semantics
 content: NIP-44(operator -> operator) of:
   {
-    "app": "phoenix",
+    "app": "phoenix-persona",
     "version": 1,
     "personaPubkey": "<persona pubkey, hex>",
     "config": { ...PersonaConfig }
@@ -65,9 +73,9 @@ content: NIP-44(operator -> operator) of:
 ```
 
 There are NO other tags. No `t`, no `p`, no descriptive `alt`, no
-`client`. The Phoenix discriminator (`app: "phoenix"`) and the link
-from the encrypted blob to the persona's pubkey both live INSIDE the
-ciphertext.
+`client`. The Phoenix discriminator (`app: "phoenix-persona"`) and the
+link from the encrypted blob to the persona's pubkey both live INSIDE
+the ciphertext.
 
 The `d` tag is a fresh `crypto.randomUUID()` value — it is required
 for addressability per NIP-01 but carries no semantic information.
@@ -145,6 +153,32 @@ a scan-and-decrypt loop:
 This costs O(N) decryptions per operator on the operator's own device.
 For typical operator volumes (1-20 personas, few dozen 30078 events
 total) this is well under a second.
+
+### Envelope discrimination — defense in depth
+
+Every step below must succeed for an event to be treated as a Phoenix
+persona. Failing any step returns the candidate to the scan loop with
+no UI exposure.
+
+1. **Decryptable.** `signer.nip44.decrypt(operatorPubkey, ciphertext)`
+   must succeed. NIP-44 events for other recipients fail here.
+2. **Valid JSON.** The decrypted plaintext must parse as JSON.
+3. **Schema-valid.** The JSON must satisfy a Zod schema requiring:
+   - `app === "phoenix-persona"` (exact string)
+   - `version === 1` (literal)
+   - `personaPubkey` matches `/^[0-9a-f]{64}$/i`
+   - `config` matches the full `PersonaConfig` shape including a
+     well-formed `personaNsec` matching `/^nsec1[02-9ac-hj-np-z]{58,}$/i`
+   - All length and array-size limits enforced (no unbounded fields)
+4. **Pubkey-from-nsec match.** The pubkey derived from the embedded
+   `personaNsec` (via `nostr-tools.getPublicKey`) must equal the
+   claimed `personaPubkey`. Defends against tampered envelopes that
+   claim one identity but embed a different keypair.
+
+Implementation: `src/lib/persona.ts` `parsePhoenixEnvelope`. Test
+coverage: `src/lib/persona.test.ts` — covers each rejection path
+including other-app collisions, version drift, key mismatch, and
+malformed input.
 
 ### Resolving a persona npub to a config
 
