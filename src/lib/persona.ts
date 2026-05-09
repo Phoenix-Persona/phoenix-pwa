@@ -83,6 +83,17 @@ const personaSchema = z.object({
   nsec: z
     .string()
     .regex(/^nsec1[02-9ac-hj-np-z]{58,}$/i, "must be a valid nsec1… string"),
+  /**
+   * Stable per-persona d-tag. Generated once at creation, mirrored
+   * onto the kind 30078 envelope's `["d", ...]` tag, and reused on
+   * every update so addressable-event semantics replace the prior
+   * revision (see PROJECT.md §5.2).
+   *
+   * Optional here for back-compat with personas published before this
+   * field landed; readers fall back to the event tag. New personas
+   * always write it.
+   */
+  dTag: z.string().min(1).max(128).optional(),
   name: z.string().min(1).max(120),
   system_prompt: z.string().max(20000),
   voice_id: z.string().min(1).max(64),

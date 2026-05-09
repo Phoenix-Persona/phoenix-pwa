@@ -108,9 +108,14 @@ const Onboard = () => {
     setPublishing(true);
     try {
       const kp = generatePersonaKeypair();
+      // Generate the stable d-tag once and store it inside the
+      // encrypted payload (PROJECT.md §5.2). Updates reuse this same
+      // d-tag so addressable-event semantics replace prior revisions.
+      const dTag = generatePersonaDTag();
       const persona: Persona = {
         pubkey: kp.hex.pk,
         nsec: kp.nsec,
+        dTag,
         name: name.trim() || "Untitled",
         system_prompt: systemPrompt,
         voice_id: voiceId,
@@ -134,9 +139,10 @@ const Onboard = () => {
         signer
       );
 
-      // 2. Build + sign with a random UUID d-tag — no identifying tags.
+      // 2. Build + sign — d-tag mirrors persona.dTag so addressable
+      //    replacement works on update.
       const personaTemplate = buildEncryptedPersonaTemplate({
-        dTag: generatePersonaDTag(),
+        dTag,
         encryptedContent: ciphertext,
       });
       const signed = await user.signer.signEvent(personaTemplate);

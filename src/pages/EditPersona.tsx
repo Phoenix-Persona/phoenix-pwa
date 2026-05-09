@@ -211,7 +211,11 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   async function handleSave() {
     if (!user) return;
 
-    const dTag = backupEvent.tags.find(([n]) => n === "d")?.[1];
+    // Prefer the d-tag stored inside the encrypted payload (PROJECT.md
+    // §5.2). Fall back to the event's own tag for personas authored
+    // before persona.dTag landed.
+    const dTag =
+      original.dTag ?? backupEvent.tags.find(([n]) => n === "d")?.[1];
     if (!dTag) {
       toast({
         title: "Save failed",
@@ -223,9 +227,13 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
 
     setSaving(true);
     try {
-      // Build the updated persona — identity fields are immutable.
+      // Build the updated persona — identity fields are immutable
+      // (pubkey, nsec, created_at, dTag).
       const updated: Persona = {
         ...original,
+        // Promote the resolved d-tag into the plaintext payload so
+        // future updates don't have to fall back to the event tag.
+        dTag,
         name: name.trim() || original.name,
         system_prompt: systemPrompt,
         voice_id: voiceId.trim() || original.voice_id,
