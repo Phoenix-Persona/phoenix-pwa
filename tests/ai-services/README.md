@@ -1,7 +1,16 @@
-# ppq.ai integration smoke test
+# ppq.ai integration smoke tests
 
-Manual end-to-end check that the Phoenix ppq.ai primitives work against the
-real `https://api.ppq.ai` service. Walks every service goal one at a time:
+Manual end-to-end checks that the Phoenix ppq.ai primitives work against
+the real `https://api.ppq.ai` service.
+
+## Two scripts
+
+| Script | Purpose |
+| --- | --- |
+| [`test-all-ppq-services-e2e.ts`](./test-all-ppq-services-e2e.ts) | Walks every endpoint top to bottom (account → balance → Lightning topup → inference → image → video). Use this on a fresh machine. |
+| [`test-veo-last-frame-conditioning.ts`](./test-veo-last-frame-conditioning.ts) | Continuity proof: generates two Veo 3.1 Fast clips that share a verbatim "locked-down world" prompt block; clip 2 is image-to-video conditioned on the LAST FRAME of clip 1. Visually inspect the seam to confirm hair / lighting / posture / wardrobe hold across the join. Requires `ffmpeg` on `$PATH`. |
+
+## Walking every endpoint
 
 1. **Account** — creates a fresh account if one isn't persisted, otherwise
    reuses the cached `credit_id` + `api_key`.
@@ -48,3 +57,45 @@ account file across runs, your topups and balance carry over.
 
 The script prints estimated cost before video generation and final cost
 after image/video so you can audit spend.
+
+## Last-frame conditioning continuity test
+
+```bash
+npx tsx tests/ai-services/test-veo-last-frame-conditioning.ts
+```
+
+Tests whether Veo 3.1 Fast preserves continuity across two clips when:
+
+1. Both prompts share a **verbatim** "world block" — character + setting
+   + wardrobe + lighting + camera language. The only thing that varies
+   between the two prompts is what the subject says and her emotional
+   register.
+2. Clip 2 is **image-to-video conditioned on the last frame of clip 1**
+   (the script extracts that frame via `ffmpeg`, uploads it to
+   `0x0.st`, and passes the URL as `image_url` to the i2v generation).
+
+The included world block puts a Rwandan journalist in a softly lit home
+office; clip 1 is her introducing herself, clip 2 is her transitioning
+to a serious topic (government corruption). Visually inspect the seam
+between clips: hair, lighting, posture, wardrobe should be identical.
+If the world drifts, more details need to migrate into the world block.
+
+State (clip MP4s, extracted frame, uploaded URL, job ids) caches under
+`tests/ai-services/.veo-last-frame/` so you can iterate on clip 2
+without paying for clip 1 twice. `--reset` wipes it.
+
+Useful flags:
+
+| Flag | Effect |
+| --- | --- |
+| `--reset` | Wipe the cache dir before starting |
+| `--skip-clip1` | Use a previously generated clip 1 (must be cached) |
+| `--skip-clip2` | Stop after extracting + uploading the last frame |
+| `--text-model <id>` | Clip 1 model (default `veo3.1-fast`) |
+| `--i2v-model <id>` | Clip 2 model (default `veo3.1-fast-i2v`) |
+| `--aspect <ratio>` | `9:16` (default), `16:9`, or `1:1` |
+| `--duration <secs>` | Per-clip duration (default 8) |
+| `--quality <p>` | `720p` (default) or `1080p` |
+| `--manual-upload` | Skip 0x0.st upload; paste your own URL |
+| `--upload-host <url>` | Override the upload host |
+| `--ffmpeg <path>` | Override the ffmpeg binary path |
