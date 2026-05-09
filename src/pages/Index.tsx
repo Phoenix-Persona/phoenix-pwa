@@ -170,14 +170,13 @@ const Index = () => {
 
         <footer className="bg-imigongo-charcoal text-imigongo-cream py-8">
           <div className="container flex flex-wrap items-center justify-between gap-4 text-sm">
-            <span className="opacity-70">Open source</span>
             <a
-              href="https://soapbox.pub"
+              href="https://github.com/Phoenix-Persona/phoenix-pwa"
               target="_blank"
               rel="noreferrer"
               className="opacity-70 hover:opacity-100 hover:text-rw-gold transition-colors"
             >
-              Soapbox
+              Open source
             </a>
           </div>
         </footer>
