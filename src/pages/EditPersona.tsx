@@ -30,6 +30,7 @@ import { nip19 } from "nostr-tools";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe } from "@/components/ImigongoBand";
+import { PersonaPictureField } from "@/components/PersonaPictureField";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -144,37 +145,67 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   const [languagesInput, setLanguagesInput] = useState(
     original.languages.join(", ")
   );
+  // The picture initial seed comes from the encrypted backup's
+  // reference_image_url; the public kind-0 picture is loaded below
+  // and may overwrite if the user changed it elsewhere.
+  const [pictureUrl, setPictureUrl] = useState(
+    original.reference_image_url ?? ""
+  );
+  const [pictureHydrated, setPictureHydrated] = useState(false);
+  const [originalPicture, setOriginalPicture] = useState(
+    original.reference_image_url ?? ""
+  );
   const [bio, setBio] = useState("");
   const [bioHydrated, setBioHydrated] = useState(false);
   const [originalBio, setOriginalBio] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Bio comes from the persona's public kind 0, fetched separately.
-  const bioQuery = useQuery({
-    queryKey: ["persona-public-bio", original.pubkey],
-    queryFn: async (c): Promise<string> => {
+  // Bio + picture come from the persona's public kind 0 — fetched
+  // separately because they live on the public profile, not the
+  // encrypted backup. Same query yields both fields.
+  interface PublicProfile {
+    bio: string;
+    picture: string;
+  }
+  const profileQuery = useQuery({
+    queryKey: ["persona-public-profile", original.pubkey],
+    queryFn: async (c): Promise<PublicProfile> => {
       const events = await nostr.query(
         [{ kinds: [0], authors: [original.pubkey], limit: 1 }],
         { signal: c.signal }
       );
       const ev = events[0];
-      if (!ev) return "";
+      if (!ev) return { bio: "", picture: "" };
       try {
-        const meta = JSON.parse(ev.content) as { about?: string };
-        return meta.about ?? "";
+        const meta = JSON.parse(ev.content) as {
+          about?: string;
+          picture?: string;
+        };
+        return { bio: meta.about ?? "", picture: meta.picture ?? "" };
       } catch {
-        return "";
+        return { bio: "", picture: "" };
       }
     },
   });
 
-  // Hydrate the bio inputs once the query resolves. Doing it inside
-  // render with a guard avoids a setState-in-effect warning while
-  // still keeping the form responsive when the user starts typing.
-  if (!bioHydrated && bioQuery.data !== undefined) {
-    setBio(bioQuery.data);
-    setOriginalBio(bioQuery.data);
+  // Hydrate inputs once the query resolves. Doing it inside render
+  // with a guard avoids a setState-in-effect warning while still
+  // keeping the form responsive once the user starts typing.
+  if (!bioHydrated && profileQuery.data !== undefined) {
+    setBio(profileQuery.data.bio);
+    setOriginalBio(profileQuery.data.bio);
     setBioHydrated(true);
+  }
+  if (!pictureHydrated && profileQuery.data !== undefined) {
+    // Prefer the public kind-0 picture if it differs from the
+    // encrypted-backup reference image — that's the most recently
+    // user-set value.
+    const publicPicture = profileQuery.data.picture;
+    if (publicPicture) {
+      setPictureUrl(publicPicture);
+      setOriginalPicture(publicPicture);
+    }
+    setPictureHydrated(true);
   }
 
   async function handleSave() {
@@ -200,6 +231,7 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
         voice_id: voiceId.trim() || original.voice_id,
         languages: parseList(languagesInput, original.languages),
         tags: parseList(tagsInput, []),
+        reference_image_url: pictureUrl || undefined,
       };
 
       const signer = user.signer as unknown as Nip44Signer;
@@ -222,25 +254,34 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
       const signed = await user.signer.signEvent(tmpl);
       await nostr.event(signed, { signal: AbortSignal.timeout(8000) });
 
-      // If the public-facing name or bio changed, re-publish kind 0
-      // signed by the persona keypair.
+      // If the public-facing name, bio, or picture changed,
+      // re-publish kind 0 signed by the persona keypair.
       const nameChanged = updated.name !== original.name;
       const bioChanged = bioHydrated && bio !== originalBio;
-      if (nameChanged || bioChanged) {
+      const pictureChanged = pictureHydrated && pictureUrl !== originalPicture;
+      if (nameChanged || bioChanged || pictureChanged) {
         try {
           const decoded = nip19.decode(updated.nsec);
           if (decoded.type !== "nsec") throw new Error("Bad nsec");
           const { finalizeEvent } = await import("nostr-tools/pure");
+          const kind0Content: Record<string, unknown> = {
+            name: updated.name,
+            display_name: updated.name,
+            about: bio,
+            picture: pictureUrl || "",
+            bot: true,
+          };
+          if (pictureUrl) {
+            kind0Content.phoenix = {
+              reference_image: pictureUrl,
+              version: 1,
+            };
+          }
           const profileTemplate = {
             kind: 0,
             created_at: Math.floor(Date.now() / 1000),
             tags: [],
-            content: JSON.stringify({
-              name: updated.name,
-              display_name: updated.name,
-              about: bio,
-              bot: true,
-            }),
+            content: JSON.stringify(kind0Content),
           };
           const profileEvent = finalizeEvent(profileTemplate, decoded.data);
           await nostr.event(profileEvent, {
@@ -255,7 +296,10 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
 
       queryClient.invalidateQueries({ queryKey: ["phoenix-persona"] });
       queryClient.invalidateQueries({ queryKey: ["phoenix-my-personas"] });
-      queryClient.invalidateQueries({ queryKey: ["author"] });
+      queryClient.invalidateQueries({ queryKey: ["nostr", "author"] });
+      queryClient.invalidateQueries({
+        queryKey: ["persona-public-profile"],
+      });
 
       toast({
         title: "Saved",
@@ -297,7 +341,20 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
             rows={2}
             value={bio}
             onChange={(e) => setBio(e.target.value)}
-            placeholder={bioQuery.isLoading ? "Loading…" : ""}
+            placeholder={profileQuery.isLoading ? "Loading…" : ""}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Profile picture</Label>
+          <PersonaPictureField
+            value={pictureUrl}
+            onChange={setPictureUrl}
+            promptHint={
+              name && bio
+                ? `Stylized portrait of ${name}: ${bio.slice(0, 80)}`
+                : `Stylized portrait of ${name}`
+            }
           />
         </div>
 
