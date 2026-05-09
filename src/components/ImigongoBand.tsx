@@ -6,6 +6,8 @@
  * `ImigongoSeal` — a single Imigongo tile rendered inline; useful as a
  *                  decorative seal next to headings or beside a verification
  *                  block.
+ * `FlagStripe`   — Rwandan-flag three-color band (clay + gold + green).
+ *                  Used as a confident architectural divider.
  */
 
 import { cn } from "@/lib/utils";
@@ -13,17 +15,51 @@ import { cn } from "@/lib/utils";
 interface ImigongoBandProps {
   className?: string;
   height?: number;
-  /** "muted" softens with reduced opacity; "bold" uses full opacity. */
-  variant?: "muted" | "default" | "bold";
+  /**
+   * `bold`     — full opacity, the default for confident dividers.
+   * `default`  — 80% opacity, blends with solid section backgrounds.
+   * `muted`    — 50% opacity, subtle on cream surfaces.
+   * `parchment` — pattern atop a cream wash mat for double-height dividers.
+   */
+  variant?: "muted" | "default" | "bold" | "parchment";
 }
 
 export function ImigongoBand({
   className,
-  height = 28,
-  variant = "default",
+  height,
+  variant = "bold",
 }: ImigongoBandProps) {
   const opacity =
-    variant === "bold" ? "opacity-100" : variant === "muted" ? "opacity-40" : "opacity-70";
+    variant === "bold"
+      ? "opacity-100"
+      : variant === "muted"
+      ? "opacity-50"
+      : variant === "parchment"
+      ? "opacity-90"
+      : "opacity-80";
+
+  // Default heights per variant — bigger than the legacy 28px sliver.
+  const fallbackHeight =
+    variant === "parchment" ? 96 : variant === "muted" ? 36 : 56;
+
+  const resolvedHeight = height ?? fallbackHeight;
+
+  if (variant === "parchment") {
+    // Layered: cream wash mat with the pattern at full strength on top.
+    return (
+      <div
+        className={cn("relative w-full overflow-hidden", className)}
+        style={{ height: resolvedHeight }}
+        aria-hidden="true"
+      >
+        <div className="absolute inset-0 cream-wash" />
+        <div
+          className={cn("absolute inset-0 imigongo-pattern text-imigongo-clay", opacity)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -31,9 +67,32 @@ export function ImigongoBand({
         opacity,
         className
       )}
-      style={{ height }}
+      style={{ height: resolvedHeight }}
       aria-hidden="true"
     />
+  );
+}
+
+interface FlagStripeProps {
+  className?: string;
+  height?: number;
+}
+
+/**
+ * Rwandan-flag three-band divider — clay (red/earth) + gold + green.
+ * Confident architectural rule that doubles as a brand mark.
+ */
+export function FlagStripe({ className, height = 6 }: FlagStripeProps) {
+  return (
+    <div
+      className={cn("flex w-full", className)}
+      style={{ height }}
+      aria-hidden="true"
+    >
+      <div className="flex-1 bg-imigongo-clay" />
+      <div className="flex-1 bg-rw-gold" />
+      <div className="flex-1 bg-rw-green" />
+    </div>
   );
 }
 

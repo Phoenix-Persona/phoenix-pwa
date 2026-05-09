@@ -53,7 +53,7 @@ import {
   type WalletHandle,
 } from "../../src/lib/wallet/client";
 import type { AutoTopupConfig } from "../../src/lib/wallet/types";
-import type { PersonaConfig } from "../../src/lib/persona";
+import type { Persona, PersonaWallet } from "../../src/lib/persona";
 import {
   createAccount as createPpqAccount,
   getBalance as getPpqBalance,
@@ -136,19 +136,19 @@ async function ensurePersona(
 ): Promise<{ mnemonic: string; personaPubkey: string }> {
   if (await loadStoredPersona()) {
     const envelope = await loadPersonaOrFail(operator);
-    if (!envelope.config.wallet?.mnemonic) {
+    if (!envelope.wallet?.seed) {
       throw new Error(
-        "Persona envelope has no wallet mnemonic. Re-run with --reset.",
+        "Persona envelope has no wallet seed. Re-run with --reset.",
       );
     }
     console.log("Decrypted persona envelope from disk.");
-    console.log(`  persona npub: ${nip19.npubEncode(envelope.personaPubkey)}`);
+    console.log(`  persona npub: ${nip19.npubEncode(envelope.persona.pubkey)}`);
     console.log(
-      `  mnemonic words: ${envelope.config.wallet.mnemonic.split(/\s+/).length} (hidden)`,
+      `  mnemonic words: ${envelope.wallet.seed.split(/\s+/).length} (hidden)`,
     );
     return {
-      mnemonic: envelope.config.wallet.mnemonic,
-      personaPubkey: envelope.personaPubkey,
+      mnemonic: envelope.wallet.seed,
+      personaPubkey: envelope.persona.pubkey,
     };
   }
 
@@ -158,32 +158,33 @@ async function ensurePersona(
   const personaNsec = nip19.nsecEncode(personaSk);
   const mnemonic = await generateMnemonic();
 
-  const config: PersonaConfig = {
+  const persona: Persona = {
+    pubkey: personaPubkey,
+    nsec: personaNsec,
     name: "Headless Wallet Test",
+    system_prompt: "test",
+    voice_id: "thalia",
+    languages: ["en"],
+    tags: [],
+    created_at: Math.floor(Date.now() / 1000),
     region: "TEST",
     cause: "test",
-    languages: ["en"],
-    tone: "test",
-    frequencySec: 0,
-    sources: [],
-    focus: [],
-    model: "anthropic/claude-sonnet-4.5",
-    systemPrompt: "test",
-    personality: "test",
     bio: "test",
-    personaNsec,
-    wallet: {
-      kind: "spark",
-      mnemonic,
-      autoTopup: {
-        enabled: true,
-        thresholdUsd: flags.topupThreshold,
-        targetUsd: flags.topupTarget,
-      },
+    tone: "test",
+    sources: [],
+  };
+
+  const wallet: PersonaWallet = {
+    kind: "spark",
+    seed: mnemonic,
+    auto_topup: {
+      enabled: true,
+      threshold_usd: flags.topupThreshold,
+      target_usd: flags.topupTarget,
     },
   };
 
-  await encryptAndSavePersona({ personaPubkey, config }, operator);
+  await encryptAndSavePersona({ persona, wallet }, operator);
   console.log("Persisted encrypted PhoenixEnvelope to .persona.json");
   console.log(`  persona npub: ${nip19.npubEncode(personaPubkey)}`);
   console.log(`  mnemonic words: ${mnemonic.split(/\s+/).length} (hidden)`);

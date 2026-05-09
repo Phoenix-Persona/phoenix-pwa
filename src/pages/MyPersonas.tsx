@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
-import { Plus } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 
 import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
 import { PersonaGridSkeleton } from "@/components/Skeletons";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,79 +20,146 @@ const MyPersonas = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <PhoenixHeader />
 
-      <main id="main-content" className="flex-1 container py-10 max-w-5xl space-y-8">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
-              Your voices
-            </p>
-            <h1 className="font-display text-4xl md:text-5xl font-medium tracking-tight">
-              My personas
-            </h1>
-            <p className="text-muted-foreground max-w-2xl leading-relaxed">
-              Every voice you operate. Persona configurations are encrypted to
-              your Nostr key — only you can operate them. Sign in on any
-              device with the same key to recover them.
-            </p>
+      {/* Cover band — charcoal mat with bold pattern + warm glow */}
+      <section className="relative overflow-hidden hero-mat text-imigongo-cream">
+        <div
+          className="absolute inset-0 imigongo-pattern-bold text-imigongo-cream opacity-[0.05] pointer-events-none"
+          aria-hidden="true"
+        />
+        <div className="container relative py-12 md:py-16 max-w-5xl">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="space-y-3">
+              <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
+                <span className="h-px w-8 bg-rw-gold" />
+                Your voices
+              </p>
+              <h1 className="font-display text-4xl md:text-5xl font-medium tracking-tight">
+                My personas
+              </h1>
+              <p className="text-imigongo-cream/80 max-w-2xl leading-relaxed">
+                Every voice you operate. Persona configurations are encrypted to
+                your Nostr key — only you can operate them. Sign in on any
+                device with the same key to recover them.
+              </p>
+            </div>
+            <Button
+              asChild
+              size="lg"
+              className="rounded-full px-6 bg-rw-gold text-imigongo-charcoal hover:bg-rw-gold/90 shadow-xl shadow-rw-gold/30"
+            >
+              <Link to="/onboard">
+                <Plus className="mr-2 size-4" />
+                New persona
+              </Link>
+            </Button>
           </div>
-          <Button asChild className="shadow-md shadow-primary/20">
-            <Link to="/onboard">
-              <Plus className="mr-2 size-4" />
-              New persona
-            </Link>
-          </Button>
         </div>
+        <FlagStripe height={4} />
+      </section>
 
+      <main
+        id="main-content"
+        className="flex-1 container py-10 max-w-5xl space-y-8"
+      >
         {!user ? (
-          <Card className="border-dashed">
-            <CardContent className="py-12 text-center text-muted-foreground">
+          <Card className="border-dashed border-imigongo-clay/30 bg-imigongo-cream/40">
+            <CardContent className="py-12 px-8 text-center text-muted-foreground">
               Sign in to view your personas.
             </CardContent>
           </Card>
         ) : isLoading ? (
           <PersonaGridSkeleton count={3} />
         ) : isError ? (
-          <Card className="border-dashed">
+          <Card className="border-dashed border-destructive/30 bg-destructive/5">
             <CardContent className="py-12 px-8 text-center text-muted-foreground space-y-2">
               <p>Couldn't load your personas.</p>
               <p className="text-xs">{String(error)}</p>
             </CardContent>
           </Card>
         ) : data && data.length > 0 ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.map(({ event, config, npub }) => (
-              <Link
-                key={event.id}
-                to={`/dashboard/${npub}`}
-                className="group relative rounded-2xl border border-border bg-card p-6 hover:border-imigongo-clay hover:shadow-lg hover:shadow-imigongo-clay/10 transition-all space-y-3 overflow-hidden"
-              >
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-imigongo-clay via-rw-gold to-rw-green opacity-70 group-hover:opacity-100 transition-opacity" />
-                <div className="text-xs uppercase tracking-[0.18em] text-imigongo-clay font-semibold pt-1">
-                  {config.region} · {config.cause}
-                </div>
-                <h3 className="font-display text-2xl font-medium tracking-tight group-hover:text-primary transition-colors">
-                  {config.name}
-                </h3>
-                <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-                  {config.bio}
-                </p>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {config.languages.slice(0, 3).map((l) => (
-                    <Badge key={l} variant="secondary" className="text-[10px]">
-                      {l.toUpperCase()}
-                    </Badge>
-                  ))}
-                </div>
-              </Link>
-            ))}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {data.map(({ event, envelope, npub }, idx) => {
+              const persona = envelope.persona;
+              const topTags = persona.tags.slice(0, 2);
+              // Rotate accent colors so the grid doesn't feel monochrome.
+              const accent = idx % 3 === 0
+                ? "from-imigongo-clay to-imigongo-ochre"
+                : idx % 3 === 1
+                ? "from-rw-green to-rw-green-deep"
+                : "from-rw-gold to-imigongo-ochre";
+              return (
+                <Link
+                  key={event.id}
+                  to={`/dashboard/${npub}`}
+                  className="group relative rounded-2xl border border-border bg-card hover:border-imigongo-clay/60 hover:shadow-2xl hover:shadow-imigongo-clay/20 transition-all overflow-hidden"
+                >
+                  {/* Color cap header */}
+                  <div className={`relative h-24 bg-gradient-to-br ${accent} overflow-hidden`}>
+                    <div
+                      className="absolute inset-0 imigongo-pattern-bold text-imigongo-cream opacity-[0.18]"
+                      aria-hidden="true"
+                    />
+                    <ImigongoSeal
+                      size={64}
+                      colorClass="text-imigongo-cream/40"
+                      className="absolute -right-3 -bottom-3"
+                    />
+                    <FlagStripe className="absolute bottom-0 left-0 right-0" height={3} />
+                  </div>
+
+                  <div className="p-5 space-y-3">
+                    {topTags.length > 0 && (
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
+                        {topTags.join(" · ")}
+                      </div>
+                    )}
+                    <h3 className="font-display text-2xl font-medium tracking-tight group-hover:text-primary transition-colors leading-tight">
+                      {persona.name}
+                    </h3>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {persona.languages.slice(0, 3).map((l) => (
+                        <Badge
+                          key={l}
+                          variant="secondary"
+                          className="text-[10px] bg-secondary/80"
+                        >
+                          {l.toUpperCase()}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         ) : (
-          <Card className="border-dashed">
-            <CardContent className="py-12 px-8 text-center text-muted-foreground space-y-3">
-              <p>You don't have any personas yet.</p>
-              <Button asChild>
+          <Card className="border-dashed border-imigongo-clay/30 bg-gradient-to-br from-imigongo-cream/40 to-rw-gold-soft/20 overflow-hidden">
+            <CardContent className="py-14 px-8 text-center space-y-5">
+              <div className="flex justify-center">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-rw-gold/20 blur-xl rounded-full" />
+                  <ImigongoSeal
+                    size={64}
+                    colorClass="text-imigongo-clay relative"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="font-display text-2xl text-foreground">
+                  No personas yet
+                </p>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  Create the first voice. Choose a cause, shape the tone,
+                  and Phoenix will mint a fresh keypair just for it.
+                </p>
+              </div>
+              <Button
+                asChild
+                size="lg"
+                className="rounded-full px-8 shadow-lg shadow-primary/20"
+              >
                 <Link to="/onboard">
-                  <Plus className="mr-2 size-4" />
+                  <Sparkles className="mr-2 size-4" />
                   Create your first persona
                 </Link>
               </Button>

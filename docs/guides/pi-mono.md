@@ -1,7 +1,10 @@
 # pi-mono
 
-Earendil's open-source AI agent toolkit. Phoenix uses three of its packages
-to run the character-creator wizard and the post-styling flow.
+Earendil's open-source AI agent toolkit. **V1 of Phoenix uses `pi-ai`
+only** — for chat completions through PPQ (post styling) and image
+generation. The agent runtime (`pi-agent-core`) and chat surface
+(`pi-web-ui`) are reserved for the V2 agent-driven character-creator
+wizard; V1 ships a form-based wizard instead.
 
 > Repo: `github.com/earendil-works/pi` (formerly `pi-mono`; both URLs
 > redirect to the same place). The packages keep the `@earendil-works/`
@@ -54,16 +57,44 @@ const finalMessage = await s.result();
 
 ### Pointing at PPQ
 
-PPQ is OpenAI-compatible (see `docs/ppq.md`). Use the OpenAI provider with
-a custom base URL — the README's "Custom Models" / "OpenAI Compatibility
-Settings" section is authoritative; verify the exact override key
-(`baseURL`) before coding.
+PPQ is OpenAI-compatible (see `docs/guides/ppq.md`). `pi-ai` exposes
+this through its **Custom Models** API: you build a `Model<>` object
+with `baseUrl` set to PPQ and pass `apiKey` per call.
 
 ```typescript
-const model = getModel('openai', 'claude-sonnet-4-5'); // model name as exposed by PPQ
-// Pass baseURL: 'https://api.ppq.ai' and apiKey: 'ppq_<token>' through
-// the per-call options or via custom-model registration.
+import { Model, stream } from '@earendil-works/pi-ai';
+
+const ppqClaude: Model<'openai-completions'> = {
+  id: 'claude-sonnet-4.5',
+  name: 'Claude Sonnet 4.5 (PPQ)',
+  api: 'openai-completions',
+  provider: 'ppq',
+  baseUrl: 'https://api.ppq.ai',
+  reasoning: false,
+  input: ['text'],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, // TBD per model
+  contextWindow: 200000,
+  maxTokens: 8192,
+  // compat: { ... }  // set if PPQ rejects fields like `store`
+};
+
+await stream(ppqClaude, context, { apiKey: 'ppq_<token>' });
 ```
+
+**Auth surface — bearer all the way.** Phoenix uses PPQ's **credits
+system**: a single `credit_id` per persona, funded by Lightning
+top-ups via the Spark wallet (NIP-47 NWC auto-topup), authenticates
+every PPQ request with a bearer token. `pi-ai` natively supports
+bearer, which is all Phoenix needs. PPQ also supports L402
+per-request but only on a subset of endpoints; the credits system
+covers the whole API surface, so Phoenix uses credits across the
+board (image gen and TTS go through the same `credit_id` + bearer
+even when called outside `pi-ai`). See `docs/guides/ppq.md` for the
+credits flow and the `/nwc-auto-topup/connect` wiring.
+
+If `pi-ai`'s defaults fail against PPQ on specific fields (e.g.
+`store`, `developer` role, `reasoning_effort`), set `compat` flags
+per the README's "OpenAI Compatibility Settings" section.
 
 ### Defining tools (TypeBox)
 
@@ -100,7 +131,7 @@ import { getModel } from '@earendil-works/pi-ai';
 const agent = new Agent({
   initialState: {
     systemPrompt: 'You are the Phoenix character-creator agent.',
-    model: getModel('anthropic', 'claude-sonnet-4-5-20250929'),
+    model: getModel('anthropic', 'claude-sonnet-4.5-20250929'),
     thinkingLevel: 'off',
     messages: [],
     tools: [proposeName, /* ... */],

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Menu } from "lucide-react";
 
+import { FlagStripe } from "@/components/ImigongoBand";
 import { LoginArea } from "@/components/auth/LoginArea";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,10 +12,14 @@ import {
   SheetTrigger,
   SheetClose,
 } from "@/components/ui/sheet";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 export function PhoenixHeader() {
+  const { user } = useCurrentUser();
+  const isLoggedIn = Boolean(user);
+
   return (
-    <header className="relative bg-card/80 backdrop-blur-md sticky top-0 z-30">
+    <header className="relative bg-card/85 backdrop-blur-md sticky top-0 z-30 border-b border-imigongo-clay/15">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-imigongo-charcoal focus:text-imigongo-cream focus:px-3 focus:py-2 focus:text-sm focus:font-medium"
@@ -47,21 +52,23 @@ export function PhoenixHeader() {
           </div>
         </Link>
 
-        {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-7 text-sm font-medium">
-          <Link
-            to="/my-personas"
-            className="text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:text-foreground"
-          >
-            My personas
-          </Link>
-          <Link
-            to="/onboard"
-            className="text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:text-foreground"
-          >
-            New persona
-          </Link>
-        </nav>
+        {/* Desktop nav — persona-management links only when signed in. */}
+        {isLoggedIn && (
+          <nav className="hidden md:flex items-center gap-7 text-sm font-medium">
+            <Link
+              to="/my-personas"
+              className="text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:text-foreground"
+            >
+              My personas
+            </Link>
+            <Link
+              to="/onboard"
+              className="text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:text-foreground"
+            >
+              New persona
+            </Link>
+          </nav>
+        )}
 
         <div className="flex items-center gap-2">
           <LoginArea className="max-w-60" />
@@ -83,23 +90,27 @@ export function PhoenixHeader() {
                 <SheetTitle className="font-display text-2xl">Phoenix</SheetTitle>
               </SheetHeader>
               <nav className="px-4 pb-6 flex flex-col gap-1 text-base font-medium">
-                <SheetClose asChild>
-                  <Link
-                    to="/my-personas"
-                    className="rounded-lg px-3 py-3 hover:bg-muted transition-colors"
-                  >
-                    My personas
-                  </Link>
-                </SheetClose>
-                <SheetClose asChild>
-                  <Link
-                    to="/onboard"
-                    className="rounded-lg px-3 py-3 hover:bg-muted transition-colors"
-                  >
-                    New persona
-                  </Link>
-                </SheetClose>
-                <div className="my-2 border-t border-border" />
+                {isLoggedIn && (
+                  <>
+                    <SheetClose asChild>
+                      <Link
+                        to="/my-personas"
+                        className="rounded-lg px-3 py-3 hover:bg-muted transition-colors"
+                      >
+                        My personas
+                      </Link>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <Link
+                        to="/onboard"
+                        className="rounded-lg px-3 py-3 hover:bg-muted transition-colors"
+                      >
+                        New persona
+                      </Link>
+                    </SheetClose>
+                    <div className="my-2 border-t border-border" />
+                  </>
+                )}
                 <SheetClose asChild>
                   <Link
                     to="/"
@@ -114,12 +125,8 @@ export function PhoenixHeader() {
         </div>
       </div>
 
-      {/* Imigongo accent band — Rwandan-flag stripe */}
-      <div className="h-[3px] flex" aria-hidden="true">
-        <div className="flex-1 bg-imigongo-clay/90" />
-        <div className="flex-1 bg-rw-gold" />
-        <div className="flex-1 bg-rw-green" />
-      </div>
+      {/* Rwandan-flag accent stripe */}
+      <FlagStripe height={3} />
     </header>
   );
 }

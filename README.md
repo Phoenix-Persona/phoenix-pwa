@@ -48,4 +48,4 @@ In active development for the **HRF AI Hack for Freedom**. The current scaffold 
 
 ## Team
 
-Anaïse (Captain + Product), Derek (Frontend + Nostr + PWA), Jim (LLM + Agent), Topher (Wallet + PPQ + Infrastructure).
+Anaïse (Captain + Product), Derek (Frontend + Nostr + PWA), Jim (PPQ + Wallet + Payments), Topher (Agent + LLM Consumers + Donations).

@@ -3,43 +3,51 @@
  *
  * Privacy posture
  * ───────────────
- * Personas MUST NOT be trackable. The kind 30078 event that holds a persona
- * config carries NO Phoenix-specific metadata in its tags. From the outside
- * it is indistinguishable from any other app's encrypted-app-data event.
+ * Personas MUST NOT be trackable from outside the encrypted payload.
+ * The kind 30078 event that carries a persona's config carries NO
+ * Phoenix-specific metadata in its tags. From the wire it is
+ * indistinguishable from any other app's NIP-78 application data.
  *
  * Event shape:
  *   kind: 30078
- *   pubkey: <operator pubkey>      (unavoidable; events must be signed)
+ *   pubkey: <user pubkey>          (unavoidable; events must be signed)
  *   tags:
  *     ["d", <random uuid>]         unique addressing only — no semantics
- *   content: NIP-44(operator → operator) of JSON {
+ *   content: NIP-44(user → user) of JSON {
  *     app: "phoenix-persona",      magic discriminator
  *     version: 1,                  schema version (only 1 accepted)
- *     personaPubkey: <hex>,        cross-reference to the persona's npub
- *     config: { ...PersonaConfig } system prompt, sources, persona nsec, etc.
+ *     persona: { pubkey, nsec, name, system_prompt, ... },
+ *     wallet?: { kind, seed, lnurl? },         (optional in Phase 1; required Phase 2)
+ *     model_prefs?: { agent, image, tts, video? },
+ *     settings?:    { default_relays }
  *   }
  *
- * The Phoenix discriminator and the persona-pubkey ↔ operator link only
- * exist inside the encrypted payload. To find a persona, the operator
+ * The Phoenix discriminator and the user-pubkey ↔ persona-pubkey link
+ * only exist inside the encrypted payload. To find a persona, the user
  * scans their own kind 30078 events and decrypts each one — successful
  * decryption + Phoenix discriminator + Zod-validated shape + derived-key
  * match = a Phoenix persona event.
  *
  * Defense in depth — every layer must agree:
- *   (a) NIP-44 decryptable by the operator's signer (else: not for me)
+ *   (a) NIP-44 decryptable by the user's signer (else: not for me)
  *   (b) Plaintext is valid JSON
  *   (c) Zod schema accepts the envelope (else: malformed / wrong app)
- *   (d) Derived pubkey from personaNsec matches the claimed personaPubkey
+ *   (d) Derived pubkey from persona.nsec matches the claimed persona.pubkey
  *       (else: tampered envelope)
  *
  * Persona POSTS (kind 1)
  * ──────────────────────
- * Posts published by the persona's own keypair carry NO operator tag, NO
+ * Posts published by the persona's own keypair carry NO user tag, NO
  * "phoenix" client tag, and NO persona-name disclosure. They look like
- * any other kind 1 note from any account — only the source-attribution
- * `r` tags (which are content, not identity) and topical `t` tags remain.
+ * any other kind 1 note from any account — only topical `t` tags and
+ * source-attribution `r` tags (which are content, not identity) remain.
  * The persona's kind 0 profile bio is the right place to disclose AI
  * usage; individual posts stay metadata-clean.
+ *
+ * Schema: PROJECT.md §5.2 inner-payload structure.
+ * Privacy override: tags-on-the-envelope follow the existing untrackable
+ * design rather than §5.2 which would tag-leak Phoenix usage.
+ * See tasks/derek-plan.md "Locked decisions" §2.
  */
 
 import { z } from "zod";
@@ -51,36 +59,53 @@ export const PERSONA_KIND = 30078;
 export const PHOENIX_PAYLOAD_APP = "phoenix-persona";
 export const PHOENIX_PAYLOAD_VERSION = 1 as const;
 
-export type SourceKind = "rss" | "url";
-
 // ─────────── Zod schemas ───────────
 
+/** Source of content the persona references (e.g. RSS feed, article URL). */
 const personaSourceSchema = z.object({
   kind: z.enum(["rss", "url"]),
-  url: z.string(),
+  url: z.string().min(1).max(2048),
 });
 
 /**
- * Auto-topup policy for the persona's ppq.ai credit. Persisted inside the
- * encrypted payload so the user's choice rides the kind 30078 backup
+ * Auto-topup policy for the persona's PPQ credit (NIP-47 NWC). Persisted
+ * inside the encrypted payload so the user's choice rides the backup
  * across devices.
  */
 const personaAutoTopupSchema = z.object({
   enabled: z.boolean(),
-  thresholdUsd: z.number().nonnegative().max(10000),
-  targetUsd: z.number().positive().max(10000),
+  threshold_usd: z.number().nonnegative().max(10000),
+  target_usd: z.number().positive().max(10000),
 });
 
-/**
- * Per-persona Spark Lightning wallet credentials. Lives next to
- * `personaNsec` inside the encrypted blob — same security envelope, same
- * recovery story. Optional for back-compat with personas authored before
- * the wallet integration shipped.
- */
-const personaWalletSchema = z.object({
+const personaSchema = z.object({
+  pubkey: z.string().regex(/^[0-9a-f]{64}$/i, "must be 64 hex chars"),
+  nsec: z
+    .string()
+    .regex(/^nsec1[02-9ac-hj-np-z]{58,}$/i, "must be a valid nsec1… string"),
+  name: z.string().min(1).max(120),
+  system_prompt: z.string().max(20000),
+  voice_id: z.string().min(1).max(64),
+  voice_sample_url: z.string().min(1).max(2048).optional(),
+  reference_image_url: z.string().min(1).max(2048).optional(),
+  languages: z.array(z.string().min(1).max(16)).min(1).max(16),
+  tags: z.array(z.string().min(1).max(120)).max(32).default([]),
+  created_at: z.number().int().nonnegative(),
+  // Demo-critical domain fields (added during PR #2 schema reconciliation).
+  // All optional for back-compat with personas authored before they shipped.
+  region: z.string().min(1).max(8).optional(),
+  cause: z.string().min(1).max(120).optional(),
+  bio: z.string().max(2000).optional(),
+  tone: z.string().max(2000).optional(),
+  sources: z.array(personaSourceSchema).max(64).optional(),
+});
+
+const walletSchema = z.object({
+  // Phoenix V1 uses Breez Spark SDK (`@breeztech/breez-sdk-spark`).
+  // Future SDK variants land as a discriminated union.
   kind: z.literal("spark"),
-  /** BIP-39 mnemonic (12 or 24 words). */
-  mnemonic: z
+  /** BIP-39 mnemonic (12, 15, 18, 21, or 24 words). Held only inside the encrypted backup. */
+  seed: z
     .string()
     .min(1)
     .max(2048)
@@ -89,47 +114,42 @@ const personaWalletSchema = z.object({
       return words.length === 12 || words.length === 15 ||
         words.length === 18 || words.length === 21 || words.length === 24;
     }, "must be a valid BIP-39 mnemonic (12, 15, 18, 21, or 24 words)"),
-  passphrase: z.string().max(512).optional(),
-  /** Public donate handle — safe to embed (it's already public on chain). */
-  lightningAddress: z.string().max(512).optional(),
-  lnurlPay: z.string().max(2048).optional(),
-  autoTopup: personaAutoTopupSchema.optional(),
+  /** Public donate handle. Safe to embed; already public via the kind 0 lud16. */
+  lightning_address: z.string().max(512).optional(),
+  lnurl: z.string().min(1).max(4096).optional(),
+  auto_topup: personaAutoTopupSchema.optional(),
 });
 
-const personaConfigSchema = z.object({
-  name: z.string().min(1).max(120),
-  region: z.string().min(1).max(8),
-  cause: z.string().min(1).max(120),
-  languages: z.array(z.string().min(1).max(16)).min(1).max(16),
-  tone: z.string().max(2000),
-  frequencySec: z.number().int().nonnegative().max(60 * 60 * 24 * 30),
-  sources: z.array(personaSourceSchema).max(64),
-  focus: z.array(z.string().min(1).max(120)).max(32),
-  model: z.string().min(1).max(120),
-  systemPrompt: z.string().max(20000),
-  personality: z.string().max(2000),
-  bio: z.string().max(2000),
-  voiceStyle: z.string().max(2000).optional(),
-  avoidTopics: z.array(z.string().min(1).max(240)).max(32).optional(),
-  personaNsec: z
-    .string()
-    .regex(/^nsec1[02-9ac-hj-np-z]{58,}$/i, "must be a valid nsec1… string"),
-  wallet: personaWalletSchema.optional(),
+const modelPrefsSchema = z.object({
+  agent: z.string().min(1).max(120),
+  image: z.string().min(1).max(120),
+  tts: z.string().min(1).max(120),
+  video: z.string().min(1).max(120).nullable().optional(),
+});
+
+const settingsSchema = z.object({
+  default_relays: z.array(z.string().min(1).max(2048)).max(64).default([]),
 });
 
 const phoenixEnvelopeSchema = z.object({
   app: z.literal(PHOENIX_PAYLOAD_APP),
   version: z.literal(PHOENIX_PAYLOAD_VERSION),
-  personaPubkey: z.string().regex(/^[0-9a-f]{64}$/i, "must be 64 hex chars"),
-  config: personaConfigSchema,
+  persona: personaSchema,
+  // Optional in Phase 1 until Jim's Breeze wallet wiring lands. Phase 2 tightens.
+  wallet: walletSchema.optional(),
+  // Optional in Phase 1; defaults applied at use-time.
+  model_prefs: modelPrefsSchema.optional(),
+  settings: settingsSchema.optional(),
 });
 
 // ─────────── Public types (inferred from schemas) ───────────
 
 export type PersonaSource = z.infer<typeof personaSourceSchema>;
-export type PersonaConfig = z.infer<typeof personaConfigSchema>;
-export type PersonaWalletConfig = z.infer<typeof personaWalletSchema>;
 export type PersonaAutoTopup = z.infer<typeof personaAutoTopupSchema>;
+export type Persona = z.infer<typeof personaSchema>;
+export type PersonaWallet = z.infer<typeof walletSchema>;
+export type PersonaModelPrefs = z.infer<typeof modelPrefsSchema>;
+export type PersonaSettings = z.infer<typeof settingsSchema>;
 export type PhoenixEnvelope = z.infer<typeof phoenixEnvelopeSchema>;
 
 // ─────────── Event template builder ───────────
@@ -137,6 +157,9 @@ export type PhoenixEnvelope = z.infer<typeof phoenixEnvelopeSchema>;
 /**
  * Build the unsigned event template for an encrypted persona definition.
  * The d-tag is a random UUID — no semantic information.
+ *
+ * No `t`, no `alt`, no client tag — anything that would identify the
+ * event as Phoenix-related lives strictly inside the ciphertext.
  */
 export function buildEncryptedPersonaTemplate(
   args: {
@@ -155,7 +178,6 @@ export function buildEncryptedPersonaTemplate(
   return {
     kind: PERSONA_KIND,
     created_at: createdAt,
-    // No t/p/alt/client tags — anything Phoenix-specific lives inside content.
     tags: [["d", args.dTag]],
     content: args.encryptedContent,
   };
@@ -209,20 +231,23 @@ export function parsePhoenixEnvelope(plaintext: string): PhoenixEnvelope | null 
 
   const envelope = result.data;
 
-  // Derive-and-verify: the personaPubkey claim must match the public key
-  // derived from the embedded personaNsec. Defends against a tampered
-  // envelope where the operator's signer was used to encrypt a config
+  // Derive-and-verify: the persona.pubkey claim must match the public key
+  // derived from the embedded persona.nsec. Defends against a tampered
+  // envelope where the user's signer was used to encrypt a config
   // claiming the wrong identity.
-  const derived = pubkeyFromNsec(envelope.config.personaNsec);
+  const derived = pubkeyFromNsec(envelope.persona.nsec);
   if (!derived) return null;
-  if (derived.toLowerCase() !== envelope.personaPubkey.toLowerCase()) {
+  if (derived.toLowerCase() !== envelope.persona.pubkey.toLowerCase()) {
     return null;
   }
 
   // Normalize the pubkey casing for downstream comparators.
   return {
     ...envelope,
-    personaPubkey: envelope.personaPubkey.toLowerCase(),
+    persona: {
+      ...envelope.persona,
+      pubkey: envelope.persona.pubkey.toLowerCase(),
+    },
   };
 }
 
@@ -239,5 +264,14 @@ export function isCandidatePersonaEvent(event: NostrEvent): boolean {
 
 // ─────────── Defaults ───────────
 
-export const DEFAULT_PERSONA_MODEL = "anthropic/claude-sonnet-4.5";
-export const DEFAULT_FREQUENCY_SEC = 3600;
+/**
+ * Default model preferences per task. PROJECT.md §6 — model strings
+ * follow whatever PPQ's `/v1/models` returns; the strings below are
+ * placeholders adjusted post-Spike A.
+ */
+export const DEFAULT_MODEL_PREFS: PersonaModelPrefs = {
+  agent: "anthropic/claude-sonnet-4.5",
+  image: "openai/gpt-image-1",
+  tts: "openai/tts-1-hd",
+  video: null,
+};

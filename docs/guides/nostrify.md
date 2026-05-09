@@ -146,9 +146,12 @@ those `useLoggedInAccounts` / `useLoginActions` build on.
 
 ## Phoenix-specific notes
 
-- **Persona backups (kind 30078)**: encrypt to the persona's own pubkey
-  with `signer.nip44.encrypt`, set `d` tag to `"phoenix-persona"` (PROJECT.md
-  §5.2).
+- **Persona backups (kind 30078)**: NIP-44-encrypt to the **user's own
+  pubkey** (not the persona's) with `signer.nip44.encrypt`, set `d` tag
+  to a fresh random UUID per publish (no `t`, `alt`, or other tags) so a
+  Phoenix backup is externally indistinguishable from any other app's
+  encrypted-app-data event. Discovery is scan-and-decrypt over the
+  user's own kind-30078 events. See PROJECT.md §5.2.
 - **NIP-49 (ncryptsec)** for at-rest local nsec: `nostr-tools` provides
   this. Signer construction happens after the user unlocks.
 - **Auto-`client` tag**: `useNostrPublish` adds `["client", "phoenix"]`
