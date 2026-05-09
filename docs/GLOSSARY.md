@@ -21,13 +21,13 @@
   use "operator" canonically.
 
 - **Persona** — an AI-driven public identity with its own Nostr keypair,
-  Spark Lightning wallet, and profile image. Owned and operated by one
-  operator.
+  Spark Lightning wallet, profile image, and voice. Owned and operated
+  by one operator.
 
-- **PPQ** — `ppq.ai`. OpenAI-compatible inference API. Supports L402
-  (`Authorization: L402 <token>:<preimage>` with `WWW-Authenticate:
-  Payment` challenge-pay-replay) and account-credit bearer tokens; the
-  persona's Spark wallet pays either way. See `docs/guides/ppq.md`.
+- **PPQ** — `ppq.ai`. OpenAI-compatible inference API. Phoenix uses
+  PPQ's **credits system**: a per-persona `credit_id` funded by
+  Lightning from the persona's Spark wallet (NWC auto-topup) auths
+  every API request via a bearer token. See `docs/guides/ppq.md`.
 
 - **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit. V1 uses
   **`pi-ai`** (LLM client) only. `pi-agent-core` (agent runtime) and
@@ -59,8 +59,10 @@
 - **L402** — Lightning HTTP 402 protocol. Pay-per-request flow:
   unauthenticated request → `402 Payment Required` + `WWW-Authenticate:
   Payment` + Lightning invoice → pay → replay with
-  `Authorization: L402 <token>:<preimage>`. Phoenix uses this against
-  PPQ for image / video generation.
+  `Authorization: L402 <token>:<preimage>`. PPQ supports L402 on a
+  subset of endpoints (image / video gen). **Phoenix does not use
+  L402** — the credits system covers everything; included here for
+  completeness only.
 
 - **Blossom** — content-addressed media server protocol used by Nostr
   clients. Profile pictures and post media live here. See

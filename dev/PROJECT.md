@@ -280,6 +280,8 @@ Plaintext payload:
     "dTag": "<opaque random uuid; generated once at creation, reused on every update>",
     "name": "Imani Uwase",
     "system_prompt": "...full persona system prompt...",
+    "voice_id": "thalia",
+    "voice_sample_url": "https://blossom.example/<sha256>.mp3",
     "reference_image_url": "https://blossom.example/<sha256>.png",
     "languages": ["en", "rw"],
     "tags": ["rwanda", "press-freedom"],
@@ -294,6 +296,7 @@ Plaintext payload:
   "model_prefs": {
     "styling": "claude-sonnet-4.5",
     "image": "gpt-image-1",
+    "tts": "deepgram-aura-2",
     "video": null
   },
   "settings": {
@@ -370,19 +373,25 @@ encryption is needed on Blossom.
 ## 6. AI capabilities
 
 All inference goes through **PPQ** (`https://api.ppq.ai`, OpenAI-compatible)
-via `pi-ai`. PPQ accepts Lightning payment via L402
-(`Authorization: L402 <token>:<preimage>` with `WWW-Authenticate:
-Payment` challenge-pay-replay) and via account-credit bearer tokens.
-Either way, payment ultimately flows from the persona's Spark wallet
-(L402 directly per request; bearer-token credit topped up via NWC from
-the wallet). See `docs/guides/ppq.md` for the PPQ surface and
-`docs/guides/pi-mono.md` for how `pi-ai` is configured against it.
+via `pi-ai`. Phoenix uses PPQ's **credits system**: each persona has
+its own `credit_id` (PPQ account), funded via Lightning from the
+persona's Spark wallet. NIP-47 NWC keeps the credit_id topped up
+hands-off — Phoenix hands PPQ the wallet's NWC URL once at persona
+creation, and PPQ pulls the next chunk of credit whenever the balance
+dips below a threshold. Every API request authenticates with the
+bearer token tied to that credit_id; one auth surface for the whole
+PPQ API. (PPQ also supports L402 per-request, but only on a subset of
+endpoints; credits are simpler and complete.) See
+`docs/guides/ppq.md` for the PPQ surface and `docs/guides/pi-mono.md`
+for how `pi-ai` is configured against it.
 
 | Task                    | Default model    | Notes                                                       |
 | ----------------------- | ---------------- | ----------------------------------------------------------- |
 | Persona text styling    | claude-sonnet-4.5 | Raw thought → polished post in persona's voice             |
 | Profile picture         | upload OR `gpt-image-1` | User uploads an image OR generates one via PPQ during the wizard. The chosen image is saved to Blossom and referenced as the canonical likeness for subsequent post-image generation. |
 | Post images             | gpt-image-1      | Always pass the reference image as input for likeness      |
+| Voice sample            | `deepgram-aura-2` (or ElevenLabs) | One-shot during creation, ~10–20 s, saved to Blossom. PPQ exposes DeepGram Aura 2 (named voices: `arcas`, `thalia`, `andromeda`, `helena`, `apollo`, `aries`) and ElevenLabs (`eleven_multilingual_v2`, `eleven_flash_v2_5`) at `/v1/audio/speech`. `tts-1-hd` is no longer the default — PPQ migrated. |
+| Post audio (V1.5)       | `deepgram-aura-2` (or ElevenLabs) | TTS each published post in the persona's voice            |
 | Video (V2 stretch)      | TBD              | Decide once we know what PPQ proxies                       |
 
 **Likeness consistency.** During wizard step 4 we generate the profile
@@ -401,14 +410,16 @@ PPQ's `/v1/models` endpoint at runtime so we don't have to hard-code it.
 character-creator wizard. The operator fills in name, region, cause,
 languages, system prompt, and source URLs through ordinary form
 inputs; Phoenix calls `pi-ai` for sample-post styling and image
-generation on demand, but does not run an LLM-driven interview.
+generation, plus `/v1/audio/speech` directly for the one-shot voice
+sample — but does not run an LLM-driven interview.
 
 The agent harness below is the V2 design: `pi-agent-core` would run
 the wizard with a small tool set (`propose_name(name, rationale)`,
 `propose_bio(bio)`, `propose_system_prompt(prompt)`,
-`generate_profile_image(prompt)`, `finalize_persona()`), with
-`pi-web-ui` rendering the conversation surface. See
-`docs/guides/pi-mono.md` for the integration shape when we revisit.
+`generate_profile_image(prompt)`, `generate_voice_sample(text, voice_id)`,
+`finalize_persona()`), with `pi-web-ui` rendering the conversation
+surface. See `docs/guides/pi-mono.md` for the integration shape when
+we revisit.
 
 ---
 
@@ -461,7 +472,7 @@ encrypted backup. Phoenix UI never shows the seed except during the
 
 When `balance < estimated_cost(action)`:
 
-- AI-gated buttons (compose/style, image gen) are disabled with a
+- AI-gated buttons (compose/style, image gen, TTS) are disabled with a
   tooltip: "This persona needs sats to think. Top up the wallet."
 - A sticky banner offers a one-tap "Generate top-up invoice" sheet.
 - Already-published content stays public and readable; the wallet running
@@ -484,6 +495,7 @@ by token estimates from `pi-ai`.
 - [ ] Persona keypair + kind 30078 backup with stable per-persona d-tag
 - [ ] Per-persona Spark wallet (Breez Spark SDK), BIP-39 seed inside the backup event
 - [ ] Profile picture: user uploads OR generates via PPQ (`gpt-image-1`); saved as canonical reference
+- [ ] Voice sample generation via PPQ (`/v1/audio/speech`, DeepGram Aura 2 or ElevenLabs), stored on Blossom
 - [ ] Multi-persona UX: list, switch, back up, restore
 - [ ] Compose flow: thought → styled → kind 1 publish (text only)
 - [ ] Post-image generation in compose flow (with reference image)
@@ -496,13 +508,13 @@ by token estimates from `pi-ai`.
 
 ### V1.5 — ship if V1 is solid by hour 24
 
+- [ ] TTS audio rendering of published posts
 - [ ] Imigongo-rooted visual polish (palette, pattern, type pairing)
 - [ ] PWA install prompt, service worker, offline shell
 
 ### V2 — stretch
 
 - [ ] Agent-driven character-creator wizard (`pi-agent-core` interview)
-- [ ] Voice sample generation + post-audio TTS (Blossom-stored)
 - [ ] Video generation using persona likeness + voice
 - [ ] NIP-46 remote signer support for power users
 - [ ] Multi-operator-per-device (separate operator keypairs per persona group)
@@ -555,18 +567,23 @@ constructive, not just resilient.
   Spark / Nodeless variant). Lightning Addresses are SDK-native via
   Breez's hosted `spark.money` LNURL server — no Phoenix-hosted
   endpoint required.
-- *PPQ payment*: PPQ supports both **L402** (`Authorization: L402
-  <token>:<preimage>` with `WWW-Authenticate: Payment`
-  challenge-pay-replay) and account-credit bearer tokens. V1 plan: use
-  L402 directly for image / video gen; chat completions go through
-  `pi-ai` with a bearer token, with the persona's Spark wallet
-  topping up via NWC.
+- *PPQ payment*: Phoenix uses PPQ's **credits system** — Lightning
+  top-ups buy credit on a per-persona `credit_id`, and every API
+  request authenticates with the bearer token tied to that credit_id.
+  NWC (NIP-47) auto-topup from the persona's Spark wallet keeps the
+  credit_id funded hands-off. PPQ also supports L402 per-request, but
+  only on a subset of endpoints; the credits system covers the entire
+  API and is what Phoenix uses everywhere.
 - *Image-gen cost at demo scale*: affordable; budget enables ten image
   generations per persona during the demo without concern.
 - *NIP-49 passphrase UX*: **one passphrase per device**, applied to the
   operator nsec only. Multi-operator-per-device is a V2 stretch.
-- *Voice deferred*: voice sample / post-audio TTS moves to V2 (§8); PPQ
-  TTS availability and audio format are no longer V1 blockers.
+- *Voice generation*: PPQ supports TTS via `/v1/audio/speech` with
+  DeepGram Aura 2 (named voices: `arcas`, `thalia`, `andromeda`,
+  `helena`, `apollo`, `aries`) and ElevenLabs
+  (`eleven_multilingual_v2`, `eleven_flash_v2_5`). `tts-1-hd` is no
+  longer the default — pick one of the above. Voice sample (V1) and
+  post-audio TTS (V1.5) stay in scope.
 
 | # | Question                              | Why it matters                                                                      |
 | - | ------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -650,16 +667,19 @@ wallet/agent/Nostr/image-gen seams are where bugs will live.
 ## 13. Glossary
 
 - **Persona** — an AI-driven public identity with its own Nostr keypair,
-  Spark Lightning wallet, and profile image. Owned and operated by one
-  operator.
+  Spark Lightning wallet, profile image, and voice. Owned and operated
+  by one operator.
 - **Operator** — the human's Nostr identity. Signs encrypted persona
   backups (kind 30078); never publishes kind 0 or kind 1 under
   Phoenix. See §3 for the full two-level identity model.
 - **User keypair** — synonym for "operator" used in some passing prose;
   prefer "operator."
-- **PPQ** — `ppq.ai`. OpenAI-compatible inference API. Supports L402
-  (`Authorization: L402 <token>:<preimage>`) and account-credit bearer
-  tokens; the persona's Spark wallet pays either way.
+- **PPQ** — `ppq.ai`. OpenAI-compatible inference API. Phoenix uses
+  PPQ's **credits system**: a per-persona `credit_id` funded by
+  Lightning from the persona's Spark wallet (NWC auto-topup) auths
+  every API request via a bearer token. (L402 per-request is also
+  supported by PPQ but only on a subset of endpoints; not Phoenix's
+  path.) See `docs/guides/ppq.md`.
 - **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit. V1 uses
   `pi-ai` (LLM client) only; `pi-agent-core` and `pi-web-ui` are
   reserved for the V2 agent-driven wizard.

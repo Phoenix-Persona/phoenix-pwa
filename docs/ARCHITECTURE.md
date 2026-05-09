@@ -3,22 +3,24 @@
 A map of `src/`. Read this first. Source of truth is the code — when this
 doc disagrees with what's on disk, the code wins; update this file.
 
-> **Identity model.** Phoenix uses a **user + persona split**
-> (`dev/PROJECT.md` §3). The code in `src/` retains "operator" as the
-> historical name for the user keypair — when you read "operator" in
-> `personaCrypto.ts`, `useNostrSync`, etc., it means "user keypair." The
-> user signs in with a single Nostr identity that NIP-44-self-encrypts
-> each persona's config as a kind 30078 event. Each persona has its own
-> separate keypair that publishes its public kind 0 profile and kind 1
-> posts. The link from persona ↔ user only exists inside the encrypted
-> ciphertext.
+> **Identity model.** Phoenix uses an **operator + persona split**
+> (`dev/PROJECT.md` §3). The operator signs in with a single Nostr
+> identity that NIP-44-self-encrypts each persona's config as a kind
+> 30078 event. Each persona has its own separate keypair that publishes
+> its public kind 0 profile and kind 1 posts. The link from persona ↔
+> operator only exists inside the encrypted ciphertext. ("User
+> keypair" appears in some passing prose as a synonym; prefer
+> "operator.")
 >
 > **kind-30078 tag scheme.** Per `dev/PROJECT.md` §5.2, the only tag is
-> `["d", "<random uuid>"]` — required by NIP-01 for addressable-range
-> kinds, but with no semantic value, no `t` tag, no `alt` tag.
-> Externally a Phoenix backup is indistinguishable from any other
-> app's encrypted-app-data event. Discovery is by scan-and-decrypt
-> over the user's own kind-30078 events.
+> `["d", "<opaque random uuid>"]`, **stable per persona** (generated
+> at creation, stored as `persona.dTag` inside the encrypted plaintext,
+> reused on every update). No `t`, no `alt`. Externally a Phoenix
+> backup is indistinguishable from any other NIP-78 app-data event.
+> Discovery is by scan-and-decrypt over the operator's own kind-30078
+> events. **Code-vs-doc divergence**: `src/lib/persona.ts` currently
+> uses a fresh random UUID per publish; switching to
+> stable-per-persona is the next persona-schema change.
 
 ## Entry & root
 
@@ -239,5 +241,7 @@ operator's signer. See `lib/personaKey.ts:1-9`.
 - Code in `src/` (canonical).
 - `docs/DATA-FLOW.md` — the seams traced through real call paths.
 - `dev/PROJECT.md` — design doc / master plan. Aligned on the identity
-  model (§3) and dependencies (§4); diverges on the kind 30078 tag
-  scheme (§5.2) — see the warning at the top of this doc.
+  model (§3), dependencies (§4 — Breez Spark SDK + PPQ credits), and
+  tag-omission stance. Diverges on the d-tag *value* scheme (spec:
+  stable opaque per persona; code: random per publish) — see warning
+  at the top.

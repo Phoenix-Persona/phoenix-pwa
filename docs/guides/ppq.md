@@ -1,63 +1,111 @@
 # PPQ (PayPerQ)
 
-Pay-per-query, OpenAI-compatible inference API. Phoenix routes **all** AI
-inference through PPQ (text, image, TTS) and the persona's Lightning wallet
-pays for it.
+OpenAI-compatible inference API. Phoenix routes **all** AI inference
+through PPQ. Auth is via PPQ's **credits system**: a unique `credit_id`
+per persona, funded with Lightning, auths every API request via a
+bearer token tied to that credit_id.
 
-> Phoenix usage: see PROJECT.md §6 for the per-task model defaults.
+> Phoenix usage: `dev/PROJECT.md` §6 for per-task model defaults and §7
+> for the wallet → PPQ payment story.
 
 ## Endpoint
 
 - **Base URL:** `https://api.ppq.ai`
-- **Auth:** `Authorization: Bearer ppq_<token>` (issue and rotate from your
-  PPQ account dashboard)
-- **Compatibility:** Fully OpenAI-compatible. Any OpenAI client SDK works;
-  just override `baseURL` and `apiKey`.
+- **Compatibility:** Fully OpenAI-compatible. Any OpenAI client SDK
+  works; override `baseURL` and `apiKey`.
+
+## Authentication — Phoenix uses credits
+
+Phoenix authenticates every PPQ request with a bearer token issued
+when an account is created:
+
+```
+Authorization: Bearer ppq_<token>
+```
+
+The bearer is tied to a `credit_id` (the spending account). Lightning
+top-ups buy credit on the credit_id; the bearer token is the proof of
+ownership for the API.
+
+**Flow:**
+
+1. `POST /accounts/create` → `{ api_key, credit_id }`. Persist these.
+2. `POST /topup/create/btc-lightning` → BOLT11 invoice. Pay it from
+   the persona's Spark wallet to fund the credit_id.
+3. `POST /nwc-auto-topup/connect` with the wallet's NIP-47 NWC URL →
+   PPQ pulls the next chunk of credit on-demand whenever the balance
+   dips below a configured threshold. Hands-off after this.
+4. Use `Authorization: Bearer ppq_<token>` on every API request.
+
+The credits system covers **the whole PPQ API surface** — chat,
+image, audio, video, models list, etc.
+
+### L402 — supported but not what Phoenix uses
+
+PPQ also supports L402 (`Authorization: L402 <token>:<preimage>` with
+a `WWW-Authenticate: Payment` challenge-pay-replay) for per-request
+Lightning auth. **L402 is only available on a subset of endpoints**
+(image-gen, video-gen, image-edit, data-enrichment); the credits
+system covers everything. Phoenix uses credits across the board.
 
 ## Endpoints we use
 
-| Endpoint                | Purpose                                   |
-| ----------------------- | ----------------------------------------- |
-| `POST /chat/completions`| Text generation (Claude, GPT, etc.)       |
-| `POST /images`          | Image generation (`gpt-image-1`)          |
-| `POST /audio/speech`    | TTS for voice sample + post audio (V1.5)  |
-| `GET  /models`          | List available models — used by Settings  |
-
-The Settings page reads `/models` at runtime (§6) so we never have to hard-code
-a list.
-
-## Payment model
-
-- Pre-paid account credit, topped up via Lightning, crypto, or card.
-- Per-request billing; no subscription. Average ~2¢ per text query at
-  hackathon-scale traffic.
-- Minimum top-up: 10¢.
-
-**Open question (PROJECT.md §10 #3):** the exact payment surface Phoenix
-will use — L402 macaroon, account credit, or per-request invoice — is not
-yet decided. Topher owns this.
+| Endpoint                         | Purpose                                                          |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `POST /chat/completions`         | Text generation (Claude, GPT, Gemini, etc.) — via `pi-ai`        |
+| `POST /v1/images/generations`    | Image generation                                                 |
+| `POST /v1/audio/speech`          | TTS — voice sample (V1) + post audio (V1.5)                      |
+| `POST /v1/audio/transcriptions`  | STT (Deepgram Nova-3) — not used by Phoenix yet                  |
+| `POST /v1/videos`                | Video generation (V2 stretch)                                    |
+| `GET  /v1/models`                | List available models (used by Settings)                         |
+| `POST /accounts/create`          | Create a PPQ account (api_key + credit_id)                       |
+| `POST /credits/balance`          | Read account balance                                             |
+| `POST /topup/create/btc-lightning` | Get a Lightning invoice for credit top-up                      |
+| `POST /nwc-auto-topup/connect`   | Wire a NIP-47 NWC URL for hands-off auto-topup                   |
 
 ## Default models per task
 
-From PROJECT.md §6. Users override per-persona; selections persist in the
-encrypted kind 30078 backup under `model_prefs`.
+From `dev/PROJECT.md` §6. Operators override per-persona; selections
+persist in the encrypted kind 30078 backup under `model_prefs`.
 
-| Task                    | Default            |
-| ----------------------- | ------------------ |
-| Character-creator agent | `claude-sonnet-4.5`|
-| Persona text styling    | `claude-sonnet-4.5`|
-| Profile / post image    | `gpt-image-1`      |
-| Voice sample / TTS      | `tts-1-hd`         |
-| Video (V2)              | TBD                |
+| Task                    | Default            | Endpoint                   |
+| ----------------------- | ------------------ | -------------------------- |
+| Persona text styling    | `claude-sonnet-4.5`| `/chat/completions`        |
+| Profile / post image    | `gpt-image-1`      | `/v1/images/generations`   |
+| Voice sample / TTS      | `deepgram-aura-2`  | `/v1/audio/speech`         |
+| Video (V2)              | TBD                | `/v1/videos`               |
 
-## Open items to verify
+### Voice models on PPQ
 
-- §10 #4: `tts-1-hd` availability on PPQ — confirm before locking the voice
-  generation tool.
-- §10 #5: image-gen token cost at demo traffic — budget exercise before
-  the demo.
+`/v1/audio/speech` is OpenAI-compatible. Two providers:
+
+- **DeepGram Aura 2** (default) — named voices: `arcas`, `thalia`,
+  `andromeda`, `helena`, `apollo`, `aries`. Max 2000 chars/request.
+- **ElevenLabs** — `eleven_multilingual_v2`, `eleven_flash_v2_5`. Max
+  5000 chars/request.
+
+`tts-1-hd` is **not available** on PPQ — they migrated. Earlier
+PROJECT.md drafts referred to `tts-1-hd`; treat those as historical.
+
+The Settings page reads `/v1/models` at runtime so we don't have to
+hard-code the list.
+
+## Pricing
+
+- Pre-paid credit, topped up via Lightning (BOLT11), crypto, or card.
+- Average ~2¢ per text query at hackathon-scale.
+- Minimum top-up: 10¢.
+
+## Already-resolved open items
+
+- *Wallet variant*: Breez Spark SDK (locked).
+- *PPQ payment*: credits system (above).
+- *TTS availability*: DeepGram Aura 2 + ElevenLabs (above).
+- *Image-gen cost at demo scale*: affordable.
 
 ## Source
 
-- ppq.ai — main site, account dashboard, full API docs at `/api-docs`
-- PROJECT.md §6 (AI capabilities), §10 (open research items)
+- `ppq.ai` — site
+- `ppq.ai/api-docs` — full API docs (credits, L402, model lists)
+- `dev/PROJECT.md` §6 (AI capabilities), §7 (wallet → PPQ flow), §10
+- `docs/guides/pi-mono.md` — how `pi-ai` is configured against PPQ

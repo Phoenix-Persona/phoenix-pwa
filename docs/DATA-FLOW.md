@@ -7,15 +7,18 @@ the actual code so you don't have to grep five files to follow it.
 > Companion to `docs/ARCHITECTURE.md`. The architecture doc tells you
 > *what each file does*; this doc tells you *what calls what*.
 >
-> **Terminology note.** This doc says "operator" because the code does;
-> in design terms (PROJECT.md §3) it's the **user keypair** of the
-> two-level user/persona split. Same role, different vocabulary.
+> **kind-30078 d-tag note.** The code paths below use a **fresh random
+> UUID per publish** for the kind-30078 d-tag (`generatePersonaDTag()`
+> in `src/lib/persona.ts`). Per `dev/PROJECT.md` §5.2 this should be
+> **stable per persona** (generated once at creation, stored as
+> `persona.dTag`, reused on every update so addressable-event semantics
+> apply). The next persona-schema change should reconcile.
 >
 > **Legacy `/api/style` callout.** The `lib/styleClient.ts` →
 > `/api/style` path documented below is **scheduled for deletion** per
 > PROJECT.md §11. Migration target: `usePpqInference` (Stream A
 > `/dev/ppq-pay` in `dev/STREAMS.md` §A3). Treat the flow descriptions
-> below as accurate-as-of-`topher`-branch documentation of code about to
+> below as accurate-as-of-current-code documentation of code about to
 > be replaced.
 
 ## Flows at a glance

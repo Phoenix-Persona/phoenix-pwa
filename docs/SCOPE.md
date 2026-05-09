@@ -12,6 +12,7 @@ What ships when, and what we are not building.
 - [ ] Persona keypair + kind 30078 backup with stable per-persona d-tag
 - [ ] Per-persona Spark wallet (Breez Spark SDK), BIP-39 seed inside the backup event
 - [ ] Profile picture: user uploads OR generates via PPQ (`gpt-image-1`); saved as canonical reference
+- [ ] Voice sample generation via PPQ (`/v1/audio/speech`, DeepGram Aura 2 or ElevenLabs), stored on Blossom
 - [ ] Multi-persona UX: list, switch, back up, restore
 - [ ] Compose flow: thought → styled → kind 1 publish (text only)
 - [ ] Post-image generation in compose flow (with reference image)
@@ -24,13 +25,13 @@ What ships when, and what we are not building.
 
 ## V1.5 — ship if V1 is solid by hour 24
 
+- [ ] TTS audio rendering of published posts
 - [ ] Imigongo-rooted visual polish (palette, pattern, type pairing)
 - [ ] PWA install prompt, service worker, offline shell
 
 ## V2 — stretch
 
 - [ ] Agent-driven character-creator wizard (`pi-agent-core` interview)
-- [ ] Voice sample generation + post-audio TTS (Blossom-stored)
 - [ ] Video generation using persona likeness + voice
 - [ ] NIP-46 remote signer support for power users
 - [ ] Multi-operator-per-device (separate operator keypairs per persona group)
