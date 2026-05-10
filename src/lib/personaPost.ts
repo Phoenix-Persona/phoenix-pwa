@@ -25,6 +25,18 @@ export interface PersonaPostInput {
   tags?: string[];
   /** Source URLs that informed the post. */
   sources?: string[];
+  /**
+   * Optional NIP-92 `imeta` attachment. When provided, we append a
+   *   `["imeta", "url <url>", "m <mimeType>"]`
+   * tag so video-aware Nostr clients (Damus, Iris, Highlighter, etc.)
+   * render the media inline. The URL itself is NOT also embedded in
+   * the content — clients deduplicate from imeta.
+   */
+  media?: {
+    url: string;
+    /** MIME type, e.g. "video/mp4" or "image/png". */
+    mimeType: string;
+  };
 }
 
 export function buildPersonaPostTemplate(
@@ -44,6 +56,14 @@ export function buildPersonaPostTemplate(
 
   for (const url of input.sources ?? []) {
     if (url) tags.push(["r", url]);
+  }
+
+  if (input.media?.url) {
+    tags.push([
+      "imeta",
+      `url ${input.media.url}`,
+      `m ${input.media.mimeType}`,
+    ]);
   }
 
   return {

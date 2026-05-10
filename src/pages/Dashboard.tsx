@@ -16,6 +16,7 @@ import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
 import { PersonaActionsMenu } from "@/components/PersonaActionsMenu";
 import { PostCard } from "@/components/PostCard";
 import { PostListSkeleton } from "@/components/Skeletons";
+import { VideoComposerDialog } from "@/components/VideoComposerDialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
@@ -65,6 +66,10 @@ const Dashboard = () => {
   const picture = author.data?.metadata?.picture;
 
   const [raw, setRaw] = useState("");
+  // Open state for the video composer modal. Mounted alongside the
+  // Generate video button so it carries the current `raw` / sources /
+  // hints when launched.
+  const [videoDialogOpen, setVideoDialogOpen] = useState(false);
 
   const envelope = persona.data?.envelope ?? null;
   const personaConfig = envelope?.persona ?? null;
@@ -442,9 +447,14 @@ const Dashboard = () => {
                         )}
                       </Button>
                       <Button
-                        disabled
+                        onClick={() => setVideoDialogOpen(true)}
+                        disabled={
+                          !raw.trim() ||
+                          publish.isPending ||
+                          crossPost.isPending
+                        }
                         className="shadow-lg shadow-primary/20"
-                        title="Video generation lands once the PPQ video pipeline + Blossom upload seam ships"
+                        title="Open the video composer (Seedance i2v chain → stitched MP4 → kind 1)"
                       >
                         <Sparkles
                           className="mr-2 size-4"
@@ -456,9 +466,10 @@ const Dashboard = () => {
                   </div>
                   <p className="text-[11px] text-muted-foreground text-right">
                     <span className="opacity-80">
-                      Video generation arrives in the next build —
-                      until then, the text-only fallback publishes
-                      a clean kind 1 note grounded by your sources.
+                      Video runs four+ Seedance clips back-to-back,
+                      stitches them with ffmpeg.wasm, uploads the
+                      result to Blossom, and lets you edit the caption
+                      before posting.
                     </span>
                   </p>
                 </div>
@@ -503,6 +514,24 @@ const Dashboard = () => {
           </div>
         </div>
       </main>
+
+      {personaConfig && (
+        <VideoComposerDialog
+          open={videoDialogOpen}
+          onOpenChange={setVideoDialogOpen}
+          persona={personaConfig}
+          idea={raw}
+          sourcesInput={sourcesInput}
+          hintsInput={hintsInput}
+          personaAvatarUrl={picture}
+          onPublished={() => {
+            posts.refetch();
+            setRaw("");
+            setSourcesInput("");
+            setHintsInput("");
+          }}
+        />
+      )}
     </div>
   );
 };

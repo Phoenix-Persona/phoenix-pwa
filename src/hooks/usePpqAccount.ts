@@ -16,9 +16,31 @@
 import { useCallback, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { readEnv } from "@/lib/env";
 import { createAccount, getBalance } from "@/lib/ppq/client";
 import { ppqAccountStore } from "@/lib/ppq/storage";
 import type { PpqAccount } from "@/lib/ppq/types";
+
+/**
+ * "Free credits" path: when the operator has been issued a direct ppq.ai
+ * api_key (e.g. from ppq.ai's team) without a credit_id-backed account,
+ * they can drop it into Vite's env (`VITE_PPQ_API_KEY` in `.env` or
+ * `dev/.env`) and the hook surfaces it as a virtual account. No
+ * auto-create-account, no localStorage write, no balance check (the
+ * `/credits/balance` endpoint requires a credit_id which we don't have).
+ *
+ * Returns null when the env key isn't set; callers fall through to the
+ * existing localStorage / auto-create flow.
+ */
+function readEnvAccount(): PpqAccount | null {
+  const apiKey = readEnv("VITE_PPQ_API_KEY");
+  if (!apiKey) return null;
+  return {
+    api_key: apiKey,
+    // Empty credit_id signals "env-only — skip balance queries".
+    credit_id: "",
+  };
+}
 
 const ACCOUNT_QK = ["ppq", "account"] as const;
 const BALANCE_QK = (creditId: string | undefined) =>
@@ -26,12 +48,18 @@ const BALANCE_QK = (creditId: string | undefined) =>
 
 export function usePpqAccount() {
   const qc = useQueryClient();
-  const [account, setAccount] = useState<PpqAccount | null>(() =>
-    ppqAccountStore.load(),
+
+  // Resolution order: VITE_PPQ_API_KEY env wins, then localStorage. The
+  // env path is read once at mount (env doesn't change at runtime); the
+  // localStorage path stays reactive via the storage event below.
+  const [account, setAccount] = useState<PpqAccount | null>(
+    () => readEnvAccount() ?? ppqAccountStore.load(),
   );
 
-  // Re-hydrate if another tab updated the credential.
+  // Re-hydrate if another tab updated the credential. Env wins over
+  // storage, so if the env key is set we ignore storage events.
   useEffect(() => {
+    if (readEnvAccount()) return;
     const onStorage = () => setAccount(ppqAccountStore.load());
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -40,6 +68,10 @@ export function usePpqAccount() {
   const ensureAccount = useMutation<PpqAccount, Error, void>({
     mutationKey: [...ACCOUNT_QK, "ensure"],
     mutationFn: async () => {
+      // Env path short-circuits — never auto-create when the operator
+      // already has a working api_key handed to them.
+      const fromEnv = readEnvAccount();
+      if (fromEnv) return fromEnv;
       const existing = ppqAccountStore.load();
       if (existing) return existing;
       const fresh = await createAccount();
@@ -93,9 +125,10 @@ export function usePpqAccount() {
 }
 
 /**
- * Pure helper — returns the account from storage without subscribing to
- * React state. Useful from event handlers / non-component code.
+ * Pure helper — returns the account from env (if VITE_PPQ_API_KEY is set)
+ * or storage. No React subscription. Useful from event handlers /
+ * non-component code that needs an api_key on demand.
  */
 export function getStoredPpqAccount(): PpqAccount | null {
-  return ppqAccountStore.load();
+  return readEnvAccount() ?? ppqAccountStore.load();
 }
