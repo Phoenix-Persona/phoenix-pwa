@@ -11,6 +11,7 @@ import {
   PHOENIX_PAYLOAD_VERSION,
   type PhoenixEnvelope,
 } from "@/lib/persona";
+import { LightningUsernameTakenError } from "@/lib/wallet/lightningAddress";
 import { useUpdatePersona } from "./useUpdatePersona";
 
 const mocks = vi.hoisted(() => {
@@ -96,15 +97,12 @@ function makeEnvelope(dTag?: string): PhoenixEnvelope {
       display_name: "Voice",
       username: "voice",
       system_prompt: "System",
-      voice_id: "alloy",
-      languages: ["en"],
-      tags: ["rwanda"],
       created_at: 1,
     },
     wallet: {
       kind: "spark",
       seed: "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
-      lightning_address: "voice@spark.money",
+      lightning_address: "voice@breez.tips",
     },
   };
 }
@@ -118,7 +116,7 @@ describe("useUpdatePersona", () => {
     mocks.disconnectWallet.mockReset().mockResolvedValue(undefined);
     mocks.registerLightningAddressWithRetry.mockReset().mockResolvedValue({
       username: "new-voice",
-      lightningAddress: "new-voice@spark.money",
+      lightningAddress: "new-voice@breez.tips",
       lnurl: "lnurl1",
     });
   });
@@ -143,9 +141,6 @@ describe("useUpdatePersona", () => {
         name: "Voice",
         username: "voice",
         systemPrompt: "System",
-        voiceId: "alloy",
-        languages: ["en"],
-        tags: ["rwanda"],
         bio: "",
         originalBio: "",
         bioHydrated: true,
@@ -181,9 +176,6 @@ describe("useUpdatePersona", () => {
         name: "Voice",
         username: "voice",
         systemPrompt: "System",
-        voiceId: "alloy",
-        languages: ["en"],
-        tags: ["rwanda"],
         bio: "",
         originalBio: "",
         bioHydrated: true,
@@ -219,9 +211,6 @@ describe("useUpdatePersona", () => {
         name: "Voice",
         username: "voice",
         systemPrompt: "System",
-        voiceId: "alloy",
-        languages: ["en"],
-        tags: ["rwanda"],
         bio: "Updated bio",
         originalBio: "",
         bioHydrated: true,
@@ -263,9 +252,6 @@ describe("useUpdatePersona", () => {
           name: "Voice",
           username: "voice",
           systemPrompt: "System",
-          voiceId: "alloy",
-          languages: ["en"],
-          tags: ["rwanda"],
           bio: "Updated bio",
           originalBio: "",
           bioHydrated: true,
@@ -283,5 +269,51 @@ describe("useUpdatePersona", () => {
       expect.any(Error),
     );
     warn.mockRestore();
+  });
+
+  it("fails deliberate renames to taken usernames without publishing", async () => {
+    mocks.registerLightningAddressWithRetry.mockRejectedValueOnce(
+      new LightningUsernameTakenError("new-voice"),
+    );
+    const envelope = makeEnvelope("stable-dtag");
+    const { result } = renderHook(() => useUpdatePersona(), { wrapper });
+
+    await expect(
+      act(async () => {
+        await result.current.mutateAsync({
+          backupEvent: {
+            id: "old",
+            pubkey: "operator-pubkey",
+            kind: 30078,
+            created_at: 1,
+            tags: [["d", "stable-dtag"]],
+            content: "old",
+            sig: "sig",
+          },
+          envelope,
+          npub: "npub1persona",
+          name: "Voice",
+          username: "new-voice",
+          systemPrompt: "System",
+          bio: "",
+          originalBio: "",
+          bioHydrated: true,
+          pictureUrl: "",
+          originalPicture: "",
+          pictureHydrated: true,
+          crossPost: undefined,
+        });
+      }),
+    ).rejects.toThrow("new-voice@breez.tips is already taken");
+
+    expect(mocks.registerLightningAddressWithRetry).toHaveBeenCalledWith(
+      { id: "wallet" },
+      expect.objectContaining({
+        baseUsername: "new-voice",
+        noSuffixOnCollision: true,
+      }),
+    );
+    expect(mocks.signEvent).not.toHaveBeenCalled();
+    expect(mocks.nostrEvent).not.toHaveBeenCalled();
   });
 });

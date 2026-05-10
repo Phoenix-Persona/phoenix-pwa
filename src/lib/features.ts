@@ -1,9 +1,8 @@
 import { readEnv } from "./env";
 
-export type FeatureFlagName = "videoComposer" | "crossPost";
+export type FeatureFlagName = "crossPost";
 
 export interface FeatureFlags {
-  videoComposer: boolean;
   crossPost: boolean;
 }
 
@@ -33,7 +32,6 @@ export function readFeatureFlag(envName: string, fallback = false): boolean {
 }
 
 export const featureFlags: FeatureFlags = {
-  videoComposer: readFeatureFlag("VITE_FEATURE_VIDEO_COMPOSER"),
   crossPost: readFeatureFlag("VITE_FEATURE_CROSS_POST"),
 };
 

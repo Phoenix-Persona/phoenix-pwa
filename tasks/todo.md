@@ -96,7 +96,7 @@ The wallet → PPQ end-to-end demo lives entirely in this stream.
 - [ ] **`/dev/agent`** (B1, ~3h) — `pi-agent-core` + `pi-web-ui` chat with one wizard tool
 - [ ] **`/dev/styling`** (B2, ~2h) — system prompt + raw thought → styled output via PPQ
 - [ ] **`/dev/image-gen`** (B3, ~3h) — `gpt-image-1` with reference-image input for likeness
-- [ ] ~~`/dev/voice-gen` (B4)~~ — **deferred to V2.** No L402-compatible TTS provider; we don't want to grow the credits surface for it. Persona schema retains `voice_id`, `voice_sample_url`, `model_prefs.tts` as optional/null for V2.
+- [ ] ~~`/dev/voice-gen` (B4)~~ — **deferred to V2.** No L402-compatible TTS provider; we don't want to grow the credits surface for it. `model_prefs.tts` remains optional/null for V2; the `voice_id` / `voice_sample_url` persona fields were removed in V1 and would be re-added additively if a provider lands.
 - [ ] **`/dev/zap`** (B5, ~3h) — LNURL/lud16 mechanics, donate button, zap receipt rendering
 
 If pressed for time at hour +20, trim voice-gen to a hardcoded sample or push zap polish to Phase 3.

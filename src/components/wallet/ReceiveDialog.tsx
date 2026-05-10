@@ -34,7 +34,7 @@ interface ReceiveDialogProps {
 export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps) {
   const { toast } = useToast();
   const [amountStr, setAmountStr] = useState("5000");
-  const [memo, setMemo] = useState("Phoenix top-up");
+  const [memo, setMemo] = useState("Zuka top-up");
   const [invoice, setInvoice] = useState<string | null>(null);
 
   async function generate() {

@@ -26,7 +26,7 @@ describe("buildPersonaProfileMetadata", () => {
         name: "Voice",
         bio: "Bio",
         pictureUrl: "https://example.com/pic.png",
-        lightningAddress: "voice@spark.money",
+        lightningAddress: "voice@breez.tips",
       }),
     ).toEqual({
       name: "Voice",
@@ -34,7 +34,7 @@ describe("buildPersonaProfileMetadata", () => {
       about: "Bio",
       picture: "https://example.com/pic.png",
       bot: true,
-      lud16: "voice@spark.money",
+      lud16: "voice@breez.tips",
       phoenix: {
         reference_image: "https://example.com/pic.png",
         version: 1,

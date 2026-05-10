@@ -1,11 +1,19 @@
 import { useMemo } from "react";
 import type { NostrEvent } from "@nostrify/nostrify";
+import { ExternalLink } from "lucide-react";
 
 import { BrandedVideo } from "./BrandedVideo";
 import { PostBody } from "./PostBody";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { XLogo } from "@/components/icons/XLogo";
+import { useAppContext } from "@/hooks/useAppContext";
+import { useNostrViewer } from "@/hooks/useNostrViewer";
+import {
+  buildEventUrl,
+  encodeEventAsNevent,
+  truncateNevent,
+} from "@/lib/nostrViewer";
 import {
   extractImetaImages,
   extractImetaVideos,
@@ -13,6 +21,8 @@ import {
 } from "@/lib/personaPost";
 import { postToTwitterIntent } from "@/lib/twitter/intent";
 import { cn } from "@/lib/utils";
+
+const NEVENT_RELAY_HINT_LIMIT = 3;
 
 interface PostCardProps {
   event: NostrEvent;
@@ -44,6 +54,28 @@ export function PostCard({ event, className }: PostCardProps) {
   const absoluteTime = useMemo(
     () => new Date(event.created_at * 1000).toLocaleString(),
     [event.created_at]
+  );
+  const { viewerUrl } = useNostrViewer();
+  const { config } = useAppContext();
+  const relayHints = useMemo(
+    () =>
+      config.relayMetadata.relays
+        .filter((r) => r.write)
+        .slice(0, NEVENT_RELAY_HINT_LIMIT)
+        .map((r) => r.url),
+    [config.relayMetadata.relays]
+  );
+  const nevent = useMemo(
+    () =>
+      encodeEventAsNevent(
+        { id: event.id, pubkey: event.pubkey, kind: event.kind },
+        relayHints,
+      ),
+    [event.id, event.pubkey, event.kind, relayHints]
+  );
+  const eventUrl = useMemo(
+    () => buildEventUrl(viewerUrl, nevent),
+    [viewerUrl, nevent]
   );
 
   // Layout: 1 image fills full width; 2 images split half-half;
@@ -128,28 +160,40 @@ export function PostCard({ event, className }: PostCardProps) {
         </div>
       )}
 
-      <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+      <div className="mt-3 pt-3 border-t border-border/60 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
         <time
           dateTime={new Date(event.created_at * 1000).toISOString()}
           title={absoluteTime}
         >
           {relativeTime(event.created_at)}
         </time>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 text-xs hover:bg-black/5"
-          onClick={() =>
-            postToTwitterIntent({
-              text: event.content,
-              mediaUrl: videos[0]?.url ?? images[0]?.url,
-            })
-          }
-          title="Open X compose tab with this post pre-filled. If there's a video, it'll start downloading so you can attach it."
-        >
-          <XLogo className="mr-1 size-3" aria-hidden="true" />
-          Post to X
-        </Button>
+        <div className="flex items-center gap-3">
+          <a
+            href={eventUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={nevent}
+            className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {truncateNevent(nevent)}
+            <ExternalLink className="size-3" aria-hidden="true" />
+          </a>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs hover:bg-black/5"
+            onClick={() =>
+              postToTwitterIntent({
+                text: event.content,
+                mediaUrl: videos[0]?.url ?? images[0]?.url,
+              })
+            }
+            title="Open X compose tab with this post pre-filled. If there's a video, it'll start downloading so you can attach it."
+          >
+            <XLogo className="mr-1 size-3" aria-hidden="true" />
+            Post to X
+          </Button>
+        </div>
       </div>
     </article>
   );

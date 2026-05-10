@@ -31,6 +31,7 @@ import { useMutation, useQuery, type UseMutationResult } from "@tanstack/react-q
 
 import { createAccount, getVideoStatus, submitVideo } from "@/lib/ppq/client";
 import { ppqAccountStore } from "@/lib/ppq/storage";
+import { queryKeys } from "@/lib/queryKeys";
 import type {
   PpqVideoRequest,
   PpqVideoStatusResponse,
@@ -76,7 +77,7 @@ export function usePpqVideoSubmit(): UseMutationResult<
  */
 export function usePpqVideoJob(id: string | undefined, intervalMs = 4_000) {
   const query = useQuery<PpqVideoStatusResponse>({
-    queryKey: ["ppq", "video", id],
+    queryKey: queryKeys.ppq.video(id),
     enabled: Boolean(id),
     queryFn: async ({ signal }) => {
       if (!id) throw new Error("missing video id");

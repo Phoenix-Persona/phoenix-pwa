@@ -1,6 +1,7 @@
 import { useNostr } from "@nostrify/react";
 import { useMutation, type UseMutationResult } from "@tanstack/react-query";
 
+import { publishWithTimeout } from "@/lib/nostrPublish";
 import { useCurrentUser } from "./useCurrentUser";
 
 import type { NostrEvent } from "@nostrify/nostrify";
@@ -33,7 +34,7 @@ export function useNostrPublish(): UseMutationResult<
           created_at: t.created_at ?? Math.floor(Date.now() / 1000),
         });
 
-        await nostr.event(event, { signal: AbortSignal.timeout(5000) });
+        await publishWithTimeout(nostr, event, 5_000);
         return event;
       } else {
         throw new Error("User is not logged in");

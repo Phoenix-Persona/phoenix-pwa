@@ -4,6 +4,7 @@ import type { NostrEvent } from "@nostrify/nostrify";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { queryKeys } from "@/lib/queryKeys";
 import { useCreatePersona } from "./useCreatePersona";
 
 const mocks = vi.hoisted(() => {
@@ -77,15 +78,21 @@ vi.mock("@/lib/wallet/lightningAddress", async (importOriginal) => {
   };
 });
 
+let queryClient: QueryClient;
+
 function wrapper({ children }: PropsWithChildren) {
-  const qc = new QueryClient({
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+
+function resetQueryClient() {
+  queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
 
 describe("useCreatePersona", () => {
   beforeEach(() => {
+    resetQueryClient();
     mocks.nostrEvent.mockReset().mockResolvedValue(undefined);
     mocks.signEvent.mockClear();
     mocks.generatePersonaKeypair.mockReset().mockReturnValue({
@@ -112,7 +119,7 @@ describe("useCreatePersona", () => {
     mocks.disconnectWallet.mockReset().mockResolvedValue(undefined);
     mocks.registerLightningAddressWithRetry.mockReset().mockResolvedValue({
       username: "voice",
-      lightningAddress: "voice@spark.money",
+      lightningAddress: "voice@breez.tips",
       lnurl: "lnurl1",
     });
     mocks.encryptPhoenixEnvelope.mockReset().mockResolvedValue("ciphertext");
@@ -127,16 +134,13 @@ describe("useCreatePersona", () => {
         username: "voice",
         bio: "Bio",
         systemPrompt: "System",
-        tags: ["rwanda"],
-        languages: ["en"],
-        voiceId: "alloy",
         pictureUrl: "https://example.com/pic.png",
       });
 
       expect(created.npub).toBe("npub1persona");
       expect(created.envelope.persona.dTag).toBeTruthy();
       expect(created.envelope.wallet?.lightning_address).toBe(
-        "voice@spark.money",
+        "voice@breez.tips",
       );
     });
 
@@ -147,6 +151,22 @@ describe("useCreatePersona", () => {
         content: "ciphertext",
       }),
     );
+    expect(
+      queryClient.getQueryData(queryKeys.persona.detail("npub1persona", "operator-pubkey")),
+    ).toEqual(
+      expect.objectContaining({
+        event: expect.objectContaining({ id: "backup-event-id" }),
+        envelope: expect.objectContaining({
+          persona: expect.objectContaining({ pubkey: "a".repeat(64) }),
+        }),
+      }),
+    );
+    expect(
+      queryClient.getQueryData(queryKeys.persona.publicProfile("a".repeat(64))),
+    ).toEqual({
+      bio: "Bio",
+      pictureUrl: "https://example.com/pic.png",
+    });
   });
 
   it("continues persona creation when Lightning Address registration fails", async () => {
@@ -161,9 +181,6 @@ describe("useCreatePersona", () => {
         username: "voice",
         bio: "Bio",
         systemPrompt: "System",
-        tags: [],
-        languages: ["en"],
-        voiceId: "alloy",
       });
 
       expect(created.envelope.wallet?.lightning_address).toBeUndefined();

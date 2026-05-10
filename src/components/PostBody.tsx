@@ -8,21 +8,11 @@
 
 import { Fragment, useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { sanitizeHttpUrl } from "@/lib/url";
 
 interface PostBodyProps {
   content: string;
   className?: string;
-}
-
-/** Strict URL sanitizer — only http(s) protocols, no data:/javascript:/etc. */
-function sanitizeUrl(raw: string): string | null {
-  try {
-    const u = new URL(raw);
-    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
-    return u.toString();
-  } catch {
-    return null;
-  }
 }
 
 const URL_RE = /\bhttps?:\/\/[^\s<>"']+/gi;
@@ -42,7 +32,7 @@ function tokenize(input: string): Token[] {
   const urlMatches: Array<{ start: number; end: number; href: string }> = [];
   for (const m of input.matchAll(URL_RE)) {
     if (m.index === undefined) continue;
-    const sanitized = sanitizeUrl(m[0]);
+    const sanitized = sanitizeHttpUrl(m[0]);
     if (!sanitized) continue;
     urlMatches.push({ start: m.index, end: m.index + m[0].length, href: sanitized });
   }

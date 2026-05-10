@@ -25,17 +25,18 @@ import {
 } from "lucide-react";
 import { useNostrLogin } from "@nostrify/react/login";
 import { nip19 } from "nostr-tools";
+import type { NostrEvent } from "@nostrify/nostrify";
 
 import { AppHeader } from "@/components/AppHeader";
 import { BlossomServerListManager } from "@/components/BlossomServerListManager";
 import { ChangePassphraseDialog } from "@/components/ChangePassphraseDialog";
 import { DownloadBackupDialog } from "@/components/DownloadBackupDialog";
 import { FlagStripe } from "@/components/ImigongoBand";
+import { NostrViewerSettings } from "@/components/NostrViewerSettings";
 import { PersonaStatsBadge } from "@/components/PersonaStatsBadge";
 import { RelayListManager } from "@/components/RelayListManager";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,6 +60,7 @@ import {
   hasUserNcryptsec,
   NOSTR_LOGIN_STORAGE_KEY,
 } from "@/lib/nip49Storage";
+import { formatDeletePersonaWarnings } from "@/lib/personaDeleteWarnings";
 
 const Settings = () => {
   useSeoMeta({ title: "Settings — Zuka" });
@@ -127,6 +129,39 @@ const Settings = () => {
       /* best effort */
     }
     window.location.assign("/");
+  }
+
+  function deletePersonaFromSettings({
+    backupEvent,
+    personaPubkey,
+    npub,
+    personaName,
+  }: {
+    backupEvent: NostrEvent;
+    personaPubkey: string;
+    npub: string;
+    personaName: string;
+  }) {
+    deletePersona.mutate(
+      { backupEvent, personaPubkey, npub },
+      {
+        onSuccess: (result) => {
+          toast({
+            title: "Persona deleted",
+            description:
+              formatDeletePersonaWarnings(result.warnings) ??
+              `${personaName} was removed from your personas.`,
+          });
+        },
+        onError: (error) => {
+          toast({
+            title: "Delete failed",
+            description: error.message,
+            variant: "destructive",
+          });
+        },
+      },
+    );
   }
 
   return (
@@ -286,6 +321,20 @@ const Settings = () => {
               </Card>
             </section>
 
+            {/* Nostr viewer */}
+            <section className="space-y-4">
+              <SectionHeader
+                eyebrow="Nostr viewer"
+                title="Where event links open"
+                description="Choose which Nostr web client opens when you click an event ID in a post footer. Default is njump.me, the canonical resolver."
+              />
+              <Card className="border-imigongo-clay/20 overflow-hidden">
+                <CardContent className="p-6">
+                  <NostrViewerSettings />
+                </CardContent>
+              </Card>
+            </section>
+
             {/* Personas */}
             <section className="space-y-4">
               <SectionHeader
@@ -329,26 +378,6 @@ const Settings = () => {
                                 stats={personaStats.data?.get(persona.pubkey)}
                                 loading={personaStats.isLoading}
                               />
-                              <div className="flex flex-wrap gap-1.5 pt-0.5">
-                                {persona.tags.slice(0, 3).map((t) => (
-                                  <Badge
-                                    key={t}
-                                    variant="secondary"
-                                    className="text-[10px]"
-                                  >
-                                    {t}
-                                  </Badge>
-                                ))}
-                                {persona.languages.slice(0, 2).map((l) => (
-                                  <Badge
-                                    key={l}
-                                    variant="outline"
-                                    className="text-[10px]"
-                                  >
-                                    {l.toUpperCase()}
-                                  </Badge>
-                                ))}
-                              </div>
                             </div>
                             <div className="flex gap-1.5">
                               <Button asChild size="sm" variant="outline">
@@ -387,9 +416,11 @@ const Settings = () => {
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                                     <AlertDialogAction
                                       onClick={() =>
-                                        deletePersona.mutate({
+                                        deletePersonaFromSettings({
                                           backupEvent: event,
                                           personaPubkey: persona.pubkey,
+                                          npub,
+                                          personaName: persona.name,
                                         })
                                       }
                                       className="bg-destructive hover:bg-destructive/90"

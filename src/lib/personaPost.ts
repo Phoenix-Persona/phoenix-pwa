@@ -3,11 +3,10 @@
  *
  * Privacy: posts MUST NOT carry any tag that identifies the user or
  * advertises Phoenix usage. They look like ordinary kind 1 notes from
- * any account. Source-attribution `r` tags and topical `t` tags are
- * content, not identity, and remain.
+ * any account. Source-attribution `r` tags are content, not identity,
+ * and remain.
  *
  * What we publish:
- *   ["t", <topic-slug>]       repeatable; topical discovery (e.g. "rwanda", "press-freedom")
  *   ["r", <source-url>]       repeatable; source attribution
  *
  * What we deliberately DON'T publish:
@@ -21,8 +20,6 @@
 export interface PersonaPostInput {
   /** Final post body (post-styling). */
   text: string;
-  /** Topical tags — region, cause, etc. Lowercased, no `#` prefix. */
-  tags?: string[];
   /** Source URLs that informed the post. */
   sources?: string[];
   /**
@@ -53,10 +50,6 @@ export function buildPersonaPostTemplate(
   content: string;
 } {
   const tags: string[][] = [];
-
-  for (const t of input.tags ?? []) {
-    if (t) tags.push(["t", t]);
-  }
 
   for (const url of input.sources ?? []) {
     if (url) tags.push(["r", url]);

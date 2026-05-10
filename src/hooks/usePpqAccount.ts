@@ -35,12 +35,9 @@ import { readEnv } from "@/lib/env";
 import { createAccount, getBalance } from "@/lib/ppq/client";
 import { ppqAccountStore } from "@/lib/ppq/storage";
 import type { PpqAccount } from "@/lib/ppq/types";
+import { queryKeys } from "@/lib/queryKeys";
 
 import { useOperatorEnvelope } from "./useOperatorEnvelope";
-
-const ACCOUNT_QK = ["ppq", "account"] as const;
-const BALANCE_QK = (creditId: string | undefined) =>
-  ["ppq", "balance", creditId] as const;
 
 /**
  * "Free credits" / pinned-account path: when `VITE_PPQ_API_KEY` is set
@@ -65,7 +62,7 @@ export function usePpqAccount() {
   const operator = useOperatorEnvelope();
 
   const accountQuery = useQuery({
-    queryKey: ACCOUNT_QK,
+    queryKey: queryKeys.ppq.account(),
     queryFn: async (): Promise<PpqAccount | null> =>
       resolveAccount(operator.envelope?.ppq),
     staleTime: Infinity,
@@ -73,23 +70,23 @@ export function usePpqAccount() {
   const account = accountQuery.data ?? null;
 
   useEffect(() => {
-    qc.setQueryData(ACCOUNT_QK, resolveAccount(operator.envelope?.ppq));
+    qc.setQueryData(queryKeys.ppq.account(), resolveAccount(operator.envelope?.ppq));
   }, [operator.envelope?.ppq, qc]);
 
   const ensureAccount = useMutation<PpqAccount, Error, void>({
-    mutationKey: [...ACCOUNT_QK, "ensure"],
+    mutationKey: [...queryKeys.ppq.account(), "ensure"],
     mutationFn: async () => {
       // env wins — never mint over a pinned account.
       const fromEnv = envAccount();
       if (fromEnv) {
-        qc.setQueryData(ACCOUNT_QK, fromEnv);
+        qc.setQueryData(queryKeys.ppq.account(), fromEnv);
         return fromEnv;
       }
 
       // operator envelope is the production source of truth.
       const fromOperator = operator.envelope?.ppq;
       if (fromOperator) {
-        qc.setQueryData(ACCOUNT_QK, fromOperator);
+        qc.setQueryData(queryKeys.ppq.account(), fromOperator);
         return fromOperator;
       }
 
@@ -102,14 +99,14 @@ export function usePpqAccount() {
         if (operator.envelope || operator.event) {
           await operator.ensureWithPpq(cached).catch(() => {/* best-effort */});
         }
-        qc.setQueryData(ACCOUNT_QK, cached);
+        qc.setQueryData(queryKeys.ppq.account(), cached);
         return cached;
       }
 
       // Mint a brand-new ppq.ai account, write to both stores.
       const fresh = await createAccount();
       ppqAccountStore.save(fresh);
-      qc.setQueryData(ACCOUNT_QK, fresh);
+      qc.setQueryData(queryKeys.ppq.account(), fresh);
       await operator.ensureWithPpq(fresh).catch((err) => {
         // If the envelope write fails, the localStorage cache still
         // unblocks the current request; log and move on.
@@ -118,13 +115,13 @@ export function usePpqAccount() {
       return fresh;
     },
     onSuccess: (acct) => {
-      qc.setQueryData(ACCOUNT_QK, acct);
-      qc.invalidateQueries({ queryKey: BALANCE_QK(acct.credit_id) });
+      qc.setQueryData(queryKeys.ppq.account(), acct);
+      qc.invalidateQueries({ queryKey: queryKeys.ppq.balance(acct.credit_id) });
     },
   });
 
   const balance = useQuery({
-    queryKey: BALANCE_QK(account?.credit_id),
+    queryKey: queryKeys.ppq.balance(account?.credit_id),
     enabled: Boolean(account?.credit_id),
     queryFn: async ({ signal }) => {
       if (!account?.credit_id) throw new Error("No ppq credit_id");
@@ -135,7 +132,7 @@ export function usePpqAccount() {
 
   const refreshBalance = useCallback(() => {
     if (account?.credit_id) {
-      qc.invalidateQueries({ queryKey: BALANCE_QK(account.credit_id) });
+      qc.invalidateQueries({ queryKey: queryKeys.ppq.balance(account.credit_id) });
     }
   }, [account, qc]);
 
@@ -147,8 +144,11 @@ export function usePpqAccount() {
    */
   const signOut = useCallback(() => {
     ppqAccountStore.clear();
-    qc.setQueryData(ACCOUNT_QK, envAccount() ?? operator.envelope?.ppq ?? null);
-    qc.removeQueries({ queryKey: ["ppq", "balance"] });
+    qc.setQueryData(
+      queryKeys.ppq.account(),
+      envAccount() ?? operator.envelope?.ppq ?? null,
+    );
+    qc.removeQueries({ queryKey: queryKeys.ppq.allBalances() });
   }, [operator.envelope?.ppq, qc]);
 
   return {

@@ -8,10 +8,10 @@ import { PersonaActionsMenu } from "@/components/PersonaActionsMenu";
 import { PersonaGridSkeleton } from "@/components/Skeletons";
 import { PersonaStatsBadge } from "@/components/PersonaStatsBadge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useMyPersonas, usePersonaActivityStats } from "@/hooks/usePersona";
+import { sanitizeHttpUrl } from "@/lib/url";
 
 const MyPersonas = () => {
   useSeoMeta({ title: "My personas — Zuka" });
@@ -79,7 +79,7 @@ const MyPersonas = () => {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {data.map(({ event, envelope, npub }, idx) => {
               const persona = envelope.persona;
-              const topTags = persona.tags.slice(0, 2);
+              const picture = sanitizeHttpUrl(persona.reference_image_url);
               // Rotate accent colors so the grid doesn't feel monochrome.
               const accent = idx % 3 === 0
                 ? "from-imigongo-clay to-imigongo-ochre"
@@ -113,9 +113,9 @@ const MyPersonas = () => {
                         when set on the persona, Imigongo seal as fallback. */}
                     <div className="px-5 -mt-8 relative">
                       <div className="size-16 rounded-full ring-4 ring-card shadow-lg overflow-hidden bg-imigongo-charcoal flex items-center justify-center">
-                        {persona.reference_image_url ? (
+                        {picture ? (
                           <img
-                            src={persona.reference_image_url}
+                            src={picture}
                             alt=""
                             className="w-full h-full object-cover"
                             loading="lazy"
@@ -131,11 +131,6 @@ const MyPersonas = () => {
                     </div>
 
                     <div className="p-5 pt-3 space-y-2.5">
-                      {topTags.length > 0 && (
-                        <div className="text-[10px] uppercase tracking-[0.18em] text-imigongo-clay font-semibold">
-                          {topTags.join(" · ")}
-                        </div>
-                      )}
                       <h3 className="font-display text-2xl font-medium tracking-tight group-hover:text-primary transition-colors leading-tight">
                         {persona.name}
                       </h3>
@@ -143,17 +138,6 @@ const MyPersonas = () => {
                         stats={stats.data?.get(persona.pubkey)}
                         loading={stats.isLoading}
                       />
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {persona.languages.slice(0, 3).map((l) => (
-                          <Badge
-                            key={l}
-                            variant="secondary"
-                            className="text-[10px] bg-secondary/80"
-                          >
-                            {l.toUpperCase()}
-                          </Badge>
-                        ))}
-                      </div>
                     </div>
                   </Link>
 

@@ -15,7 +15,7 @@ clients can ignore.
   "display_name": "Imani Uwase",
   "about": "Voice of Rwanda. Press freedom, civil society, the long memory.",
   "picture": "https://blossom.example/<sha256>.png",
-  "lud16": "imani@spark.money",
+  "lud16": "imani@breez.tips",
   "lud06": "lnurl1...",
   "nip05": "imani@example.com",
   "phoenix": {
@@ -28,7 +28,7 @@ clients can ignore.
 
 Replaceable event — only the latest is kept by relays. The `lud16`
 Lightning Address is provided natively by the Spark SDK (Breez's
-hosted `spark.money` LNURL server) — no Zuka-hosted endpoint needed.
+hosted `breez.tips` LNURL server) — no Zuka-hosted endpoint needed.
 
 ## kind 30078 — encrypted persona backup (signed by *operator*, one per persona)
 
@@ -74,7 +74,7 @@ keypair).
   "wallet": {
     "kind": "spark",
     "seed": "<bip39 mnemonic>",
-    "lightning_address": "imani@spark.money",
+    "lightning_address": "imani@breez.tips",
     "lnurl": "lnurl1..."
   },
   "model_prefs": {

@@ -11,6 +11,7 @@ import { useMutation, type UseMutationResult } from "@tanstack/react-query";
 import { useNostr } from "@nostrify/react";
 import type { NostrEvent } from "@nostrify/nostrify";
 
+import { publishWithTimeout } from "@/lib/nostrPublish";
 import { decodePersonaNsec, signWithPersona } from "@/lib/personaKey";
 
 type EventTemplate = {
@@ -47,7 +48,7 @@ export function usePersonaPublish(): UseMutationResult<
         keypair
       );
 
-      await nostr.event(event, { signal: AbortSignal.timeout(8000) });
+      await publishWithTimeout(nostr, event);
       return event;
     },
   });

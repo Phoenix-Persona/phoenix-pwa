@@ -4,6 +4,7 @@ import { NostrContext } from '@nostrify/react';
 import { NUser, useNostrLogin } from '@nostrify/react/login';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '@/hooks/useAppContext';
+import { queryKeys } from '@/lib/queryKeys';
 
 interface NostrProviderProps {
   children: React.ReactNode;
@@ -111,7 +112,7 @@ const NostrProvider: React.FC<NostrProviderProps> = (props) => {
   // Invalidate Nostr queries when relay metadata changes.
   useEffect(() => {
     relayMetadataRef.current = config.relayMetadata;
-    queryClient.invalidateQueries({ queryKey: ['nostr'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.nostr.all });
   }, [config.relayMetadata, queryClient]);
 
   const contextValue = useMemo(() => ({ nostr: pool }), [pool]);

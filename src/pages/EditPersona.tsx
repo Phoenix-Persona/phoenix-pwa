@@ -2,8 +2,8 @@
  * EditPersona — modify an existing persona's encrypted backup.
  *
  * Pulls the current envelope via `usePersona`, pre-populates a form
- * with editable fields (name, system_prompt, voice_id, languages,
- * tags), and on save:
+ * with editable fields (name, system_prompt, picture, cross-post),
+ * and on save:
  *
  *   1. Builds a new PhoenixEnvelope keeping persona.{pubkey, nsec,
  *      created_at} unchanged (identity invariants).
@@ -23,8 +23,6 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useNostr } from "@nostrify/react";
 import type { NostrEvent } from "@nostrify/nostrify";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -37,6 +35,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePersona } from "@/hooks/usePersona";
+import { usePersonaPublicProfile } from "@/hooks/usePersonaPublicProfile";
 import { useToast } from "@/hooks/useToast";
 import { useUpdatePersona } from "@/hooks/useUpdatePersona";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
@@ -74,9 +73,9 @@ const EditPersona = () => {
               {personaQ.data?.envelope.persona.name ?? "Edit"}
             </h1>
             <p className="text-imigongo-cream/80 text-sm max-w-xl">
-              Changes to name, prompt, voice, languages, and tags
-              re-encrypt and republish to relays. The persona's keypair
-              and creation date never change.
+              Changes to name, prompt, and picture re-encrypt and
+              republish to relays. The persona's keypair and creation
+              date never change.
             </p>
           </div>
           <FlagStripe height={4} />
@@ -129,7 +128,6 @@ interface EditPersonaFormProps {
 
 function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) {
   const navigate = useNavigate();
-  const { nostr } = useNostr();
   const { user } = useCurrentUser();
   const { toast } = useToast();
   const updatePersona = useUpdatePersona();
@@ -148,11 +146,6 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   const [username, setUsername] = useState(initialUsername);
   const [usernameDirty, setUsernameDirty] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState(original.system_prompt);
-  const [voiceId, setVoiceId] = useState(original.voice_id);
-  const [tagsInput, setTagsInput] = useState(original.tags.join(", "));
-  const [languagesInput, setLanguagesInput] = useState(
-    original.languages.join(", ")
-  );
   // The picture initial seed comes from the encrypted backup's
   // reference_image_url; the public kind-0 picture is loaded below
   // and may overwrite if the user changed it elsewhere.
@@ -198,30 +191,7 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   // Bio + picture come from the persona's public kind 0 — fetched
   // separately because they live on the public profile, not the
   // encrypted backup. Same query yields both fields.
-  interface PublicProfile {
-    bio: string;
-    picture: string;
-  }
-  const profileQuery = useQuery({
-    queryKey: ["persona-public-profile", original.pubkey],
-    queryFn: async (c): Promise<PublicProfile> => {
-      const events = await nostr.query(
-        [{ kinds: [0], authors: [original.pubkey], limit: 1 }],
-        { signal: c.signal }
-      );
-      const ev = events[0];
-      if (!ev) return { bio: "", picture: "" };
-      try {
-        const meta = JSON.parse(ev.content) as {
-          about?: string;
-          picture?: string;
-        };
-        return { bio: meta.about ?? "", picture: meta.picture ?? "" };
-      } catch {
-        return { bio: "", picture: "" };
-      }
-    },
-  });
+  const profileQuery = usePersonaPublicProfile(original.pubkey);
 
   // Hydrate inputs once the query resolves. Doing it inside render
   // with a guard avoids a setState-in-effect warning while still
@@ -298,9 +268,6 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
         name,
         username: trimmedUsername,
         systemPrompt,
-        voiceId,
-        languages: parseCommaList(languagesInput, original.languages),
-        tags: parseCommaList(tagsInput, []),
         bio,
         originalBio,
         bioHydrated,
@@ -400,37 +367,6 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
             rows={6}
             value={systemPrompt}
             onChange={(e) => setSystemPrompt(e.target.value)}
-          />
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="edit-tags">Topical tags</Label>
-            <Input
-              id="edit-tags"
-              value={tagsInput}
-              onChange={(e) => setTagsInput(e.target.value)}
-              placeholder="rwanda, press-freedom"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-languages">Languages</Label>
-            <Input
-              id="edit-languages"
-              value={languagesInput}
-              onChange={(e) => setLanguagesInput(e.target.value)}
-              placeholder="en, rw"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="edit-voice">Voice</Label>
-          <Input
-            id="edit-voice"
-            value={voiceId}
-            onChange={(e) => setVoiceId(e.target.value)}
-            placeholder="alloy"
           />
         </div>
 
@@ -552,8 +488,7 @@ function UsernameAvailabilityHint({
       return (
         <p className="text-xs text-amber-600 dark:text-amber-500">
           <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code> is
-          taken — pick a different name. Save will append a random suffix
-          rather than fail.
+          taken — pick a different name before saving.
         </p>
       );
     case "error":

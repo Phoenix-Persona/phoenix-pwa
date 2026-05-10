@@ -14,6 +14,7 @@ import { useAuthor } from "@/hooks/useAuthor";
 import { usePersonaPosts } from "@/hooks/usePersona";
 import { genUserName } from "@/lib/genUserName";
 import { npubToHex } from "@/lib/nostrIds";
+import { sanitizeHttpUrl } from "@/lib/url";
 
 const PersonaFeed = () => {
   const { npub = "" } = useParams();
@@ -26,7 +27,7 @@ const PersonaFeed = () => {
     author.data?.metadata?.name ??
     (personaHex ? genUserName(personaHex) : "Unknown persona");
   const bio = author.data?.metadata?.about ?? "";
-  const picture = author.data?.metadata?.picture;
+  const picture = sanitizeHttpUrl(author.data?.metadata?.picture);
 
   useSeoMeta({
     title: `${displayName} — Zuka`,

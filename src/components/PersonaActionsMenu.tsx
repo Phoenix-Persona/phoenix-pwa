@@ -43,6 +43,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useDeletePersona } from "@/hooks/useDeletePersona";
+import { useToast } from "@/hooks/useToast";
+import { formatDeletePersonaWarnings } from "@/lib/personaDeleteWarnings";
 import { cn } from "@/lib/utils";
 
 interface PersonaActionsMenuProps {
@@ -82,9 +84,29 @@ export function PersonaActionsMenu({
 }: PersonaActionsMenuProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const deletePersona = useDeletePersona();
+  const { toast } = useToast();
 
   const onConfirmDelete = () => {
-    deletePersona.mutate({ backupEvent, personaPubkey });
+    deletePersona.mutate(
+      { backupEvent, personaPubkey, npub },
+      {
+        onSuccess: (result) => {
+          const warning = formatDeletePersonaWarnings(result.warnings);
+          setConfirmOpen(false);
+          toast({
+            title: "Persona deleted",
+            description: warning ?? `${personaName} was removed from your personas.`,
+          });
+        },
+        onError: (error) => {
+          toast({
+            title: "Delete failed",
+            description: error.message,
+            variant: "destructive",
+          });
+        },
+      },
+    );
   };
 
   const inverseBtnClass =

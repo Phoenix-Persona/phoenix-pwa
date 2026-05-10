@@ -36,6 +36,7 @@ import {
   isTopupExpired,
 } from "@/lib/ppq/client";
 import { ppqAccountStore } from "@/lib/ppq/storage";
+import { queryKeys } from "@/lib/queryKeys";
 import type {
   PpqNwcConnectRequest,
   PpqNwcSettings,
@@ -91,7 +92,7 @@ export function usePpqTopupStatus(
   intervalMs = 3_000,
 ) {
   const query = useQuery<PpqTopupStatusResponse>({
-    queryKey: ["ppq", "topup", invoiceId],
+    queryKey: queryKeys.ppq.topup(invoiceId),
     enabled: Boolean(invoiceId),
     queryFn: async ({ signal }) => {
       if (!invoiceId) throw new Error("missing invoice id");
@@ -118,7 +119,7 @@ export function usePpqTopupStatus(
 
 export function usePpqNwcAutoTopup() {
   const settings = useQuery<PpqNwcSettings>({
-    queryKey: ["ppq", "nwc-auto-topup"],
+    queryKey: queryKeys.ppq.nwcAutoTopup(),
     queryFn: async ({ signal }) => {
       const acct = ppqAccountStore.load();
       if (!acct) throw new Error("no ppq account");

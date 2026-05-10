@@ -829,7 +829,7 @@ interface DashboardComposerCardProps {
   raw: string;
   sourcesInput: string;
   hintsInput: string;
-  videoComposerEnabled: boolean;
+  videoGenerationEnabled: boolean;
   crossPostEnabled: boolean;
   walletSeed: string | undefined;
   isStyling: boolean;
@@ -848,7 +848,7 @@ export function DashboardComposerCard(props: DashboardComposerCardProps) {
     raw,
     sourcesInput,
     hintsInput,
-    videoComposerEnabled,
+    videoGenerationEnabled,
     crossPostEnabled,
     walletSeed,
     isStyling,
@@ -866,17 +866,17 @@ export function DashboardComposerCard(props: DashboardComposerCardProps) {
   return (
     <Card className="border-imigongo-clay/20 bg-gradient-to-br from-card via-card to-rw-gold-soft/10 overflow-hidden">
       <div className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center gap-2">
-        {videoComposerEnabled ? (
+        {videoGenerationEnabled ? (
           <Film className="size-5 text-imigongo-clay" aria-hidden="true" />
         ) : (
           <FileText className="size-5 text-imigongo-clay" aria-hidden="true" />
         )}
         <div className="flex-1 min-w-0">
           <h2 className="font-display text-2xl font-medium tracking-tight">
-            {videoComposerEnabled ? "Compose a video" : "Compose a post"}
+            {videoGenerationEnabled ? "Compose a video" : "Compose a post"}
           </h2>
           <p className="text-xs text-muted-foreground">
-            {videoComposerEnabled
+            {videoGenerationEnabled
               ? "Idea + sources + hints feed the AI prompt that generates the persona's video. Text-only posting is available as a fallback."
               : "Draft a note, optionally style it in the persona's voice, and publish it to relays."}
           </p>
@@ -908,7 +908,7 @@ export function DashboardComposerCard(props: DashboardComposerCardProps) {
           />
         </div>
 
-        <div className={videoComposerEnabled ? "grid sm:grid-cols-2 gap-4" : "grid gap-4"}>
+        <div className={videoGenerationEnabled ? "grid sm:grid-cols-2 gap-4" : "grid gap-4"}>
           <div className="space-y-2">
             <label htmlFor="composer-sources" className="text-sm font-medium">
               Sources <span className="text-xs font-normal text-muted-foreground">(optional)</span>
@@ -925,7 +925,7 @@ export function DashboardComposerCard(props: DashboardComposerCardProps) {
               Comma-separated URLs. Sources publish as <code className="font-mono">r</code> tags.
             </p>
           </div>
-          {videoComposerEnabled ? (
+          {videoGenerationEnabled ? (
             <div className="space-y-2">
               <label htmlFor="composer-hints" className="text-sm font-medium">
                 Style hints <span className="text-xs font-normal text-muted-foreground">(optional)</span>
@@ -1000,7 +1000,7 @@ export function DashboardComposerCard(props: DashboardComposerCardProps) {
                   </>
                 )}
               </Button>
-              {videoComposerEnabled ? (
+              {videoGenerationEnabled ? (
                 <Button disabled className="shadow-lg shadow-primary/20">
                   <Sparkles className="mr-2 size-4" aria-hidden="true" />
                   Generate video
@@ -1044,7 +1044,7 @@ Replace the inline composer card with:
   raw={raw}
   sourcesInput={sourcesInput}
   hintsInput={hintsInput}
-  videoComposerEnabled={videoComposerEnabled}
+  videoGenerationEnabled={videoGenerationEnabled}
   crossPostEnabled={crossPostEnabled}
   walletSeed={walletSeed}
   isStyling={composer.isStyling}

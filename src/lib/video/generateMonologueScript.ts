@@ -3,7 +3,7 @@
  *
  * Calls ppq.ai's chat completions endpoint (claude-sonnet-4.5 by
  * default), grounded in:
- *   - The persona's voice (system_prompt + bio + tags + languages).
+ *   - The persona's voice (system_prompt + bio).
  *   - The user's idea (the Dashboard composer "raw" field).
  *   - Optional sources (URLs the user wants the persona to ground in).
  *   - Optional style hints (tone / framing direction).
@@ -53,7 +53,7 @@ const SYSTEM_PROMPT = [
   "to camera in a short-form video.",
   "",
   "You will be given:",
-  "  • the persona's voice spec (system prompt, bio, tags, languages)",
+  "  • the persona's voice spec (system prompt, bio)",
   "  • the user's raw idea for what the persona should say",
   "  • optional sources the persona should cite or ground in",
   "  • optional style hints (tone, framing)",
@@ -100,8 +100,6 @@ export async function generateMonologueScript(
       name: persona.name,
       system_prompt: persona.system_prompt,
       bio: persona.bio,
-      tags: persona.tags,
-      languages: persona.languages,
       tone: persona.tone,
       region: persona.region,
       cause: persona.cause,
