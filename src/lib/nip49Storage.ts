@@ -25,6 +25,8 @@
 
 import { encrypt as nip49Encrypt, decrypt as nip49Decrypt } from "nostr-tools/nip49";
 
+import { secureStorage } from "./secureStorage";
+
 /** Where the encrypted user nsec is parked. */
 const STORAGE_KEY = "zuka:user:ncryptsec";
 
@@ -90,7 +92,23 @@ export function decryptNcryptsec(
   return nip49Decrypt(ncryptsec, passphrase);
 }
 
-// ─────────── localStorage helpers ───────────
+// ─────────── storage helpers ───────────
+//
+// On Capacitor (native) the ncryptsec lives in iOS Keychain / Android
+// KeyStore via `secureStorage`. On web it falls back to localStorage.
+// `secureStorage` migrates legacy localStorage values to the OS keystore
+// automatically on first read, so existing users transparently upgrade
+// the first time the native app reads the key.
+//
+// API consumers (UnlockGate, AuthDialog, Settings, main.tsx) want
+// synchronous reads. We back the sync read API with an in-memory cache
+// hydrated once at boot from the (async) secureStorage. Writes update
+// the cache synchronously and fire-and-forget the underlying write.
+//
+//   undefined = not hydrated yet → fall back to sync localStorage read
+//   null      = hydrated, no value parked
+//   string    = hydrated, current ncryptsec
+let cachedNcryptsec: string | null | undefined = undefined;
 
 /** Best-effort access — returns a stub when storage is unavailable. */
 function safeStorage(): Storage | null {
@@ -102,26 +120,54 @@ function safeStorage(): Storage | null {
   }
 }
 
+/**
+ * Hydrate the in-memory ncryptsec cache from secureStorage.
+ *
+ * Call this ONCE at boot (from `main.tsx`) before any sync read. On
+ * native, reads from iOS Keychain / Android KeyStore. On web, reads
+ * from localStorage. If a legacy localStorage value exists on native,
+ * `secureStorage.getItem` migrates it to the OS keystore as a side
+ * effect of this call.
+ */
+export async function hydrateUserNcryptsec(): Promise<void> {
+  try {
+    const v = await secureStorage.getItem(STORAGE_KEY);
+    cachedNcryptsec = v && v.startsWith("ncryptsec1") ? v : null;
+  } catch {
+    cachedNcryptsec = null;
+  }
+}
+
 /** Persist the user's ncryptsec. Overwrites any existing value. */
 export function storeUserNcryptsec(ncryptsec: string): void {
-  const storage = safeStorage();
-  if (!storage) return;
-  storage.setItem(STORAGE_KEY, ncryptsec);
+  cachedNcryptsec = ncryptsec;
+  // Fire-and-forget. On web this is a sync localStorage write under
+  // the hood; on native it's a fast Keychain write. Failures are
+  // logged but don't block UI.
+  void secureStorage.setItem(STORAGE_KEY, ncryptsec).catch((err) => {
+    console.error("[nip49Storage] failed to persist ncryptsec:", err);
+  });
 }
 
 /** Read the stored ncryptsec, or null if none. */
 export function loadUserNcryptsec(): string | null {
-  const storage = safeStorage();
-  if (!storage) return null;
-  const v = storage.getItem(STORAGE_KEY);
-  return v && v.startsWith("ncryptsec1") ? v : null;
+  // Hydration not run yet (tests, hot reload, edge boot order) — fall
+  // back to a sync localStorage read so tests don't need to opt in.
+  if (cachedNcryptsec === undefined) {
+    const storage = safeStorage();
+    if (!storage) return null;
+    const v = storage.getItem(STORAGE_KEY);
+    return v && v.startsWith("ncryptsec1") ? v : null;
+  }
+  return cachedNcryptsec;
 }
 
 /** Clear the stored ncryptsec. Used on logout / "forget device". */
 export function clearUserNcryptsec(): void {
-  const storage = safeStorage();
-  if (!storage) return;
-  storage.removeItem(STORAGE_KEY);
+  cachedNcryptsec = null;
+  void secureStorage.removeItem(STORAGE_KEY).catch((err) => {
+    console.error("[nip49Storage] failed to clear ncryptsec:", err);
+  });
 }
 
 /** Whether the user has a Phoenix-managed ncryptsec stored on this device. */
