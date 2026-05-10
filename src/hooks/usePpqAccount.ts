@@ -31,10 +31,10 @@
 import { useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { readEnv } from "@/lib/env";
 import { createAccount, getBalance } from "@/lib/ppq/client";
 import { ppqAccountStore } from "@/lib/ppq/storage";
 import type { PpqAccount } from "@/lib/ppq/types";
-import { readEnv } from "@/lib/env";
 
 import { useOperatorEnvelope } from "./useOperatorEnvelope";
 
@@ -42,11 +42,16 @@ const ACCOUNT_QK = ["ppq", "account"] as const;
 const BALANCE_QK = (creditId: string | undefined) =>
   ["ppq", "balance", creditId] as const;
 
+/**
+ * "Free credits" / pinned-account path: when `VITE_PPQ_API_KEY` is set
+ * (in `.env` or `dev/.env`), surface that key as a virtual account and
+ * skip the auto-create + envelope-write flows. Optional
+ * `VITE_PPQ_CREDIT_ID` enables balance queries; when omitted, balance
+ * lookup is skipped and inference still works.
+ */
 function envAccount(): PpqAccount | null {
   const apiKey = readEnv("VITE_PPQ_API_KEY");
   if (!apiKey) return null;
-  // credit_id is optional — when missing, balance lookup + auto-topup
-  // will be best-effort, but inference still works.
   const creditId = readEnv("VITE_PPQ_CREDIT_ID") ?? "";
   return { api_key: apiKey, credit_id: creditId };
 }
@@ -143,8 +148,9 @@ export function usePpqAccount() {
 }
 
 /**
- * Pure helper — returns the account from storage without subscribing to
- * React state. Useful from event handlers / non-component code.
+ * Pure helper — returns the account from env (if VITE_PPQ_API_KEY is set)
+ * or storage. No React subscription. Useful from event handlers /
+ * non-component code that needs an api_key on demand.
  */
 export function getStoredPpqAccount(): PpqAccount | null {
   return envAccount() ?? ppqAccountStore.load();

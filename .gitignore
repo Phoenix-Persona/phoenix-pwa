@@ -41,6 +41,13 @@ tests/ai-services/.last-invoice.json
 # Veo last-frame-conditioning test artifacts (clip MP4s + extracted frame)
 tests/ai-services/.veo-last-frame/
 
+# i2v chain test scratch dirs (per-run mp4s + extracted frames)
+tests/ai-services/.i2v-chain/
+tests/ai-services/.i2v-chain-english-paced/
+
+# Parallel-runner per-run logs
+tests/ai-services/.monologue-runs/
+
 # Local wallet test credentials (grants spending power — never commit)
 tests/wallet/.operator.json
 tests/wallet/.persona.json

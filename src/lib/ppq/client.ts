@@ -65,6 +65,7 @@ async function request<T>(
   const base = init.baseUrl ?? readEnvBase();
   const url = `${base.replace(/\/$/, "")}${path}`;
   const headers: Record<string, string> = { ...(init.headers ?? {}) };
+  const method = init.method ?? (init.body ? "POST" : "GET");
 
   let body: BodyInit | undefined;
   if (init.body !== undefined && init.body !== null) {
@@ -77,12 +78,25 @@ async function request<T>(
     }
   }
 
+  const startTs = Date.now();
+  console.log(
+    `%c[ppq] →%c ${method} ${path}`,
+    "color:#7a4f1c;font-weight:bold",
+    "",
+    init.body && !(init.body instanceof FormData)
+      ? summarizeRequestBody(init.body)
+      : init.body instanceof FormData
+        ? "(multipart)"
+        : "(no body)",
+  );
+
   const res = await fetch(url, {
-    method: init.method ?? (body ? "POST" : "GET"),
+    method,
     headers,
     body,
     signal: init.signal,
   });
+  const elapsed = Date.now() - startTs;
 
   const ok = res.ok || (init.accept202 && res.status === 202);
   if (!ok) {
@@ -93,14 +107,19 @@ async function request<T>(
     } catch {
       // keep as text
     }
-    throw new PpqError(
-      typeof parsed === "string" && parsed
-        ? parsed
-        : `ppq.ai request failed (${res.status})`,
-      res.status,
+    console.error(
+      `[ppq] ✗ ${method} ${path} → ${res.status} (${elapsed}ms)`,
       parsed,
     );
+    const fallbackMessage =
+      summarizePpqError(parsed) ?? `ppq.ai request failed (${res.status})`;
+    throw new PpqError(fallbackMessage, res.status, parsed);
   }
+  console.log(
+    `%c[ppq] ✓%c ${method} ${path} → ${res.status} (${elapsed}ms)`,
+    "color:#1f7a1f;font-weight:bold",
+    "",
+  );
 
   // Some endpoints (TTS, signed video URLs) return non-JSON. Caller opts in.
   if (init.raw) return { data: res as unknown as T, status: res.status };
@@ -424,4 +443,43 @@ export async function disconnectNwcAutoTopup(
     headers: { "x-credit-id": creditId },
     ...options,
   });
+}
+
+
+/* ---------- internal log helpers ---------- */
+
+/**
+ * Compact summary of a JSON request body for log readability —
+ * avoids dumping huge prompts inline. Strings are clipped, image_url
+ * is left intact (short and useful for debugging), prompt is shown
+ * with a length suffix.
+ */
+function summarizeRequestBody(body: unknown): unknown {
+  if (!body || typeof body !== "object") return body;
+  const obj = body as Record<string, unknown>;
+  const summary: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (typeof v === "string" && v.length > 200) {
+      summary[k] = `<${v.length} chars> ${v.slice(0, 80)}…`;
+    } else if (Array.isArray(v) && v.length > 4) {
+      summary[k] = `<array len=${v.length}>`;
+    } else {
+      summary[k] = v;
+    }
+  }
+  return summary;
+}
+
+/** Pull a short error message out of ppq.ai's `{error: {message, type}}` shape. */
+function summarizePpqError(parsed: unknown): string | undefined {
+  if (!parsed || typeof parsed !== "object") return undefined;
+  const obj = parsed as Record<string, unknown>;
+  const err = obj.error as Record<string, unknown> | undefined;
+  if (err && typeof err === "object") {
+    const msg = typeof err.message === "string" ? err.message : undefined;
+    const type = typeof err.type === "string" ? err.type : undefined;
+    if (msg && type) return `${type}: ${msg}`;
+    if (msg) return msg;
+  }
+  return undefined;
 }

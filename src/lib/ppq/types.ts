@@ -116,16 +116,36 @@ export interface PpqImageResponse {
  * ppq.ai adds models faster than we update this file.
  */
 export type PpqVideoModel =
+  // Seedance 2 family — empirically the best end-to-end on ppq.ai for
+  // talking-head video: accepts image_url for last-frame conditioning,
+  // produces native lip-synced audio, holds character + setting
+  // continuity across i2v seams. The proven path for Phoenix's
+  // multi-clip persona videos. Default to `-fast` for iteration; use
+  // the non-fast `seedance-2` only for hero / final renders.
+  | "seedance-2-fast"
+  | "seedance-2"
+  | "seedance-v1-lite"
+  // Kling — accepts image_url, holds character continuity, but produces
+  // SILENT video. Use only when audio isn't needed.
+  | "kling-3.0"
+  | "kling-2.5-turbo"
+  | "kling-2.1-master"
+  | "kling-2.1-pro"
+  | "kling-2.1-standard"
+  // Veo 3 / Veo 3 Fast — native audio + lip sync, but ppq.ai's route
+  // does NOT accept image_url today (returns 502 "No providers
+  // available for this model"). Useful only for standalone t2v clips.
   | "veo3"
   | "veo3-fast"
-  | "veo3-i2v"
-  | "kling-2.1-pro"
-  | "kling-2.1-master"
-  | "kling-2.5-turbo"
-  | "kling-2.1-master-i2v"
-  | "kling-2.5-turbo-i2v"
+  // Runway Gen-4 / Aleph — i2v capable, silent.
   | "runway-gen4"
   | "runway-aleph"
+  // Other catalog members.
+  | "luma-dream-machine"
+  | "pika-v2.2"
+  | "hailuo-02-pro"
+  | "hailuo-02-standard"
+  | "pixverse-v4.5"
   | (string & {});
 
 export interface PpqVideoRequest {
@@ -134,7 +154,14 @@ export interface PpqVideoRequest {
   aspect_ratio?: "16:9" | "9:16" | "1:1";
   /** Seconds. Most models accept 5/8/10. */
   duration?: number | string;
-  quality?: "720p" | "1080p";
+  /**
+   * Per-model quality tier. Values vary by model family:
+   *   - Seedance / Veo / Runway / Luma / Pika / Hailuo: "720p" | "1080p"
+   *   - Kling: "standard" (the API rejects 720p/1080p with a 400)
+   * Typed permissively so callers can pass whichever string the
+   * destination model accepts.
+   */
+  quality?: "720p" | "1080p" | "standard" | (string & {});
   /** Required for image-to-video models (e.g. veo3-i2v, *-i2v). */
   image_url?: string;
 }

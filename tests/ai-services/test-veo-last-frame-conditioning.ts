@@ -1,9 +1,21 @@
 /**
- * Test: does Veo 3.1 Fast preserve continuity across two clips when
+ * Test: does last-frame conditioning preserve continuity across two
+ * video clips when the user supplies a "locked-down world"?
+ *
+ * Originally we wanted Veo 3.1 Fast for both clips. ppq.ai's catalog
+ * doesn't expose Veo 3.1, AND `veo3-fast` on ppq.ai is text-to-video
+ * only — passing `image_url` returns 502 ("No providers available for
+ * this model"). After empirical testing, **`seedance-2-fast` is the
+ * proven path** on ppq.ai today: it accepts `image_url`, produces
+ * lip-synced audio, AND holds character + setting continuity across
+ * the seam. Defaults now resolve to seedance-2-fast first, with Kling
+ * variants as silent-video fallbacks.
+ *
+ * The technique under test:
  *
  *   (a) the user provides a "locked-down world" — verbatim character +
  *       setting + wardrobe + lighting + camera-language block in both
- *       prompts, and
+ *       prompts; and
  *
  *   (b) the second clip is image-to-video, conditioned on the LAST FRAME
  *       of the first clip?
@@ -32,22 +44,37 @@
  *     bootstrap-spark-wallet-e2e.ts or test-all-ppq-services-e2e.ts once
  *     to mint one).
  *
- * Caching:
- *   Each step persists state under tests/ai-services/.veo-last-frame/.
- *   Re-running the script picks up where it left off so you don't pay
- *   for clip 1 twice while iterating on clip 2.
+ * No caching. Every run is a fresh end-to-end pipeline: the working
+ *   directory is wiped at startup, both clips are generated from scratch,
+ *   and the last-frame upload happens fresh every time. This eliminates
+ *   the "stale clip 2 conditioned on a different person's last frame"
+ *   class of bugs.
+ *
+ * Pre-flight: the script checks ppq.ai's credit balance before kicking
+ *   off and bails with a clear top-up command if there isn't enough to
+ *   cover both clips.
  *
  * Flags:
- *   --reset                  Wipe the cache dir before starting.
- *   --skip-clip1             Use a previously generated clip 1 (must be cached).
- *   --skip-clip2             Stop after extracting + uploading the last frame.
- *   --text-model <id>        Override clip 1 model (default `veo3.1-fast`).
- *   --i2v-model <id>         Override clip 2 model (default `veo3.1-fast-i2v`).
+ *   --list-models            List all video models advertised by ppq.ai and exit.
+ *   --model <id>             Override the singleton model used for BOTH clips.
+ *                            Default: auto-resolve from `/v1/models?type=video`
+ *                            (preference: seedance-2-fast → seedance-2 →
+ *                            kling-3.0 → kling-2.1-master → kling-2.1-pro →
+ *                            runway-gen4 → luma-dream-machine → hailuo-02-pro).
+ *                            seedance-2-fast is the only entry that delivers
+ *                            BOTH continuity AND lip-synced audio. Both clips
+ *                            MUST use the same model — mixing families is the
+ *                            #1 cause of broken continuity. Don't point this
+ *                            at `veo3-fast`: ppq.ai's Veo route doesn't
+ *                            accept `image_url` (returns 502).
  *   --aspect <ratio>         "9:16" (default), "16:9", "1:1".
  *   --duration <secs>        Per-clip duration (default 8).
  *   --quality <p>            "720p" (default) or "1080p".
- *   --manual-upload          Skip 0x0.st upload; prompt for a URL you host yourself.
- *   --upload-host <url>      Override the upload host (default https://0x0.st).
+ *   --manual-upload          Skip the public-host upload; prompt for a URL you host yourself.
+ *   --upload-host <url>      Pin uploads to a single host (basic POST,
+ *                            file field "file"). Default: walk a fallback
+ *                            chain of public no-auth hosts (catbox.moe →
+ *                            uguu.se → 0x0.st).
  *   --ffmpeg <path>          Override the ffmpeg binary path.
  */
 
@@ -61,7 +88,9 @@ import { fileURLToPath } from "node:url";
 import { stdin as input, stdout as output } from "node:process";
 
 import {
+  getBalance,
   getVideoStatus,
+  listModels,
   submitVideo,
 } from "../../src/lib/ppq/client";
 
@@ -79,16 +108,22 @@ function flagValue(name: string): string | undefined {
 }
 
 const flags = {
-  reset: argv.includes("--reset"),
-  skipClip1: argv.includes("--skip-clip1"),
-  skipClip2: argv.includes("--skip-clip2"),
   manualUpload: argv.includes("--manual-upload"),
-  textModel: flagValue("text-model") ?? "veo3.1-fast",
-  i2vModel: flagValue("i2v-model") ?? "veo3.1-fast-i2v",
+  listModels: argv.includes("--list-models"),
+  // Singleton model — used for BOTH clip 1 and clip 2. Empty string means
+  // "auto-resolve to the best available model from /v1/models?type=video".
+  model: flagValue("model") ?? "",
   aspect: (flagValue("aspect") ?? "9:16") as "9:16" | "16:9" | "1:1",
-  duration: Number(flagValue("duration") ?? "8"),
-  quality: (flagValue("quality") ?? "720p") as "720p" | "1080p",
-  uploadHost: flagValue("upload-host") ?? "https://0x0.st",
+  // Kling on ppq.ai only accepts duration ∈ {5, 10} and quality "standard".
+  // Defaults match Kling's pricing matrix; override per-run for other models.
+  duration: Number(flagValue("duration") ?? "5"),
+  quality: (flagValue("quality") ?? "standard") as
+    | "standard"
+    | "720p"
+    | "1080p",
+  // Empty = walk the built-in public-host fallback chain.
+  // Set explicitly to pin a single host (basic POST with file field "file").
+  uploadHost: flagValue("upload-host") ?? "",
   ffmpeg: flagValue("ffmpeg") ?? "ffmpeg",
 };
 
@@ -96,29 +131,13 @@ const flags = {
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = path.join(SCRIPT_DIR, ".veo-last-frame");
-const STATE_PATH = path.join(CACHE_DIR, "state.json");
+// Working-directory paths only — no state.json, no cross-run reuse.
+// Every script invocation wipes CACHE_DIR at startup and writes fresh
+// files. The contents matter only for the duration of a single run
+// (downloaded clip 1 mp4 → ffmpeg → last-frame.png → upload).
 const CLIP1_PATH = path.join(CACHE_DIR, "clip1.mp4");
 const LAST_FRAME_PATH = path.join(CACHE_DIR, "last-frame.png");
 const PPQ_ACCOUNT_PATH = path.join(SCRIPT_DIR, ".account.json");
-
-interface State {
-  clip1?: { id: string; url: string };
-  uploadedFrameUrl?: string;
-  clip2?: { id: string; url: string };
-}
-
-async function loadState(): Promise<State> {
-  try {
-    return JSON.parse(await fs.readFile(STATE_PATH, "utf8")) as State;
-  } catch {
-    return {};
-  }
-}
-
-async function saveState(state: State): Promise<void> {
-  await fs.mkdir(CACHE_DIR, { recursive: true });
-  await fs.writeFile(STATE_PATH, JSON.stringify(state, null, 2));
-}
 
 /* ---------- prompts: the "locked-down world" technique ---------- */
 
@@ -165,6 +184,102 @@ function printPrompt(label: string, prompt: string): void {
   }
 }
 
+/* ---------- model discovery ---------- */
+
+/**
+ * Veo on ppq.ai is text-to-video only today — passing `image_url` to
+ * `veo3-fast` returns 502 "No providers available for this model".
+ * The earlier `veo3-i2v` model id has been dropped from the catalog
+ * and ppq.ai hasn't routed Veo's image-to-video variant in its place.
+ *
+ * To test last-frame conditioning end to end we need a model that DOES
+ * support i2v. Curated preference list below — talking-head-friendly
+ * families with native i2v support, ordered by quality + maturity.
+ *
+ * Both clips default to the same auto-resolved id so the aesthetic
+ * matches across the seam (Veo 3 Fast for clip 1 + Kling for clip 2
+ * makes the i2v join visibly different lineage). Users can split via
+ * --text-model / --i2v-model to deliberately test cross-model behavior.
+ */
+
+/**
+ * Best-singleton preference order. Both clips use the SAME model so the
+ * latent space matches across the seam — mixing model families is the
+ * #1 named cause of broken continuity in 2026 multi-clip AI video.
+ *
+ * Ordered by predicted quality + suitability for talking-head + native
+ * i2v support. We pick the FIRST one that exists in ppq.ai's live
+ * catalog and stop.
+ */
+const BEST_SINGLETON_PREFERENCE = [
+  // Seedance 2 Fast — empirically PROVEN to deliver all three of
+  // (a) image-to-video conditioning, (b) native lip-synced audio, and
+  // (c) character + setting continuity across the seam. THIS is the
+  // path for Phoenix's multi-clip talking-head videos. `-fast` first
+  // for dev iteration; promote to `seedance-2` only for finals.
+  "seedance-2-fast",
+  "seedance-2",
+  // Kling 3.0 — accepts i2v with strong continuity, but produces
+  // SILENT video. Use only when audio isn't part of the requirement.
+  "kling-3.0",
+  "kling-2.1-master",
+  "kling-2.1-pro",
+  // Runway Gen-4 — silent, strong character-reference consistency.
+  "runway-gen4",
+  // Luma Dream Machine — silent, native start-frame conditioning.
+  "luma-dream-machine",
+  // Hailuo 02 Pro — silent fallback.
+  "hailuo-02-pro",
+];
+
+const I2V_CAPABLE_FAMILIES_LEGACY = [
+  "kling",
+  "runway",
+  "luma",
+  "seedance",
+  "hailuo",
+  "pika",
+  "pixverse",
+  "minimax",
+];
+
+/**
+ * Pick the single best video model available on ppq.ai for the
+ * continuity test. Both clips will use this same id.
+ */
+function resolveBestSingleton(ids: string[], preferRequested: string): string {
+  if (preferRequested) {
+    if (ids.includes(preferRequested)) return preferRequested;
+    throw new Error(
+      `Model "${preferRequested}" is not in the available video models. ` +
+        `Available:\n  - ${ids.join("\n  - ")}`,
+    );
+  }
+
+  // 1. Curated exact-match preference list — best quality first.
+  for (const candidate of BEST_SINGLETON_PREFERENCE) {
+    if (ids.includes(candidate)) return candidate;
+  }
+
+  // 2. Fuzzy fallback: anything from a known i2v-capable family.
+  // (Veo deliberately excluded — Veo on ppq.ai doesn't accept image_url.)
+  const lc = ids.map((id) => ({ id, lc: id.toLowerCase() }));
+  for (const family of I2V_CAPABLE_FAMILIES_LEGACY) {
+    const hit = lc.find((e) => e.lc.includes(family));
+    if (hit) return hit.id;
+  }
+
+  throw new Error(
+    `No i2v-capable model found in catalog. Available:\n  - ${ids.join("\n  - ")}\n\n` +
+      `Pass --model <id> explicitly.`,
+  );
+}
+
+async function discoverVideoModels(): Promise<string[]> {
+  const models = await listModels("video");
+  return models.map((m) => m.id).sort();
+}
+
 /* ---------- ppq.ai account loader ---------- */
 
 interface PpqAccountFile {
@@ -193,6 +308,10 @@ interface ClipSubmitArgs {
   model: string;
   prompt: string;
   imageUrl?: string;
+  // Per-attempt parameter overrides for the i2v fallback cascade.
+  aspect?: "9:16" | "16:9" | "1:1";
+  duration?: number;
+  quality?: string;
 }
 
 async function generateClip(args: ClipSubmitArgs): Promise<{
@@ -203,9 +322,9 @@ async function generateClip(args: ClipSubmitArgs): Promise<{
   const submitted = await submitVideo(args.apiKey, {
     model: args.model,
     prompt: args.prompt,
-    aspect_ratio: flags.aspect,
-    duration: flags.duration,
-    quality: flags.quality,
+    aspect_ratio: args.aspect ?? flags.aspect,
+    duration: args.duration ?? flags.duration,
+    quality: args.quality ?? flags.quality,
     ...(args.imageUrl !== undefined ? { image_url: args.imageUrl } : {}),
   });
   console.log(`  job id:           ${submitted.id}`);
@@ -216,11 +335,24 @@ async function generateClip(args: ClipSubmitArgs): Promise<{
 
   const deadline = Date.now() + 12 * 60 * 1000;
   let last = "";
+  let pollCount = 0;
+  const startTime = Date.now();
   while (Date.now() < deadline) {
     const status = await getVideoStatus(args.apiKey, submitted.id);
+    pollCount++;
     if (status.status !== last) {
+      // newline before any prior heartbeat dots, then the status
+      if (pollCount > 1) process.stdout.write("\n");
       console.log(`  status: ${status.status}`);
       last = status.status;
+    } else {
+      // heartbeat: a dot every poll, with elapsed time every 6 polls (30s)
+      if (pollCount % 6 === 0) {
+        const secs = Math.round((Date.now() - startTime) / 1000);
+        process.stdout.write(`  · still ${status.status} (${secs}s elapsed)\n`);
+      } else {
+        process.stdout.write(".");
+      }
     }
     if (status.status === "completed") {
       const url = status.data?.url;
@@ -299,59 +431,273 @@ function runCommand(cmd: string, args: string[]): Promise<void> {
 
 /* ---------- upload last frame ---------- */
 
+interface UploadProvider {
+  name: string;
+  url: string;
+  fileField: string;
+  extraFields?: Record<string, string>;
+  parseResponse: (body: string) => string | undefined;
+}
+
+/**
+ * Public no-auth file hosts we'll try in order until one accepts the
+ * upload. Files just need to stay reachable long enough for ppq.ai to
+ * fetch them once during clip 2 generation (~minutes).
+ */
+const UPLOAD_PROVIDERS: UploadProvider[] = [
+  {
+    // Persistent, reliable, allows direct image hotlinking.
+    name: "catbox.moe",
+    url: "https://catbox.moe/user/api.php",
+    fileField: "fileToUpload",
+    extraFields: { reqtype: "fileupload" },
+    parseResponse: (body) => {
+      const t = body.trim();
+      return /^https?:\/\//.test(t) ? t : undefined;
+    },
+  },
+  {
+    // 3-hour TTL; long enough for the test, short enough to be friendly.
+    name: "uguu.se",
+    url: "https://uguu.se/upload.php",
+    fileField: "files[]",
+    parseResponse: (body) => {
+      try {
+        const j = JSON.parse(body) as { files?: Array<{ url?: string }> };
+        const url = j.files?.[0]?.url;
+        return typeof url === "string" ? url : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+  },
+  {
+    // Legacy fallback — sometimes 503s under load.
+    name: "0x0.st",
+    url: "https://0x0.st",
+    fileField: "file",
+    parseResponse: (body) => {
+      const t = body.trim();
+      return /^https?:\/\//.test(t) ? t : undefined;
+    },
+  },
+];
+
+const USER_AGENT = "phoenix-test/0.1 (+https://phoenix.example)";
+
+async function uploadToProvider(
+  framePath: string,
+  provider: UploadProvider,
+): Promise<string> {
+  const attempt = async (): Promise<string> => {
+    const buf = await fs.readFile(framePath);
+    const blob = new Blob([new Uint8Array(buf)], { type: "image/png" });
+    const form = new FormData();
+    form.set(provider.fileField, blob, "last-frame.png");
+    for (const [k, v] of Object.entries(provider.extraFields ?? {})) {
+      form.set(k, v);
+    }
+    const res = await fetch(provider.url, {
+      method: "POST",
+      body: form,
+      headers: { "user-agent": USER_AGENT },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.text();
+    const url = provider.parseResponse(body);
+    if (!url) throw new Error(`non-URL response: ${body.slice(0, 200)}`);
+    return url;
+  };
+
+  // One retry on transient errors (DNS / TLS hiccups read as "fetch failed").
+  try {
+    return await attempt();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/fetch failed|EAI_AGAIN|ECONNRESET|ETIMEDOUT/i.test(msg)) {
+      console.warn(`  ↻ ${provider.name} transient (${msg}), retrying once…`);
+      return await attempt();
+    }
+    throw err;
+  }
+}
+
 async function uploadFrame(framePath: string): Promise<string> {
   if (flags.manualUpload) {
     console.log(
-      `  --manual-upload: please host ${framePath} somewhere reachable by ppq.ai (Imgur, Blossom, gist raw, etc.) and paste the URL.`,
+      `  --manual-upload: host ${framePath} somewhere reachable by ppq.ai ` +
+        `(Imgur, Blossom, gist raw, etc.) and paste the URL.`,
     );
     const pasted = (await ask("frame URL?")).trim();
     if (!pasted) throw new Error("no frame URL provided");
     return pasted;
   }
 
-  console.log(`  uploading ${framePath} → ${flags.uploadHost} …`);
-  const buf = await fs.readFile(framePath);
-  const blob = new Blob([new Uint8Array(buf)], { type: "image/png" });
-  const form = new FormData();
-  form.set("file", blob, "last-frame.png");
+  // --upload-host overrides the fallback chain with a single fixed target
+  // (basic POST with file field "file"). Useful when you have an internal
+  // hosting service or want to pin a specific provider.
+  if (flags.uploadHost) {
+    console.log(`  uploading to override host: ${flags.uploadHost} …`);
+    const url = await uploadToProvider(framePath, {
+      name: flags.uploadHost,
+      url: flags.uploadHost,
+      fileField: "file",
+      parseResponse: (body) => {
+        const t = body.trim();
+        return /^https?:\/\//.test(t) ? t : undefined;
+      },
+    });
+    console.log(`  ✓ uploaded: ${url}`);
+    return url;
+  }
 
-  const res = await fetch(flags.uploadHost, {
-    method: "POST",
-    body: form,
-    // 0x0.st requires a User-Agent — many Node fetch clients omit one and
-    // get 403'd back. Set a sane default.
-    headers: { "user-agent": "phoenix-test/0.1 (+https://phoenix.example)" },
-  });
-  if (!res.ok) {
-    throw new Error(
-      `upload to ${flags.uploadHost} failed (${res.status}). ` +
-        `Re-run with --manual-upload to paste a URL of your own.`,
-    );
+  // Otherwise walk the public-host fallback chain.
+  const errors: string[] = [];
+  for (const provider of UPLOAD_PROVIDERS) {
+    try {
+      console.log(`  trying ${provider.name} …`);
+      const url = await uploadToProvider(framePath, provider);
+      console.log(`  ✓ uploaded via ${provider.name}: ${url}`);
+      return url;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`  ✗ ${provider.name}: ${msg}`);
+      errors.push(`${provider.name}: ${msg}`);
+    }
   }
-  const url = (await res.text()).trim();
-  if (!/^https?:\/\//.test(url)) {
-    throw new Error(
-      `upload host returned non-URL response: ${url.slice(0, 200)}. ` +
-        `Re-run with --manual-upload.`,
-    );
-  }
-  console.log(`  uploaded:        ${url}`);
-  return url;
+  throw new Error(
+    `All upload providers failed:\n  - ${errors.join("\n  - ")}\n\n` +
+      `Re-run with --manual-upload to paste a URL of your own, or use ` +
+      `--upload-host <url> to target a specific endpoint.`,
+  );
 }
+
+/* ---------- i2v fallback cascade ---------- */
+
+/**
+ * Curated set of i2v candidate models on ppq.ai with the parameter
+ * combos each accepts. We cascade through these for clip 2 because
+ * ppq.ai's catalog advertises models without telling us which actually
+ * route i2v requests — discovery is empirical.
+ *
+ * Order: most-likely-to-work first. Stops on first success.
+ */
+interface I2vCandidate {
+  model: string;
+  aspect: "9:16" | "16:9" | "1:1";
+  duration: number;
+  quality: string;
+  notes?: string;
+}
+
+/**
+ * Reordered to surface Kling 3.0 first — it's specifically marketed for
+ * "3-15 second multi-shot sequences while maintaining subject
+ * consistency", which is exactly the continuity goal we're testing.
+ */
+const I2V_FALLBACK_CHAIN: I2vCandidate[] = [
+  { model: "kling-3.0",        aspect: "9:16", duration: 5, quality: "standard" },
+  { model: "kling-2.5-turbo",  aspect: "9:16", duration: 5, quality: "standard" },
+  { model: "kling-2.1-master", aspect: "9:16", duration: 5, quality: "standard" },
+  { model: "kling-2.1-pro",    aspect: "9:16", duration: 5, quality: "standard" },
+  { model: "runway-gen4",      aspect: "9:16", duration: 5, quality: "720p" },
+  { model: "luma-dream-machine", aspect: "9:16", duration: 5, quality: "720p" },
+  { model: "pika-v2.2",        aspect: "9:16", duration: 5, quality: "720p" },
+  { model: "seedance-2-fast",  aspect: "9:16", duration: 5, quality: "720p" },
+  { model: "hailuo-02-pro",    aspect: "9:16", duration: 6, quality: "720p" },
+  { model: "pixverse-v4.5",    aspect: "9:16", duration: 5, quality: "720p" },
+];
+
+// Cascade machinery removed — we run as a singleton on the best
+// available model. If it fails, the script suggests the next-best
+// singleton to try via --model. No automatic fallback.
 
 /* ---------- main ---------- */
 
+/**
+ * Conservative pre-flight estimate. Two singleton clips on a Kling-class
+ * model run ~$0.50-1.50 each. We require ≥ this much in the ppq balance
+ * before kicking off so we don't spend on clip 1 just to discover we
+ * can't afford clip 2.
+ */
+const PREFLIGHT_USD_REQUIRED = 3;
+
 async function main(): Promise<void> {
   console.log("Veo 3.1 Fast — last-frame conditioning continuity test");
-  console.log("(locked-down world prompt + i2v second clip)");
+  console.log("(one-shot, no caching: every run is a fresh pipeline)");
 
-  if (flags.reset) {
-    await fs.rm(CACHE_DIR, { recursive: true, force: true });
-    console.log("Reset: cleared cache.");
-  }
+  // Always wipe the working directory at startup. No state.json, no clip
+  // reuse, no upload URL reuse — a single run produces one fresh pair of
+  // clips so there's never a mystery about which artifact came from where.
+  await fs.rm(CACHE_DIR, { recursive: true, force: true });
+  await fs.mkdir(CACHE_DIR, { recursive: true });
 
   const ppq = await loadPpqAccount();
-  const state = await loadState();
+
+  /* ---- pre-flight balance check ---- */
+
+  header("0. Pre-flight balance check");
+  const balance = await getBalance(ppq.credit_id);
+  const balanceUsd = balance.balance_usd;
+  if (typeof balanceUsd !== "number") {
+    console.warn(
+      "  Could not parse ppq.ai balance — proceeding anyway. Raw payload:",
+    );
+    console.warn(JSON.stringify(balance.raw, null, 2));
+  } else {
+    console.log(`  ppq balance:     $${balanceUsd.toFixed(4)}`);
+    console.log(
+      `  required:        ≥ $${PREFLIGHT_USD_REQUIRED.toFixed(2)} (covers 2 clips with margin)`,
+    );
+    if (balanceUsd < PREFLIGHT_USD_REQUIRED) {
+      const need = (PREFLIGHT_USD_REQUIRED - balanceUsd).toFixed(2);
+      throw new Error(
+        `Insufficient ppq.ai credit. Balance is $${balanceUsd.toFixed(4)}; ` +
+          `need at least $${PREFLIGHT_USD_REQUIRED.toFixed(2)}.\n\n` +
+          `Top up at least $${need} more. Recommended path (pay from any ` +
+          `Lightning wallet, no Spark dependency):\n\n` +
+          `  npx tsx tests/ai-services/top-up-ppq-with-lightning.ts --usd ${Math.ceil(parseFloat(need))}\n\n` +
+          `Other options:\n` +
+          `  • Already have sats in your Spark wallet?\n` +
+          `      npx tsx tests/wallet/test-auto-topup-and-inference.ts  (pushes Spark → ppq)\n` +
+          `  • Spark wallet empty? Fund it first:\n` +
+          `      npx tsx tests/wallet/fund-spark-wallet-with-sats.ts --amount-sats 10000`,
+      );
+    }
+  }
+
+  /* ---- discover + resolve video models ---- */
+
+  header("1. Discover video models on ppq.ai");
+  const videoModelIds = await discoverVideoModels();
+  console.log(`  ${videoModelIds.length} video models advertised:`);
+  for (const id of videoModelIds) console.log(`    - ${id}`);
+
+  if (flags.listModels) {
+    console.log("\n--list-models specified, exiting.");
+    return;
+  }
+
+  // Singleton: one model for both clips. Different model families have
+  // different latent spaces; mixing them across a continuity seam is the
+  // #1 named cause of broken multi-clip continuity.
+  const singletonModel = resolveBestSingleton(videoModelIds, flags.model);
+  const profile =
+    I2V_FALLBACK_CHAIN.find((c) => c.model === singletonModel) ?? {
+      model: singletonModel,
+      aspect: flags.aspect,
+      duration: flags.duration,
+      quality: flags.quality,
+    };
+  console.log(`\n  singleton model → ${singletonModel}`);
+  console.log(
+    `  params:           ${profile.aspect}, ${profile.duration}s, ${profile.quality}`,
+  );
+  if (!flags.model) {
+    console.log(
+      `  (auto-resolved; override with --model <id> — see --list-models for the catalog)`,
+    );
+  }
 
   header("World block (verbatim in both prompts)");
   printPrompt("WORLD_BLOCK", WORLD_BLOCK);
@@ -362,122 +708,112 @@ async function main(): Promise<void> {
       "model has consistent ground truth.",
   );
 
-  /* ---- clip 1 ---- */
+  /* ---- single confirmation gate ---- */
 
-  if (state.clip1 && !flags.reset) {
-    header("1. Clip 1 (text-to-video) — cached");
-    console.log(`  id:  ${state.clip1.id}`);
-    console.log(`  url: ${state.clip1.url}`);
-  } else if (flags.skipClip1) {
-    throw new Error(
-      "--skip-clip1 set, but no clip 1 is cached. Run without --skip-clip1 first.",
-    );
-  } else {
-    header(`1. Clip 1 (text-to-video, ${flags.textModel})`);
-    printPrompt("CLIP1_PROMPT", CLIP1_PROMPT);
-    if (!(await askYesNo("Generate clip 1?"))) return;
-    const clip1 = await generateClip({
-      apiKey: ppq.api_key,
-      model: flags.textModel,
-      prompt: CLIP1_PROMPT,
-    });
-    console.log(`  ✓ clip 1 url:      ${clip1.url}`);
-    if (clip1.costUsd !== undefined) {
-      console.log(`  ✓ clip 1 cost:     $${clip1.costUsd.toFixed(4)}`);
-    }
-    state.clip1 = { id: clip1.id, url: clip1.url };
-    await saveState(state);
+  console.log(
+    `\nThis run will submit TWO ${singletonModel} jobs back to back, no caching.`,
+  );
+  if (
+    !(await askYesNo("Proceed end to end?", "y"))
+  )
+    return;
+
+  /* ---- clip 1: text-to-video ---- */
+
+  header(`2. Clip 1 (text-to-video, ${singletonModel})`);
+  printPrompt("CLIP1_PROMPT", CLIP1_PROMPT);
+  const clip1 = await generateClip({
+    apiKey: ppq.api_key,
+    model: singletonModel,
+    prompt: CLIP1_PROMPT,
+    aspect: profile.aspect,
+    duration: profile.duration,
+    quality: profile.quality,
+  });
+  console.log(`  ✓ clip 1 url:      ${clip1.url}`);
+  if (clip1.costUsd !== undefined) {
+    console.log(`  ✓ clip 1 cost:     $${clip1.costUsd.toFixed(4)}`);
   }
 
   /* ---- download + extract last frame ---- */
 
-  header("2. Download clip 1 + extract last frame");
-  let needFrame = true;
-  try {
-    await fs.access(LAST_FRAME_PATH);
-    needFrame = false;
-    console.log(`  cached frame:    ${LAST_FRAME_PATH}`);
-  } catch {
-    /* not cached */
-  }
-  if (needFrame) {
-    let needMp4 = true;
-    try {
-      await fs.access(CLIP1_PATH);
-      needMp4 = false;
-      console.log(`  cached mp4:      ${CLIP1_PATH}`);
-    } catch {
-      /* not cached */
-    }
-    if (needMp4) {
-      if (!state.clip1) throw new Error("no clip 1 url to download");
-      console.log(`  downloading ${state.clip1.url} …`);
-      await downloadMp4(state.clip1.url, CLIP1_PATH);
-    }
-    console.log(`  running ${flags.ffmpeg} to grab last frame …`);
-    await extractLastFrame(CLIP1_PATH, LAST_FRAME_PATH);
-  }
+  header("3. Download clip 1 + extract last frame");
+  console.log(`  downloading ${clip1.url} …`);
+  await downloadMp4(clip1.url, CLIP1_PATH);
+  console.log(`  running ${flags.ffmpeg} to grab last frame …`);
+  await extractLastFrame(CLIP1_PATH, LAST_FRAME_PATH);
 
   /* ---- upload frame ---- */
 
-  header("3. Upload last frame so ppq.ai can fetch it");
-  if (state.uploadedFrameUrl) {
-    console.log(`  cached upload:   ${state.uploadedFrameUrl}`);
-    if (
-      !(await askYesNo(
-        "Re-use the cached upload URL? (y) or upload a fresh copy? (n)",
-        "y",
-      ))
-    ) {
-      delete state.uploadedFrameUrl;
+  header("4. Upload last frame so ppq.ai can fetch it");
+  const uploadedFrameUrl = await uploadFrame(LAST_FRAME_PATH);
+
+  /* ---- mid-flight balance check before clip 2 ---- */
+
+  if (typeof balanceUsd === "number" && clip1.costUsd !== undefined) {
+    const remaining = balanceUsd - clip1.costUsd;
+    const need = clip1.costUsd; // assume clip 2 ≈ clip 1 cost
+    if (remaining < need) {
+      throw new Error(
+        `Clip 1 ($${clip1.costUsd.toFixed(4)}) consumed too much credit; ` +
+          `remaining $${remaining.toFixed(4)} won't cover clip 2 (~$${need.toFixed(4)}). ` +
+          `Top up before re-running.\n\n` +
+          `Clip 1 (already paid for) is at: ${clip1.url}`,
+      );
     }
   }
-  if (!state.uploadedFrameUrl) {
-    state.uploadedFrameUrl = await uploadFrame(LAST_FRAME_PATH);
-    await saveState(state);
-  }
 
-  if (flags.skipClip2) {
-    header("Stopping after upload (--skip-clip2).");
-    return;
-  }
+  /* ---- clip 2: image-to-video ---- */
 
-  /* ---- clip 2 ---- */
-
-  if (state.clip2 && !flags.reset) {
-    header("4. Clip 2 (image-to-video) — cached");
-    console.log(`  id:  ${state.clip2.id}`);
-    console.log(`  url: ${state.clip2.url}`);
-  } else {
-    header(`4. Clip 2 (image-to-video, ${flags.i2vModel})`);
-    console.log(`  conditioning image: ${state.uploadedFrameUrl}`);
-    printPrompt("CLIP2_PROMPT", CLIP2_PROMPT);
-    if (!(await askYesNo("Generate clip 2?"))) return;
-    const clip2 = await generateClip({
+  header(`5. Clip 2 (image-to-video, ${singletonModel})`);
+  console.log(`  conditioning image: ${uploadedFrameUrl}`);
+  console.log(
+    `  params:             ${profile.aspect}, ${profile.duration}s, ${profile.quality}`,
+  );
+  printPrompt("CLIP2_PROMPT", CLIP2_PROMPT);
+  let clip2: Awaited<ReturnType<typeof generateClip>>;
+  try {
+    clip2 = await generateClip({
       apiKey: ppq.api_key,
-      model: flags.i2vModel,
+      model: singletonModel,
       prompt: CLIP2_PROMPT,
-      imageUrl: state.uploadedFrameUrl,
+      imageUrl: uploadedFrameUrl,
+      aspect: profile.aspect,
+      duration: profile.duration,
+      quality: profile.quality,
     });
-    console.log(`  ✓ clip 2 url:      ${clip2.url}`);
-    if (clip2.costUsd !== undefined) {
-      console.log(`  ✓ clip 2 cost:     $${clip2.costUsd.toFixed(4)}`);
-    }
-    state.clip2 = { id: clip2.id, url: clip2.url };
-    await saveState(state);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const nextBest =
+      BEST_SINGLETON_PREFERENCE.find(
+        (m) => m !== singletonModel && videoModelIds.includes(m),
+      ) ?? "(none)";
+    throw new Error(
+      `${singletonModel} failed on i2v: ${msg}\n\n` +
+        `Clip 1 (already paid for) is at: ${clip1.url}\n\n` +
+        `Next-best singleton to try:\n` +
+        `  npx tsx tests/ai-services/test-veo-last-frame-conditioning.ts --model ${nextBest}`,
+      { cause: err },
+    );
+  }
+  console.log(`\n  ✓ clip 2 url:      ${clip2.url}`);
+  if (clip2.costUsd !== undefined) {
+    console.log(`  ✓ clip 2 cost:     $${clip2.costUsd.toFixed(4)}`);
   }
 
   /* ---- summary ---- */
 
   header("Both clips");
-  console.log(`  clip 1 (intro):       ${state.clip1?.url ?? "(missing)"}`);
-  console.log(`  clip 2 (corruption):  ${state.clip2?.url ?? "(missing)"}`);
-  console.log(`  conditioning frame:   ${state.uploadedFrameUrl ?? "(missing)"}`);
+  console.log(`  clip 1 (intro):       ${clip1.url}`);
+  console.log(`  clip 2 (corruption):  ${clip2.url}`);
+  console.log(`  conditioning frame:   ${uploadedFrameUrl}`);
+  console.log(`  model used (both):    ${singletonModel}`);
   console.log(
     "\nVisually inspect the seam: hair, lighting, posture, wardrobe should be " +
       "identical at the join. The only delta should be what she's saying and " +
       "the emotional register. If the world drifts, the locked-down-world " +
-      "technique is leaking — try moving more details into WORLD_BLOCK.",
+      "technique is leaking — try moving more details into WORLD_BLOCK or a " +
+      "stronger continuity model (--model kling-2.1-master, runway-gen4, etc.).",
   );
 }
 
