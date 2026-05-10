@@ -16,21 +16,13 @@ import {
   SheetClose,
 } from "@/components/ui/sheet";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useOperatorEnvelope } from "@/hooks/useOperatorEnvelope";
-import { useWallet } from "@/hooks/useWallet";
-import { readEnv } from "@/lib/env";
+import { useOperatorWallet } from "@/hooks/useOperatorWallet";
 
 export function AppHeader() {
   const { user } = useCurrentUser();
   const isLoggedIn = Boolean(user);
-  const operator = useOperatorEnvelope();
-  const operatorSeed =
-    readEnv("VITE_WALLET_SEED") ?? operator.envelope?.wallet?.seed;
-  const operatorWallet = useWallet({
-    walletId: user ? `operator:${user.pubkey}` : undefined,
-    mnemonic: operatorSeed,
-  });
   const [walletOpen, setWalletOpen] = useState(false);
+  const operatorWallet = useOperatorWallet(walletOpen);
 
   return (
     <header className="relative bg-card/85 backdrop-blur-md sticky top-0 z-30 border-b border-imigongo-clay/15">
@@ -85,9 +77,9 @@ export function AppHeader() {
         )}
 
         <div className="flex items-center gap-2">
-          {isLoggedIn && operatorSeed ? (
+          {isLoggedIn && operatorWallet.seed ? (
             <WalletBadge
-              wallet={operatorWallet}
+              wallet={operatorWallet.wallet}
               onClick={() => setWalletOpen(true)}
             />
           ) : null}
@@ -157,9 +149,9 @@ export function AppHeader() {
       {/* Rwandan-flag accent stripe */}
       <FlagStripe height={3} />
 
-      {operatorSeed ? (
+      {operatorWallet.seed ? (
         <WalletDialog
-          wallet={operatorWallet}
+          wallet={operatorWallet.wallet}
           open={walletOpen}
           onOpenChange={setWalletOpen}
           personaName="Operator"
