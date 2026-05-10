@@ -15,6 +15,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
 import { PersonaActionsMenu } from "@/components/PersonaActionsMenu";
 import { DashboardComposerCard } from "@/components/persona/DashboardComposerCard";
+import { PersonaHero } from "@/components/persona/PersonaHero";
 import { PostCard } from "@/components/PostCard";
 import { PostListSkeleton } from "@/components/Skeletons";
 import { VideoComposerDialog } from "@/components/VideoComposerDialog";
@@ -186,74 +187,33 @@ const Dashboard = () => {
             <FlagStripe height={4} />
           </section>
         ) : personaConfig ? (
-          <section className="relative overflow-hidden hero-mat text-imigongo-cream">
-            <div
-              className="absolute inset-0 imigongo-pattern-bold text-imigongo-cream opacity-[0.05] pointer-events-none"
-              aria-hidden="true"
-            />
-            <div
-              className="absolute -top-40 -right-32 w-[36rem] h-[36rem] rounded-full bg-rw-gold/10 blur-3xl pointer-events-none"
-              aria-hidden="true"
-            />
-
-            <div className="container relative py-10 md:py-14 max-w-4xl">
-              <div className="flex items-start gap-6 flex-wrap md:flex-nowrap">
-                <div className="relative flex-shrink-0">
-                  <div
-                    className="absolute -inset-2 rounded-full bg-gradient-to-br from-rw-gold/40 via-imigongo-ochre/40 to-imigongo-clay/40 blur-2xl"
-                    aria-hidden="true"
+          <PersonaHero
+            eyebrow="Composer"
+            name={personaConfig.name}
+            bio={publicBio || undefined}
+            pictureUrl={picture ?? null}
+            avatarSize="dashboard"
+            actions={
+              <div className="flex items-center gap-2 pt-2">
+                {walletSeed ? (
+                  <WalletBadge
+                    wallet={wallet}
+                    onClick={() => setWalletOpen(true)}
+                    inverse
                   />
-                  <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden ring-2 ring-rw-gold/40 shadow-2xl shadow-black/40 bg-imigongo-charcoal flex items-center justify-center">
-                    {picture ? (
-                      <img
-                        src={picture}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        loading="eager"
-                        crossOrigin="anonymous"
-                      />
-                    ) : (
-                      <ImigongoSeal size={56} colorClass="text-rw-gold/80" />
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex-1 min-w-0 space-y-3">
-                  <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
-                    <span className="h-px w-6 bg-rw-gold" />
-                    Composer
-                  </p>
-                  <h1 className="font-display text-3xl md:text-5xl font-medium tracking-tight leading-tight">
-                    {personaConfig.name}
-                  </h1>
-                  {publicBio && (
-                    <p className="text-imigongo-cream/80 max-w-2xl leading-relaxed">
-                      {publicBio}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2 pt-2">
-                    {walletSeed ? (
-                      <WalletBadge
-                        wallet={wallet}
-                        onClick={() => setWalletOpen(true)}
-                        inverse
-                      />
-                    ) : null}
-                    <PersonaActionsMenu
-                      npub={npub}
-                      backupEvent={persona.data!.event}
-                      personaPubkey={personaConfig.pubkey}
-                      personaName={personaConfig.name}
-                      variant="inline"
-                      publicFeedNpub={npub}
-                      inverse
-                    />
-                  </div>
-                </div>
+                ) : null}
+                <PersonaActionsMenu
+                  npub={npub}
+                  backupEvent={persona.data!.event}
+                  personaPubkey={personaConfig.pubkey}
+                  personaName={personaConfig.name}
+                  variant="inline"
+                  publicFeedNpub={npub}
+                  inverse
+                />
               </div>
-            </div>
-            <FlagStripe height={4} />
-          </section>
+            }
+          />
         ) : persona.isError ? (
           <section className="cream-wash py-12">
             <div className="container max-w-3xl">
