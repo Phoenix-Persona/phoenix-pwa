@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   generatePersonaKeypair: vi.fn(),
   createPersonaSigner: vi.fn(),
   uploadFileToBlossom: vi.fn(),
+  inferenceMutateAsync: vi.fn(),
   availability: { status: "idle" } as { status: "idle" } | { status: "taken"; username: string },
 }));
 
@@ -58,6 +59,17 @@ vi.mock("@/hooks/useUsernameAvailability", () => ({
   useUsernameAvailability: () => mocks.availability,
 }));
 
+vi.mock("@/hooks/usePpqInference", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/usePpqInference")>();
+  return {
+    ...actual,
+    usePpqInference: () => ({
+      mutateAsync: mocks.inferenceMutateAsync,
+      isPending: false,
+    }),
+  };
+});
+
 vi.mock("@/lib/personaKey", () => ({
   generatePersonaKeypair: mocks.generatePersonaKeypair,
 }));
@@ -71,10 +83,27 @@ vi.mock("@/lib/blossomUpload", () => ({
   urlFromUploadTags: vi.fn(),
 }));
 
+function ppqResponse(content: string) {
+  return {
+    id: "chatcmpl-test",
+    object: "chat.completion",
+    created: 1,
+    model: "test-model",
+    choices: [
+      {
+        index: 0,
+        message: { role: "assistant" as const, content },
+        finish_reason: "stop",
+      },
+    ],
+  };
+}
+
 describe("Onboard", () => {
   beforeEach(() => {
     mocks.navigate.mockReset();
     mocks.toast.mockReset();
+    mocks.inferenceMutateAsync.mockReset();
     mocks.generatePersonaKeypair.mockReset().mockReturnValue({
       nsec: "nsec1persona",
       npub: "npub1persona",
@@ -142,5 +171,65 @@ describe("Onboard", () => {
 
     expect(screen.getByRole("button", { name: /create persona/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /skip/i })).not.toBeInTheDocument();
+  });
+
+  it("shows AI Assist controls for Bio and System prompt", () => {
+    render(<Onboard />);
+
+    expect(screen.getAllByRole("button", { name: /ai assist/i })).toHaveLength(2);
+  });
+
+  it("uses AI Assist to replace only the bio field", async () => {
+    mocks.inferenceMutateAsync.mockResolvedValue(
+      ppqResponse("A sharper generated bio."),
+    );
+    render(<Onboard />);
+    const bio = screen.getByLabelText(/bio \(public/i) as HTMLTextAreaElement;
+    const systemPrompt = screen.getByLabelText(
+      /system prompt/i,
+    ) as HTMLTextAreaElement;
+    const originalSystemPrompt = systemPrompt.value;
+
+    fireEvent.click(screen.getAllByRole("button", { name: /ai assist/i })[0]);
+    fireEvent.change(screen.getByLabelText(/instructions/i), {
+      target: { value: "Rewrite the public bio." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /generate/i }));
+
+    expect(await screen.findByText("A sharper generated bio.")).toBeInTheDocument();
+    expect(bio.value).not.toBe("A sharper generated bio.");
+
+    fireEvent.click(screen.getByRole("button", { name: /replace field/i }));
+
+    expect(bio.value).toBe("A sharper generated bio.");
+    expect(systemPrompt.value).toBe(originalSystemPrompt);
+  });
+
+  it("uses AI Assist to replace only the system prompt field", async () => {
+    mocks.inferenceMutateAsync.mockResolvedValue(
+      ppqResponse("Generated private system prompt."),
+    );
+    render(<Onboard />);
+    const bio = screen.getByLabelText(/bio \(public/i) as HTMLTextAreaElement;
+    const systemPrompt = screen.getByLabelText(
+      /system prompt/i,
+    ) as HTMLTextAreaElement;
+    const originalBio = bio.value;
+
+    fireEvent.click(screen.getAllByRole("button", { name: /ai assist/i })[1]);
+    fireEvent.change(screen.getByLabelText(/instructions/i), {
+      target: { value: "Rewrite the private prompt." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /generate/i }));
+
+    expect(
+      await screen.findByText("Generated private system prompt."),
+    ).toBeInTheDocument();
+    expect(systemPrompt.value).not.toBe("Generated private system prompt.");
+
+    fireEvent.click(screen.getByRole("button", { name: /replace field/i }));
+
+    expect(systemPrompt.value).toBe("Generated private system prompt.");
+    expect(bio.value).toBe(originalBio);
   });
 });
