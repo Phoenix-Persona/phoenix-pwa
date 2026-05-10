@@ -18,6 +18,7 @@ export interface PersonaComposerWalletRefresh {
 export interface UsePersonaComposerOptions {
   persona: Persona | null | undefined;
   stylingModel: string;
+  crossPostEnabled?: boolean;
   wallet?: PersonaComposerWalletRefresh;
   onPublished?: () => void | Promise<void>;
 }
@@ -36,6 +37,7 @@ export interface PublishTextOnlyResult {
 export function usePersonaComposer({
   persona,
   stylingModel,
+  crossPostEnabled = false,
   wallet,
   onPublished,
 }: UsePersonaComposerOptions) {
@@ -83,13 +85,16 @@ export function usePersonaComposer({
         personaNsec: persona.nsec,
         template,
       });
+      const shouldCrossPost = Boolean(
+        crossPostEnabled && persona.cross_post?.webhook_url,
+      );
 
       let result: PublishTextOnlyResult = {
         event,
-        crossPost: persona.cross_post?.webhook_url ? "sent" : "skipped",
+        crossPost: shouldCrossPost ? "sent" : "skipped",
       };
 
-      if (persona.cross_post?.webhook_url) {
+      if (shouldCrossPost) {
         try {
           await crossPost.mutateAsync({ persona, event });
         } catch (error) {
@@ -105,7 +110,7 @@ export function usePersonaComposer({
       await onPublished?.();
       return result;
     },
-    [crossPost, onPublished, persona, publish, user],
+    [crossPost, crossPostEnabled, onPublished, persona, publish, user],
   );
 
   return {

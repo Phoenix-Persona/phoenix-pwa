@@ -169,6 +169,7 @@ describe("usePersonaComposer", () => {
             cross_post: { webhook_url: "https://hooks.example.com" },
           }),
           stylingModel: "test-model",
+          crossPostEnabled: true,
         }),
       { wrapper },
     );

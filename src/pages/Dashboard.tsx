@@ -30,11 +30,13 @@ import { usePersonaComposer } from "@/hooks/usePersonaComposer";
 import { usePersona, usePersonaPosts } from "@/hooks/usePersona";
 import { useRegisterPersonaLightningAddress } from "@/hooks/useRegisterPersonaLightningAddress";
 import { useWallet } from "@/hooks/useWallet";
+import { featureFlags } from "@/lib/features";
 import { npubToHex } from "@/lib/nostrIds";
 
 const Dashboard = () => {
   const { npub = "" } = useParams();
   useSeoMeta({ title: "Dashboard — Zuka" });
+  const crossPostEnabled = featureFlags.crossPost;
 
   const { user } = useCurrentUser();
   const { toast } = useToast();
@@ -79,6 +81,7 @@ const Dashboard = () => {
   const composer = usePersonaComposer({
     persona: personaConfig,
     stylingModel,
+    crossPostEnabled,
     wallet,
     onPublished: () => {
       posts.refetch();
@@ -386,7 +389,7 @@ const Dashboard = () => {
                 </div>
 
                 {/* Cross-post indicator (read-only) */}
-                {personaConfig.cross_post?.webhook_url && (
+                {crossPostEnabled && personaConfig.cross_post?.webhook_url && (
                   <div className="flex flex-wrap items-center gap-2 rounded-lg border border-rw-sky/25 bg-rw-sky/5 px-4 py-2.5 text-xs">
                     <span className="font-medium text-foreground">
                       Cross-post:
@@ -416,12 +419,10 @@ const Dashboard = () => {
                   </div>
                 )}
 
-                {/* Action row — primary 'Generate video' (disabled until
-                    Jim's PPQ video → Blossom seam lands), secondary
+                {/* Action row — primary 'Generate video', secondary
                     'Publish text-only' fallback that ships the kind 1
-                    immediately. "Style in voice" rewrites the idea
-                    text using the persona's system prompt before
-                    publish (PPQ chat completion). */}
+                    immediately. "Style in voice" rewrites the idea text
+                    using the persona's system prompt before publish. */}
                 <div className="space-y-3 pt-1">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <Button
@@ -503,8 +504,8 @@ const Dashboard = () => {
                         onClick={() => setVideoDialogOpen(true)}
                         disabled={
                           !raw.trim() ||
-                          publish.isPending ||
-                          crossPost.isPending
+                          composer.isPublishing ||
+                          composer.isStyling
                         }
                         className="shadow-lg shadow-primary/20"
                         title="Open the video composer (Seedance i2v chain → stitched MP4 → kind 1)"

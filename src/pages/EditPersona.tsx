@@ -40,6 +40,7 @@ import { usePersona } from "@/hooks/usePersona";
 import { useToast } from "@/hooks/useToast";
 import { useUpdatePersona } from "@/hooks/useUpdatePersona";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
+import { featureFlags } from "@/lib/features";
 import { type PhoenixEnvelope } from "@/lib/persona";
 import {
   isValidLightningUsername,
@@ -131,6 +132,7 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   const { user } = useCurrentUser();
   const { toast } = useToast();
   const updatePersona = useUpdatePersona();
+  const crossPostEnabled = featureFlags.crossPost;
 
   const original = envelope.persona;
 
@@ -277,14 +279,16 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
       // string clears the configuration entirely.
       const trimmedWebhook = webhookUrl.trim();
       const webhookPlatforms = parseCommaList(webhookPlatformsInput, []);
-      const cross_post = trimmedWebhook
-        ? {
-            webhook_url: trimmedWebhook,
-            ...(webhookPlatforms.length > 0
-              ? { webhook_platforms: webhookPlatforms }
-              : {}),
-        }
-        : undefined;
+      const cross_post = crossPostEnabled
+        ? trimmedWebhook
+          ? {
+              webhook_url: trimmedWebhook,
+              ...(webhookPlatforms.length > 0
+                ? { webhook_platforms: webhookPlatforms }
+                : {}),
+            }
+          : undefined
+        : original.cross_post;
 
       const result = await updatePersona.mutateAsync({
         backupEvent,
@@ -429,45 +433,46 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
           />
         </div>
 
-        {/* Cross-posting (V1.5 — webhook to a third-party aggregator) */}
-        <div className="space-y-3 pt-2 border-t border-border">
-          <div className="space-y-1">
-            <Label htmlFor="edit-cross-post-url">
-              Cross-posting webhook (optional)
-            </Label>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Paste a webhook URL from your social-media aggregator
-              (Buffer, Zapier, Make.com, n8n, etc.). On every persona
-              publish, Zuka POSTs the event payload there so the
-              aggregator can fan it out to X / Facebook / Instagram /
-              TikTok / wherever you've connected. Leave blank to
-              disable.
-            </p>
-          </div>
-          <Input
-            id="edit-cross-post-url"
-            type="url"
-            value={webhookUrl}
-            onChange={(e) => setWebhookUrl(e.target.value)}
-            placeholder="https://hooks.zapier.com/hooks/catch/..."
-            autoComplete="off"
-          />
-          <div className="space-y-1">
-            <Label htmlFor="edit-cross-post-platforms" className="text-xs">
-              Platforms hint (comma separated, optional)
-            </Label>
+        {crossPostEnabled ? (
+          <div className="space-y-3 pt-2 border-t border-border">
+            <div className="space-y-1">
+              <Label htmlFor="edit-cross-post-url">
+                Cross-posting webhook (optional)
+              </Label>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Paste a webhook URL from your social-media aggregator
+                (Buffer, Zapier, Make.com, n8n, etc.). On every persona
+                publish, Zuka POSTs the event payload there so the
+                aggregator can fan it out to X / Facebook / Instagram /
+                TikTok / wherever you've connected. Leave blank to
+                disable.
+              </p>
+            </div>
             <Input
-              id="edit-cross-post-platforms"
-              value={webhookPlatformsInput}
-              onChange={(e) => setWebhookPlatformsInput(e.target.value)}
-              placeholder="x, facebook, instagram"
+              id="edit-cross-post-url"
+              type="url"
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              placeholder="https://hooks.zapier.com/hooks/catch/..."
+              autoComplete="off"
             />
-            <p className="text-[11px] text-muted-foreground">
-              Passed to your webhook as a `platforms` array — your
-              aggregator decides what to honor.
-            </p>
+            <div className="space-y-1">
+              <Label htmlFor="edit-cross-post-platforms" className="text-xs">
+                Platforms hint (comma separated, optional)
+              </Label>
+              <Input
+                id="edit-cross-post-platforms"
+                value={webhookPlatformsInput}
+                onChange={(e) => setWebhookPlatformsInput(e.target.value)}
+                placeholder="x, facebook, instagram"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Passed to your webhook as a `platforms` array — your
+                aggregator decides what to honor.
+              </p>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="flex justify-between gap-2 pt-2">
           <Button asChild variant="ghost" disabled={saving}>
