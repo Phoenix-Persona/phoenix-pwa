@@ -141,25 +141,37 @@ If pressed for time at hour +20, trim voice-gen to a hardcoded sample or push za
 - [x] persona-create flow — two-step Onboard wizard (Details → Picture → Mint) with PPQ image gen / Blossom upload
 - [x] persona-restore flow — sign in fresh, scan-and-decrypt re-hydrates personas, NostrSync invalidates caches on user/relay change
 - [ ] Wizard agent harness (`pi-agent-core` interview) — V2 per PROJECT.md §6, deferred
-- [ ] Composer wired to PPQ styling — Jim seam
-- [ ] Inline post-image generation — Jim seam
+- [x] Composer brief shape (idea + sources + hints + cross-post indicator) — PR #5 (Derek shipped the scaffold; AI styling + video gen wiring is Jim's seam)
+- [x] PostCard NIP-92 imeta image render — PR #4
+- [x] PostCard NIP-92 imeta video render — PR #5
+- [ ] Composer AI styling on publish — Jim seam (`useStyle` hook)
+- [ ] Composer video generation pipeline (`usePpqVideo` → Blossom → imeta on kind 1) — **Jim** (took over from Derek post-PR #5)
+- [ ] Inline post-image generation in compose — Jim seam
 - [ ] Empty-wallet UX (sticky banner + disabled buttons) — Jim seam
 
 ### Phase 3 — Main UI integration
-- [x] `Onboard.tsx` — form-based wizard with profile picture step (PR #3)
-- [x] `MyPersonas.tsx` — list with profile-picture avatars + 3-dot Edit/Delete menu (PR #3)
+- [x] `Onboard.tsx` — two-step wizard with profile-picture step (PR #3)
+- [x] `MyPersonas.tsx` — list with profile-picture avatars + 3-dot Edit/Delete menu + activity stats (PRs #3, #5)
 - [x] `PersonaFeed.tsx` — public profile header + posts (zap receipts pending Topher)
 - [x] `Verify.tsx` rebuilt — real client-side signature checks, post counts, profile timestamp (PR #3)
-- [x] `Settings.tsx` — Account (Lock now / Forget device / Change passphrase / Download backup) + Relays (NIP-65 manager) + Personas (PR #3)
-- [x] `EditPersona.tsx` — same-d-tag re-publish for name / bio / picture / system prompt / tags / languages (PR #3)
+- [x] `Settings.tsx` — Account + Relays + Media (Blossom servers) + Personas (PRs #3, #4)
+- [x] `EditPersona.tsx` — same-d-tag re-publish for name / bio / picture / system prompt / tags / languages / cross-post webhook (PRs #3, #5)
 - [x] AuthDialog NIP-49 import — kill-and-resurrect inverse of download-backup (PR #3)
-- [ ] PWA polish: install prompt, service worker, manifest icons — current branch
-- [ ] Mobile QA: 360 / 414 / 768 px on iPhone Safari + Android Chrome
+- [x] PWA install prompt + manifest + service worker (PR #4)
+- [x] Persona Edit/Delete affordances: 3-dot card menu + inline dashboard buttons (PR #3)
+- [x] Cross-post webhook scaffold (`cross_post` schema + `useCrossPost` hook + EditPersona UI + Dashboard dispatch) (PR #5)
+- [x] Persona activity stats (post count + last-active) on every card (PR #5)
+- [x] Composer reframe: video-first with text-only fallback (PR #5)
+- [ ] Mobile QA: 360 / 414 / 768 px on iPhone Safari + Android Chrome (needs a real device)
+- [ ] App shortcuts manifest entry for "New persona" / "My personas"
 
 ### Phase 4 — Demo prep
 - [ ] Kill-and-resurrect rehearsal: Device A logs in, posts; Device B drops in `.ncryptsec` and resumes
 - [ ] Persona nsec backups on multiple devices (exercises export/import round-trip)
+- [ ] Live-relay verification runbook (5 min with Anaïse — `docs/spike-nostr.md`)
+- [ ] Mobile NIP-49 latency measurement on Anaïse's phone
 - [ ] PWA install demonstrated on Anaïse's phone
+- [ ] Pre-load demo browser tabs + sign-ins on demo laptop
 
 ---
 

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="warm-glow" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#d97a2f" stop-opacity="0.50"/>
+      <stop offset="60%" stop-color="#1a0f08" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="imigongo" width="120" height="120" patternUnits="userSpaceOnUse">
+      <g stroke="#f5d05a" stroke-width="0.6" fill="none" opacity="0.08">
+        <path d="M60 8 L112 60 L60 112 L8 60 Z"/>
+        <path d="M60 28 L92 60 L60 92 L28 60 Z"/>
+        <path d="M60 48 L72 60 L60 72 L48 60 Z" fill="#f5d05a" fill-opacity="0.4" stroke-width="0.8"/>
+      </g>
+    </pattern>
+  </defs>
+
+  <!-- Charcoal base + Imigongo pattern + warm radial glow -->
+  <rect width="1200" height="630" fill="#1a0f08"/>
+  <rect width="1200" height="630" fill="url(#imigongo)"/>
+  <rect width="1200" height="630" fill="url(#warm-glow)"/>
+
+  <!-- Imigongo seal accent (top-left) -->
+  <g transform="translate(80, 96)" stroke="#f5d05a" fill="none" opacity="0.9">
+    <path d="M44 0 L88 44 L44 88 L0 44 Z" stroke-width="2"/>
+    <path d="M44 18 L70 44 L44 70 L18 44 Z" stroke-width="1.5"/>
+    <path d="M44 30 L58 44 L44 58 L30 44 Z" fill="#f5d05a" fill-opacity="0.45" stroke-width="1"/>
+  </g>
+
+  <!-- Eyebrow -->
+  <text x="200" y="148" font-family="Georgia, 'Liberation Serif', serif" font-size="22" font-weight="600" fill="#f5d05a" letter-spacing="5">
+    UNCENSORABLE VOICES
+  </text>
+
+  <!-- Wordmark -->
+  <text x="80" y="380" font-family="Georgia, 'Liberation Serif', serif" font-size="220" font-weight="500" fill="#fdf6e3" letter-spacing="-6">
+    Zuka
+  </text>
+
+  <!-- Italic tagline -->
+  <text x="80" y="468" font-family="Georgia, 'Liberation Serif', serif" font-size="38" fill="#fdf6e3" opacity="0.92" font-style="italic">
+    Voices that can&#8217;t be silenced.
+  </text>
+
+  <!-- Sub-tagline -->
+  <text x="80" y="514" font-family="Helvetica, 'DejaVu Sans', Arial, sans-serif" font-size="22" fill="#fdf6e3" opacity="0.65">
+    AI personas on Nostr · Built for the activists whose words have weight
+  </text>
+
+  <!-- Modern Rwandan flag stripe at bottom -->
+  <rect x="0" y="610" width="400" height="20" fill="#0099d4"/>
+  <rect x="400" y="610" width="400" height="20" fill="#fad201"/>
+  <rect x="800" y="610" width="400" height="20" fill="#20603d"/>
+</svg>
