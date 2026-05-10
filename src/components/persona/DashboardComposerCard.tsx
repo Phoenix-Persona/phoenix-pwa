@@ -174,9 +174,9 @@ export function DashboardComposerCard({
               </Button>
               <div className="flex flex-wrap gap-2">
                 <Button
-                  variant="outline"
                   onClick={onStyle}
                   disabled={styleDisabled}
+                  className="shadow-lg shadow-primary/20"
                   title={styleTitle}
                 >
                   {isStyling ? (
@@ -195,9 +195,9 @@ export function DashboardComposerCard({
                   )}
                 </Button>
                 <Button
+                  variant="outline"
                   onClick={onPost}
                   disabled={isPublishing || isStyling || !raw.trim()}
-                  className="shadow-lg shadow-primary/20"
                   title="Publish a text-only kind 1 note"
                 >
                   {isPublishing ? (
@@ -283,9 +283,9 @@ export function DashboardComposerCard({
                 </Button>
                 <div className="flex flex-wrap gap-2">
                   <Button
-                    variant="outline"
                     onClick={onStyle}
                     disabled={styleDisabled}
+                    className="shadow-lg shadow-primary/20"
                     title={styleTitle}
                   >
                     {isStyling ? (
@@ -304,9 +304,9 @@ export function DashboardComposerCard({
                     )}
                   </Button>
                   <Button
+                    variant="outline"
                     onClick={onOpenVideo}
                     disabled={!raw.trim() || isPublishing || isStyling}
-                    className="shadow-lg shadow-primary/20"
                     title="Open the video composer (Seedance i2v chain → stitched MP4 → kind 1)"
                   >
                     <Sparkles className="mr-2 size-4" aria-hidden="true" />

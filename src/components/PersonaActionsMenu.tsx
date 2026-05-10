@@ -7,7 +7,7 @@
  *                   cards where space is tight.
  *   - `inline`    : explicit Edit + Delete buttons rendered inline.
  *                   Used in the persona dashboard header next to
- *                   the "Public feed" link.
+ *                   the "Profile" link.
  *
  * Both variants share the same delete-confirm AlertDialog flow so
  * the user gets a consistent destructive-action gate.
@@ -62,9 +62,8 @@ interface PersonaActionsMenuProps {
    */
   variant?: "iconOnly" | "inline";
   /**
-   * For the `inline` variant, optionally show a "Public feed" link
-   * alongside Edit / Delete (saves the dashboard from rendering its
-   * own Public-feed button next to ours).
+   * For the `inline` variant, optionally show a "Profile" link
+   * (the public-facing persona page) alongside Edit / Delete.
    */
   publicFeedNpub?: string;
   /** Tone the inline buttons for a dark cover band. */
@@ -146,7 +145,7 @@ export function PersonaActionsMenu({
                     className="cursor-pointer"
                   >
                     <ExternalLink className="mr-2 size-4" />
-                    Public feed
+                    Profile
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -194,7 +193,7 @@ export function PersonaActionsMenu({
             >
               <Link to={`/p/${publicFeedNpub}`}>
                 <ExternalLink className="mr-2 size-3.5" />
-                Public feed
+                Profile
               </Link>
             </Button>
           )}

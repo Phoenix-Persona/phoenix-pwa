@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import type { NostrEvent } from "@nostrify/nostrify";
-import { ExternalLink } from "lucide-react";
+import { Check, Copy, ExternalLink } from "lucide-react";
 
 import { BrandedVideo } from "./BrandedVideo";
 import { PostBody } from "./PostBody";
+import { PostInteractionBadges } from "./PostInteractionBadges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { XLogo } from "@/components/icons/XLogo";
@@ -77,6 +78,12 @@ export function PostCard({ event, className }: PostCardProps) {
     () => buildEventUrl(viewerUrl, nevent),
     [viewerUrl, nevent]
   );
+  const [copied, setCopied] = useState(false);
+  async function handleCopyNevent() {
+    await navigator.clipboard.writeText(nevent);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
 
   // Layout: 1 image fills full width; 2 images split half-half;
   // 3+ images use a 2-column grid with the first one spanning.
@@ -160,39 +167,71 @@ export function PostCard({ event, className }: PostCardProps) {
         </div>
       )}
 
-      <div className="mt-3 pt-3 border-t border-border/60 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <time
-          dateTime={new Date(event.created_at * 1000).toISOString()}
-          title={absoluteTime}
-        >
-          {relativeTime(event.created_at)}
-        </time>
-        <div className="flex items-center gap-3">
-          <a
-            href={eventUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={nevent}
-            className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {truncateNevent(nevent)}
-            <ExternalLink className="size-3" aria-hidden="true" />
-          </a>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs hover:bg-black/5"
-            onClick={() =>
-              postToTwitterIntent({
-                text: event.content,
-                mediaUrl: videos[0]?.url ?? images[0]?.url,
-              })
-            }
-            title="Open X compose tab with this post pre-filled. If there's a video, it'll start downloading so you can attach it."
-          >
-            <XLogo className="mr-1 size-3" aria-hidden="true" />
-            Post to X
-          </Button>
+      <div className="mt-4 border-t border-border/60 pt-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <time
+              dateTime={new Date(event.created_at * 1000).toISOString()}
+              title={absoluteTime}
+            >
+              {relativeTime(event.created_at)}
+            </time>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <PostInteractionBadges eventId={event.id} />
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="h-7 rounded-full px-3 text-xs"
+            >
+              <a
+                href={eventUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={nevent}
+              >
+                View
+                <ExternalLink className="ml-1.5 size-3" aria-hidden="true" />
+              </a>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleCopyNevent}
+              title={copied ? "Copied" : `Copy ${truncateNevent(nevent)}`}
+              aria-label="Copy nevent to clipboard"
+              className="h-7 rounded-full px-3 text-xs"
+            >
+              {copied ? (
+                <>
+                  <Check className="mr-1.5 size-3" aria-hidden="true" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-1.5 size-3" aria-hidden="true" />
+                  Copy
+                </>
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 rounded-full bg-[#1d9bf0] px-3 text-xs font-semibold text-white shadow-none hover:bg-[#1a8cd8] hover:text-white focus-visible:ring-[#1d9bf0]/35"
+              onClick={() =>
+                postToTwitterIntent({
+                  text: event.content,
+                  mediaUrl: videos[0]?.url ?? images[0]?.url,
+                })
+              }
+              title="Open X compose tab with this post pre-filled. If there's a video, it'll start downloading so you can attach it."
+            >
+              <span>Post to</span>
+              <XLogo className="ml-1.5 size-3" aria-hidden="true" />
+            </Button>
+          </div>
         </div>
       </div>
     </article>

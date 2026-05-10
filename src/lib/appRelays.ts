@@ -19,7 +19,7 @@ export const APP_RELAYS: RelayMetadata = {
     { url: 'wss://nos.lol', read: true, write: true },
     // Ditto stack — needed for Soapbox / Ditto-rendered persona feeds
     { url: 'wss://relay.ditto.pub', read: true, write: true },
-    // nostr.band — search index; helps the Verify / public-feed pages
+    // nostr.band — search index; helps the public profile feed
     { url: 'wss://relay.nostr.band', read: true, write: true },
     // Long-tail mirrors — keep events alive if a hub drops them
     { url: 'wss://nostr.wine', read: true, write: true },

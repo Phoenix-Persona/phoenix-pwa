@@ -39,6 +39,16 @@ export function encodeEventAsNevent(
   });
 }
 
+export function encodePubkeyAsNprofile(
+  pubkey: string,
+  relays?: readonly string[],
+): string {
+  return nip19.nprofileEncode({
+    pubkey,
+    relays: relays ? [...relays] : undefined,
+  });
+}
+
 export function findPresetByUrl(
   urlPrefix: string,
 ): NostrViewerPreset | undefined {

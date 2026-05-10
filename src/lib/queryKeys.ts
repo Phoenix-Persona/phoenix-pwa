@@ -18,6 +18,8 @@ export const queryKeys = {
     posts: (npub: string | undefined, limit: number) =>
       ["phoenix-persona-posts", npub, limit] as const,
     allPosts: () => ["phoenix-persona-posts"] as const,
+    interactions: (eventId: string | undefined) =>
+      ["phoenix-post-interactions", eventId ?? ""] as const,
     publicProfile: (pubkey: string | undefined) =>
       ["persona-public-profile", pubkey ?? ""] as const,
     allPublicProfiles: () => ["persona-public-profile"] as const,

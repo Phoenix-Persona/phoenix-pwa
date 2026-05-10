@@ -8,7 +8,6 @@ import Dashboard from "./pages/Dashboard";
 import EditPersona from "./pages/EditPersona";
 import MyPersonas from "./pages/MyPersonas";
 import PersonaFeed from "./pages/PersonaFeed";
-import Verify from "./pages/Verify";
 import Settings from "./pages/Settings";
 import { NIP19Page } from "./pages/NIP19Page";
 import NotFound from "./pages/NotFound";
@@ -31,7 +30,6 @@ export function AppRouter() {
         <Route path="/dashboard/:npub" element={<Dashboard />} />
         <Route path="/dashboard/:npub/edit" element={<EditPersona />} />
         <Route path="/p/:npub" element={<PersonaFeed />} />
-        <Route path="/verify/:npub" element={<Verify />} />
         <Route path="/settings" element={<Settings />} />
         {/* Developer harnesses. */}
         <Route path="/dev/wallet" element={<WalletHarness />} />
