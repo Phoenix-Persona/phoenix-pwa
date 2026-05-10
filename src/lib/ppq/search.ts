@@ -20,6 +20,13 @@
  */
 
 import { chatCompletion, type PpqRequestOptions } from "./client";
+import {
+  getXUserTweets,
+  searchXTweets,
+  tweetPermalink,
+  twitterDateToIso,
+  type XTweet,
+} from "./dataEnrichment";
 import type { PpqChatRequest } from "./types";
 
 export interface SearchResult {
@@ -97,6 +104,106 @@ const SYSTEM_PROMPT = [
   "If the search returns nothing relevant, return { \"results\": [] }.",
   "Never fabricate URLs.",
 ].join("\n");
+
+/* ---------- X / Twitter search via PPQ data-enrichment ---------- */
+
+export interface SearchXUserArgs {
+  apiKey: string;
+  /** Handle without the leading `@`. */
+  handle: string;
+  maxResults?: number;
+  options?: PpqRequestOptions;
+}
+
+/**
+ * Pull recent tweets from a single handle via PPQ's
+ * `/v1/data/x/tweets/user` endpoint. Maps to `SearchResult[]` so the
+ * Research panel renders X tweets through the same row UX as web hits.
+ *
+ * Pricing: $0.0115 per call (vs the `web` plugin's $0.02 Exa
+ * fallback). Returns structured tweet data — title, full text,
+ * media, expanded URLs — instead of LLM prose around aggregator
+ * results.
+ */
+export async function searchXUser(args: SearchXUserArgs): Promise<SearchResult[]> {
+  const handle = stripHandle(args.handle);
+  if (!handle) return [];
+  const res = await getXUserTweets(
+    args.apiKey,
+    {
+      username: handle,
+      maxResults: Math.min(Math.max(args.maxResults ?? 8, 1), 100),
+    },
+    args.options,
+  );
+  return (res.data ?? []).map((t) => tweetToSearchResult(t, handle));
+}
+
+export interface SearchXQueryArgs {
+  apiKey: string;
+  /**
+   * Free-form words (AND-joined). Mapped to the `words` filter on
+   * the upstream endpoint. For more advanced filters (specific handle,
+   * phrase, hashtag, time range) call `searchXTweets` directly.
+   */
+  query: string;
+  maxResults?: number;
+  options?: PpqRequestOptions;
+}
+
+/** Free-form X search via `/v1/data/x/tweets/search` with `words` filter. */
+export async function searchXQuery(args: SearchXQueryArgs): Promise<SearchResult[]> {
+  const q = args.query?.trim();
+  if (!q) return [];
+  const res = await searchXTweets(
+    args.apiKey,
+    {
+      words: q,
+      maxResults: Math.min(Math.max(args.maxResults ?? 8, 1), 100),
+    },
+    args.options,
+  );
+  // Free-form search doesn't carry the per-tweet handle in scope —
+  // x.com routes "/i/status/<id>" correctly even without the user
+  // segment, so use "i" as a wildcard.
+  return (res.data ?? []).map((t) => tweetToSearchResult(t, "i"));
+}
+
+function stripHandle(input: string): string {
+  return input.trim().replace(/^@+/, "").replace(/[^A-Za-z0-9_]/g, "");
+}
+
+/**
+ * Map an X v2 tweet object to the unified `SearchResult` shape. The
+ * row component is agnostic — it renders title + excerpt + source
+ * badge + Open link the same way regardless of source.
+ *
+ * URL preference: when a tweet has a non-twitter expanded URL (e.g.
+ * a linked article), use that as `result.url` so "Add as source"
+ * cites the underlying article instead of the t.co shortlink.
+ * Otherwise fall back to the X permalink.
+ */
+function tweetToSearchResult(t: XTweet, handle: string): SearchResult {
+  const text = (t.text ?? "").trim();
+  const expanded = t.entities?.urls?.find(
+    (u) =>
+      typeof u.expanded_url === "string" &&
+      !/^https?:\/\/(www\.)?(x|twitter)\.com\//i.test(u.expanded_url),
+  )?.expanded_url;
+  const permalink = tweetPermalink(handle, t.id);
+  const url = expanded ?? permalink;
+  const title =
+    text.length > 120 ? text.slice(0, 117).trimEnd() + "…" : text || permalink;
+  return {
+    title,
+    url,
+    excerpt: text.length > 0 ? text : "(no text — see tweet for media or quote)",
+    source: handle === "i" ? "X / Twitter" : `@${handle}`,
+    publishedAt: t.created_at ? twitterDateToIso(t.created_at) : undefined,
+  };
+}
+
+/* ---------- web search (Claude + `web` plugin) ---------- */
 
 export async function searchWeb(args: SearchWebArgs): Promise<SearchResult[]> {
   const maxResults = args.maxResults ?? DEFAULT_MAX_RESULTS;

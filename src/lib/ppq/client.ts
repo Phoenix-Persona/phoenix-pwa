@@ -58,7 +58,7 @@ interface InternalRequestInit extends PpqRequestOptions {
   accept202?: boolean;
 }
 
-async function request<T>(
+export async function request<T>(
   path: string,
   init: InternalRequestInit = {},
 ): Promise<{ data: T; status: number }> {

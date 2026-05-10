@@ -18,8 +18,8 @@
  * fresh-onboarding user has zero-typing entry points.
  */
 
-import { useEffect, useRef, useState } from "react";
-import { ExternalLink, Loader2, Quote, Search, Tag } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ExternalLink, Globe, Loader2, Quote, Search, Tag } from "lucide-react";
 
 import {
   Sheet,
@@ -32,53 +32,76 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useResearchSearch } from "@/hooks/useResearchSearch";
+import { XLogo } from "@/components/icons/XLogo";
+import {
+  useResearchSearch,
+  type ResearchSearchInput,
+} from "@/hooks/useResearchSearch";
 import { useToast } from "@/hooks/useToast";
 import type { SearchResult } from "@/lib/ppq/search";
 import { cn } from "@/lib/utils";
 
 /**
- * Curated topic seeds. One-tap entry points for human-rights research
- * — covers the user's stated examples (Rwanda, HRW, HRF) plus the
- * adjacent press-freedom / political-prisoner space the personas
- * typically operate in.
+ * Curated topic seeds. One-tap entry points.
+ *
+ * `web` chips → Claude + the `web` plugin (Exa.AI) — best for
+ * institutional sources that publish HTML articles.
+ *
+ * `x-user` chips → PPQ's `/v1/data/x/tweets/user` data-enrichment
+ * endpoint — real recent tweets from the named handle, with article
+ * URLs surfaced from each tweet's expanded entities.
  */
-const CURATED_TOPICS: { label: string; query: string }[] = [
-  { label: "Rwanda human rights", query: "Rwanda human rights" },
-  { label: "Human Rights Watch", query: "Human Rights Watch latest reports" },
+type CuratedTopic =
+  | { source: "web"; label: string; query: string }
+  | { source: "x-user"; label: string; handle: string };
+
+const CURATED_TOPICS: CuratedTopic[] = [
+  { source: "web", label: "Rwanda human rights", query: "Rwanda human rights" },
   {
+    source: "web",
+    label: "Human Rights Watch",
+    query: "Human Rights Watch latest reports",
+  },
+  {
+    source: "web",
     label: "Human Rights Foundation",
     query: "Human Rights Foundation campaigns",
   },
-  { label: "Press freedom Africa", query: "press freedom Africa 2025 2026" },
   {
+    source: "web",
+    label: "Press freedom Africa",
+    query: "press freedom Africa 2025 2026",
+  },
+  {
+    source: "web",
     label: "Political prisoners",
     query: "political prisoners advocacy releases",
   },
   {
+    source: "web",
     label: "Reporters Without Borders",
     query: "Reporters Without Borders press index",
   },
-  { label: "Censorship", query: "internet censorship recent reports" },
   {
+    source: "web",
+    label: "Censorship",
+    query: "internet censorship recent reports",
+  },
+  {
+    source: "web",
     label: "Amnesty International",
     query: "Amnesty International recent statements",
   },
-  // Verified Rwandan independent reporting handles — surface their
-  // recent X posts alongside the institutional sources above.
-  {
-    label: "@ChroniclesRW",
-    query: "site:x.com from:ChroniclesRW recent posts on Rwanda",
-  },
-  {
-    label: "@therwandaeditor",
-    query: "site:x.com from:therwandaeditor recent posts",
-  },
-  {
-    label: "@Jambonewsnet",
-    query: "site:x.com from:Jambonewsnet recent reporting on Rwanda",
-  },
+  // Verified Rwandan independent reporting handles — pulled live via
+  // PPQ's X data-enrichment endpoint, not just web search around the
+  // handle.
+  { source: "x-user", label: "@ChroniclesRW", handle: "ChroniclesRW" },
+  { source: "x-user", label: "@therwandaeditor", handle: "therwandaeditor" },
+  { source: "x-user", label: "@Jambonewsnet", handle: "Jambonewsnet" },
 ];
+
+/** Match `@handle` (single token, optional leading @, no spaces). */
+const HANDLE_RE = /^@?([A-Za-z0-9_]{1,32})$/;
 
 export interface ResearchPanelProps {
   open: boolean;
@@ -96,24 +119,40 @@ export function ResearchPanel(props: ResearchPanelProps) {
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [activeQuery, setActiveQuery] = useState<string | null>(null);
+  /**
+   * The discriminated input that's currently being shown / loading.
+   * `null` means we haven't searched yet (fresh-open empty state).
+   */
+  const [activeInput, setActiveInput] = useState<ResearchSearchInput | null>(
+    null,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Focus the input when the sheet opens so the operator can just
-  // start typing.
+  /**
+   * What the free-text input would search if Enter were pressed
+   * right now. `@handle` (single token) → x-user; otherwise → web.
+   * Memoized so the Search button can show the correct icon and the
+   * active-pill highlighting can find the match.
+   */
+  const detectedInput = useMemo<ResearchSearchInput | null>(() => {
+    const trimmed = query.trim();
+    if (!trimmed) return null;
+    const m = trimmed.match(HANDLE_RE);
+    if (m) return { source: "x-user", handle: m[1] };
+    return { source: "web", query: trimmed };
+  }, [query]);
+
   useEffect(() => {
     if (!open) return;
     const t = window.setTimeout(() => inputRef.current?.focus(), 50);
     return () => window.clearTimeout(t);
   }, [open]);
 
-  async function runSearch(q: string) {
-    const trimmed = q.trim();
-    if (!trimmed) return;
-    setActiveQuery(trimmed);
+  async function runSearch(input: ResearchSearchInput) {
+    setActiveInput(input);
     setResults([]);
     try {
-      const items = await research.mutateAsync({ query: trimmed });
+      const items = await research.mutateAsync(input);
       setResults(items);
       if (items.length === 0) {
         toast({
@@ -154,7 +193,7 @@ export function ResearchPanel(props: ResearchPanelProps) {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              void runSearch(query);
+              if (detectedInput) void runSearch(detectedInput);
             }}
             className="flex gap-2"
           >
@@ -162,48 +201,70 @@ export function ResearchPanel(props: ResearchPanelProps) {
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="e.g. Rwanda press freedom, @hrw, Belarus political prisoners…"
+              placeholder="@handle (live X search) or topic (web search)…"
               disabled={research.isPending}
               className="flex-1"
             />
             <Button
               type="submit"
-              disabled={!query.trim() || research.isPending}
+              disabled={!detectedInput || research.isPending}
               className="shadow-md shadow-primary/20"
+              title={
+                detectedInput?.source === "x-user"
+                  ? `Live X search for @${detectedInput.handle}`
+                  : "Web search"
+              }
             >
               {research.isPending ? (
-                <Loader2
-                  className="size-4 animate-spin"
-                  aria-hidden="true"
-                />
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : detectedInput?.source === "x-user" ? (
+                <XLogo className="size-3.5" aria-hidden="true" />
               ) : (
-                <Search className="size-4" aria-hidden="true" />
+                <Globe className="size-4 text-rw-sky" aria-hidden="true" />
               )}
               <span className="ml-2">Search</span>
             </Button>
           </form>
           <div className="flex flex-wrap gap-1.5">
-            {CURATED_TOPICS.map((t) => (
-              <button
-                key={t.query}
-                type="button"
-                disabled={research.isPending}
-                onClick={() => {
-                  setQuery(t.label);
-                  void runSearch(t.query);
-                }}
-                className={cn(
-                  "rounded-full border px-2.5 py-1 text-[11px] transition-colors",
-                  "border-imigongo-clay/20 bg-card hover:border-imigongo-clay/40",
-                  "disabled:opacity-50",
-                  activeQuery === t.query
-                    ? "border-rw-gold bg-rw-gold/15 text-foreground"
-                    : "text-muted-foreground",
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
+            {CURATED_TOPICS.map((t) => {
+              const active = topicMatchesActive(t, activeInput);
+              const onClick = () => {
+                setQuery(t.label);
+                void runSearch(
+                  t.source === "x-user"
+                    ? { source: "x-user", handle: t.handle }
+                    : { source: "web", query: t.query },
+                );
+              };
+              return (
+                <button
+                  key={`${t.source}-${t.label}`}
+                  type="button"
+                  disabled={research.isPending}
+                  onClick={onClick}
+                  title={
+                    t.source === "x-user"
+                      ? `Live X search · @${t.handle}`
+                      : "Web search"
+                  }
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-colors",
+                    "border-imigongo-clay/20 bg-card hover:border-imigongo-clay/40",
+                    "disabled:opacity-50",
+                    active
+                      ? "border-rw-gold bg-rw-gold/15 text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {t.source === "x-user" ? (
+                    <XLogo className="size-2.5" aria-hidden="true" />
+                  ) : (
+                    <Globe className="size-3 text-rw-sky" aria-hidden="true" />
+                  )}
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -212,7 +273,7 @@ export function ResearchPanel(props: ResearchPanelProps) {
           {research.isPending ? (
             <ResearchSkeleton />
           ) : results.length === 0 ? (
-            <ResearchEmpty hasSearched={activeQuery !== null} />
+            <ResearchEmpty hasSearched={activeInput !== null} />
           ) : (
             <ul className="space-y-3">
               {results.map((r, idx) => (
@@ -361,6 +422,24 @@ function ResearchEmpty(props: { hasSearched: boolean }) {
 }
 
 /* ---------- helpers ---------- */
+
+/**
+ * True iff the curated chip matches the currently-active search.
+ * Used to highlight the chip golden when its results are showing.
+ */
+function topicMatchesActive(
+  topic: CuratedTopic,
+  active: ResearchSearchInput | null,
+): boolean {
+  if (!active) return false;
+  if (topic.source === "web" && active.source === "web") {
+    return topic.query === active.query;
+  }
+  if (topic.source === "x-user" && active.source === "x-user") {
+    return topic.handle.toLowerCase() === active.handle.toLowerCase();
+  }
+  return false;
+}
 
 function safeDomain(url: string): string | null {
   try {

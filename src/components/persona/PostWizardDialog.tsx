@@ -174,6 +174,7 @@ export function PostWizardDialog({
   async function runResearch() {
     try {
       const results = await research.mutateAsync({
+        source: "web",
         query: buildResearchQuery(persona),
         lens: "recent human-rights, press-freedom, and civic-rights reporting",
         maxResults: 6,
