@@ -1,13 +1,18 @@
 import type { NostrSigner } from "@nostrify/types";
 
+import { AiAssistButton } from "@/components/AiAssistField";
 import { PersonaPictureField } from "@/components/PersonaPictureField";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { SPARK_LN_DOMAIN } from "@/lib/wallet/lightningAddress";
 
 export interface EditPersonaPublicProfileFieldsProps {
   bio: string;
   pictureUrl: string;
   name: string;
+  username: string;
+  lightningUsername: string;
+  systemPrompt: string;
   loadingBio: boolean;
   onBioChange: (value: string) => void;
   onPictureUrlChange: (value: string) => void;
@@ -32,6 +37,9 @@ export function EditPersonaPublicProfileFields({
   bio,
   pictureUrl,
   name,
+  username,
+  lightningUsername,
+  systemPrompt,
   loadingBio,
   onBioChange,
   onPictureUrlChange,
@@ -42,7 +50,25 @@ export function EditPersonaPublicProfileFields({
   return (
     <>
       <div className="space-y-2">
-        <Label htmlFor="edit-bio">Bio (public profile)</Label>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Label htmlFor="edit-bio">Bio (public profile)</Label>
+          <AiAssistButton
+            fieldLabel="Bio"
+            fieldPurpose="A concise public Nostr profile bio for the persona."
+            currentValue={bio}
+            surroundingContext={[
+              `Display name: ${fieldContextValue(name)}`,
+              `Username: ${fieldContextValue(username)}`,
+              `Lightning address: ${
+                lightningUsername
+                  ? `${lightningUsername}@${SPARK_LN_DOMAIN}`
+                  : "(empty)"
+              }`,
+              `Current system prompt: ${fieldContextValue(systemPrompt)}`,
+            ]}
+            onReplace={onBioChange}
+          />
+        </div>
         <Textarea
           id="edit-bio"
           rows={2}
@@ -69,4 +95,8 @@ export function EditPersonaPublicProfileFields({
       </div>
     </>
   );
+}
+
+function fieldContextValue(value: string): string {
+  return value.trim() || "(empty)";
 }

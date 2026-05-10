@@ -30,11 +30,10 @@ import { FlagStripe } from "@/components/ImigongoBand";
 import { EditPersonaCrossPostFields } from "@/components/persona/EditPersonaCrossPostFields";
 import { EditPersonaIdentityFields } from "@/components/persona/EditPersonaIdentityFields";
 import { EditPersonaPublicProfileFields } from "@/components/persona/EditPersonaPublicProfileFields";
+import { EditPersonaSystemPromptField } from "@/components/persona/EditPersonaSystemPromptField";
 import { createPersonaSigner } from "@/lib/personaSigner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePersona } from "@/hooks/usePersona";
 import { usePersonaPublicProfile } from "@/hooks/usePersonaPublicProfile";
@@ -360,23 +359,23 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
           bio={bio}
           pictureUrl={pictureUrl}
           name={name}
+          username={username}
+          lightningUsername={lightningUsername}
+          systemPrompt={systemPrompt}
           loadingBio={profileQuery.isLoading}
           onBioChange={setBio}
           onPictureUrlChange={setPictureUrl}
           pictureSigner={personaSigner}
         />
 
-        <div className="space-y-2">
-          <Label htmlFor="edit-system-prompt">
-            System prompt (private)
-          </Label>
-          <Textarea
-            id="edit-system-prompt"
-            rows={6}
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
-          />
-        </div>
+        <EditPersonaSystemPromptField
+          name={name}
+          username={username}
+          lightningUsername={lightningUsername}
+          bio={bio}
+          systemPrompt={systemPrompt}
+          onSystemPromptChange={setSystemPrompt}
+        />
 
         {crossPostEnabled ? (
           <EditPersonaCrossPostFields
