@@ -29,7 +29,10 @@ import {
   disconnectWallet,
   generateMnemonic,
 } from "@/lib/wallet/client";
-import { DEFAULT_AUTO_TOPUP_CONFIG } from "@/lib/wallet/types";
+import {
+  DEFAULT_AUTO_TOPUP_CONFIG,
+  autoTopupConfigToPersisted,
+} from "@/lib/wallet/types";
 import {
   LightningUsernameTakenError,
   isValidLightningUsername,
@@ -141,11 +144,7 @@ export function useCreatePersona() {
         seed: mnemonic,
         lightning_address: lightningAddress,
         lnurl,
-        auto_topup: {
-          enabled: DEFAULT_AUTO_TOPUP_CONFIG.enabled,
-          threshold_usd: DEFAULT_AUTO_TOPUP_CONFIG.thresholdUsd,
-          target_usd: DEFAULT_AUTO_TOPUP_CONFIG.targetUsd,
-        },
+        auto_topup: autoTopupConfigToPersisted(DEFAULT_AUTO_TOPUP_CONFIG),
       };
 
       const signer = user.signer as unknown as Nip44Signer;

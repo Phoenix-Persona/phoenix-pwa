@@ -21,7 +21,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { runAutoTopupOnce } from "@/lib/wallet/autoTopup";
+import { getQueryHistory } from "@/lib/ppq/client";
+import { runAutoTopupOnce, runManualTopupOnce } from "@/lib/wallet/autoTopup";
 import { queryKeys } from "@/lib/queryKeys";
 import {
   connectWallet,
@@ -36,6 +37,7 @@ import {
   type AutoTopupConfig,
   type AutoTopupRunResult,
   type Payment,
+  type PpqFundingSource,
   type ReceiveBolt11Args,
   type ReceiveBolt11Result,
   type SendBolt11Args,
@@ -43,10 +45,30 @@ import {
   type WalletHandle,
   type WalletInfo,
 } from "@/lib/wallet/types";
+import type { PpqAccount, PpqQueryHistoryItem } from "@/lib/ppq/types";
 
 import { usePpqAccount } from "./usePpqAccount";
 
 const WALLET_INFO_REFETCH_MS = 15_000;
+const DEFAULT_SELF_FUNDED_AUTO_TOPUP_CONFIG: AutoTopupConfig = {
+  ...DEFAULT_AUTO_TOPUP_CONFIG,
+  fundingSource: "persona",
+};
+
+export interface OperatorFundingWallet {
+  handle: WalletHandle | undefined;
+  walletId: string | undefined;
+  label: string;
+  refreshInfo: () => void;
+  refreshPayments: () => void;
+  isConnecting?: boolean;
+}
+
+export interface PpqFundingSourceState {
+  source: PpqFundingSource;
+  label: string;
+  isAvailable: boolean;
+}
 
 export interface UseWalletOptions {
   /** Non-secret identity for query keys, e.g. `persona:<pubkey>`. */
@@ -55,12 +77,13 @@ export interface UseWalletOptions {
   mnemonic: string | undefined;
   /**
    * Initial auto-topup config. Defaults to `DEFAULT_AUTO_TOPUP_CONFIG`
-   * (enabled, threshold $1, target $5). The hook holds this in state and
+   * (enabled, threshold $5, top-up amount $5). The hook holds this in state and
    * exposes `setAutoTopup` for callers to mutate. Persistence (e.g. into
    * the persona's encrypted backup) is the caller's responsibility — wire
    * a `useEffect` on `autoTopup` to write changes back.
    */
   autoTopup?: AutoTopupConfig;
+  operatorFundingWallet?: OperatorFundingWallet;
 }
 
 export interface AutoTopupRunState {
@@ -90,18 +113,36 @@ export interface UseWalletResult {
   sendError: Error | undefined;
   /* ----- ppq.ai credit ----- */
   ppqBalanceUsd: number | undefined;
+  ppqAccount: PpqAccount | null;
   isPpqBalanceLoading: boolean;
   refreshPpqBalance: () => void;
+  ppqQueryHistory: PpqQueryHistoryItem[] | undefined;
+  isPpqQueryHistoryLoading: boolean;
+  ppqQueryHistoryError: Error | undefined;
+  refreshPpqQueryHistory: () => void;
   /* ----- Auto-topup ----- */
   autoTopup: AutoTopupConfig;
   setAutoTopup: (cfg: AutoTopupConfig) => void;
   autoTopupRun: AutoTopupRunState;
   /** Manually trigger an auto-topup pass (bypasses threshold check). */
   triggerAutoTopup: () => Promise<AutoTopupRunResult | null>;
+  fundingSources: PpqFundingSourceState[];
+  manualTopup: (
+    amountUsd: number,
+    source?: PpqFundingSource,
+  ) => Promise<AutoTopupRunResult>;
+  isManualTopupRunning: boolean;
+  manualTopupError: Error | undefined;
+  manualTopupResult: AutoTopupRunResult | undefined;
 }
 
 export function useWallet(opts: UseWalletOptions): UseWalletResult {
   const { mnemonic, walletId } = opts;
+  const operatorFundingHandle = opts.operatorFundingWallet?.handle;
+  const operatorFundingLabel = opts.operatorFundingWallet?.label;
+  const operatorFundingRefreshInfo = opts.operatorFundingWallet?.refreshInfo;
+  const operatorFundingRefreshPayments =
+    opts.operatorFundingWallet?.refreshPayments;
   const qc = useQueryClient();
 
   const ppq = usePpqAccount();
@@ -112,14 +153,21 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
   // caller is currently passing in `opts.autoTopup`. This pattern lets prop
   // changes flow through without a sync effect (which the React lint rules
   // — rightly — flag as an anti-pattern).
+  const autoTopupIdentity = walletId ?? "";
   const [localAutoTopup, setLocalAutoTopup] = useState<
-    AutoTopupConfig | undefined
+    | {
+        identity: string;
+        config: AutoTopupConfig;
+      }
+    | undefined
   >(undefined);
   const autoTopup =
-    localAutoTopup ?? opts.autoTopup ?? DEFAULT_AUTO_TOPUP_CONFIG;
+    localAutoTopup?.identity === autoTopupIdentity
+      ? localAutoTopup.config
+      : opts.autoTopup ?? DEFAULT_SELF_FUNDED_AUTO_TOPUP_CONFIG;
   const setAutoTopup = useCallback((cfg: AutoTopupConfig) => {
-    setLocalAutoTopup(cfg);
-  }, []);
+    setLocalAutoTopup({ identity: autoTopupIdentity, config: cfg });
+  }, [autoTopupIdentity]);
 
   /* ---------- SDK connect ---------- */
 
@@ -214,6 +262,97 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
     qc.invalidateQueries({ queryKey: queryKeys.wallet.payments(walletId) });
   }, [walletId, qc]);
 
+  const isOperatorWallet = walletId?.startsWith("operator:") ?? false;
+  const fundingSources = useMemo<PpqFundingSourceState[]>(
+    () => [
+      {
+        source: "operator",
+        label: operatorFundingLabel ?? "Operator",
+        isAvailable: Boolean(
+          operatorFundingHandle ?? (isOperatorWallet ? handle : undefined),
+        ),
+      },
+      ...(isOperatorWallet
+        ? []
+        : [
+            {
+              source: "persona" as const,
+              label: "Persona",
+              isAvailable: Boolean(handle),
+            },
+          ]),
+    ],
+    [
+      handle,
+      isOperatorWallet,
+      operatorFundingHandle,
+      operatorFundingLabel,
+    ],
+  );
+
+  const resolveFundingWallet = useCallback(
+    (source: PpqFundingSource) => {
+      if (source === "operator") {
+        if (
+          operatorFundingHandle &&
+          operatorFundingRefreshInfo &&
+          operatorFundingRefreshPayments
+        ) {
+          return {
+            handle: operatorFundingHandle,
+            refreshInfo: operatorFundingRefreshInfo,
+            refreshPayments: operatorFundingRefreshPayments,
+          };
+        }
+        if (isOperatorWallet && handle) {
+          return { handle, refreshInfo, refreshPayments };
+        }
+        return null;
+      }
+      if (!handle) return null;
+      return { handle, refreshInfo, refreshPayments };
+    },
+    [
+      handle,
+      isOperatorWallet,
+      operatorFundingHandle,
+      operatorFundingRefreshInfo,
+      operatorFundingRefreshPayments,
+      refreshInfo,
+      refreshPayments,
+    ],
+  );
+
+  const refreshFundingWallet = useCallback(
+    (source: PpqFundingSource) => {
+      const fundingWallet = resolveFundingWallet(source);
+      fundingWallet?.refreshInfo();
+      fundingWallet?.refreshPayments();
+    },
+    [resolveFundingWallet],
+  );
+
+  const ppqQueryHistoryQuery = useQuery({
+    queryKey: queryKeys.ppq.queryHistory(ppq.account?.credit_id),
+    enabled: Boolean(ppq.account?.api_key),
+    queryFn: async (c) => {
+      if (!ppq.account) throw new Error("ppq account not initialized");
+      return getQueryHistory(ppq.account.api_key, {
+        page: 1,
+        pageCount: 20,
+        allKeys: true,
+        signal: c.signal,
+      });
+    },
+    staleTime: 30_000,
+  });
+
+  const refreshPpqQueryHistory = useCallback(() => {
+    qc.invalidateQueries({
+      queryKey: queryKeys.ppq.queryHistory(ppq.account?.credit_id),
+    });
+  }, [ppq.account?.credit_id, qc]);
+
   /* ---------- Receive / send ---------- */
 
   const receiveMutation = useMutation<
@@ -243,6 +382,7 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
   const [autoTopupRun, setAutoTopupRun] = useState<AutoTopupRunState>({
     isRunning: false,
   });
+  const lastAutoTopupKeyRef = useRef<string | undefined>(undefined);
 
   const autoTopupMutation = useMutation<
     AutoTopupRunResult | null,
@@ -250,10 +390,13 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
     void
   >({
     mutationFn: async () => {
-      if (!handle) throw new Error("Wallet not connected");
       if (!ppq.account) throw new Error("ppq account not initialized");
+      const fundingWallet = resolveFundingWallet(autoTopup.fundingSource);
+      if (!fundingWallet) {
+        throw new Error(`${autoTopup.fundingSource} funding wallet not connected`);
+      }
       return runAutoTopupOnce({
-        wallet: handle,
+        wallet: fundingWallet.handle,
         ppqApiKey: ppq.account.api_key,
         ppqBalanceUsd: ppq.balance?.balance_usd,
         config: autoTopup,
@@ -269,7 +412,8 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
         lastResult: result ?? undefined,
       });
       ppq.refreshBalance();
-      refreshInfo();
+      refreshFundingWallet(autoTopup.fundingSource);
+      refreshPpqQueryHistory();
     },
     onError: (err) => {
       setAutoTopupRun((s) => ({
@@ -284,22 +428,68 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
   // wallet, kick off one auto-topup pass. Guarded by the mutation's pending
   // state so we never queue concurrent runs.
   const balanceUsd = ppq.balance?.balance_usd;
-  const canAutoTopup = Boolean(handle && ppq.account && autoTopup.enabled);
+  const canAutoTopup = Boolean(
+    resolveFundingWallet(autoTopup.fundingSource) &&
+      ppq.account &&
+      autoTopup.enabled,
+  );
   useEffect(() => {
     if (!canAutoTopup) return;
     if (typeof balanceUsd !== "number") return;
-    if (balanceUsd >= autoTopup.thresholdUsd) return;
+    if (balanceUsd >= autoTopup.thresholdUsd) {
+      lastAutoTopupKeyRef.current = undefined;
+      return;
+    }
     if (autoTopupMutation.isPending) return;
     if (autoTopupRun.isRunning) return;
+    const runKey = [
+      ppq.account?.credit_id,
+      balanceUsd,
+      autoTopup.thresholdUsd,
+      autoTopup.topupAmountUsd,
+      autoTopup.fundingSource,
+    ].join(":");
+    if (lastAutoTopupKeyRef.current === runKey) return;
+    lastAutoTopupKeyRef.current = runKey;
     autoTopupMutation.mutate();
     // We intentionally leave `autoTopupMutation` out of deps — TanStack
     // Query mutation objects are referentially stable per query client.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [balanceUsd, canAutoTopup, autoTopup.thresholdUsd]);
+  }, [
+    balanceUsd,
+    canAutoTopup,
+    autoTopup.thresholdUsd,
+    autoTopup.topupAmountUsd,
+    autoTopup.fundingSource,
+    ppq.account?.credit_id,
+    resolveFundingWallet,
+  ]);
 
   const triggerAutoTopup = useCallback(async () => {
     return autoTopupMutation.mutateAsync();
   }, [autoTopupMutation]);
+
+  const manualTopupMutation = useMutation<
+    AutoTopupRunResult,
+    Error,
+    { amountUsd: number; source: PpqFundingSource }
+  >({
+    mutationFn: async ({ amountUsd, source }) => {
+      if (!ppq.account) throw new Error("ppq account not initialized");
+      const fundingWallet = resolveFundingWallet(source);
+      if (!fundingWallet) throw new Error(`${source} funding wallet not connected`);
+      return runManualTopupOnce({
+        wallet: fundingWallet.handle,
+        ppqApiKey: ppq.account.api_key,
+        amountUsd,
+      });
+    },
+    onSuccess: (_result, variables) => {
+      ppq.refreshBalance();
+      refreshFundingWallet(variables.source);
+      refreshPpqQueryHistory();
+    },
+  });
 
   /* ---------- Result ---------- */
 
@@ -321,12 +511,23 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
       isSending: sendMutation.isPending,
       sendError: sendMutation.error ?? undefined,
       ppqBalanceUsd: ppq.balance?.balance_usd,
+      ppqAccount: ppq.account,
       isPpqBalanceLoading: ppq.isBalanceLoading,
       refreshPpqBalance: ppq.refreshBalance,
+      ppqQueryHistory: ppqQueryHistoryQuery.data?.data,
+      isPpqQueryHistoryLoading: ppqQueryHistoryQuery.isLoading,
+      ppqQueryHistoryError: ppqQueryHistoryQuery.error ?? undefined,
+      refreshPpqQueryHistory,
       autoTopup,
       setAutoTopup,
       autoTopupRun,
       triggerAutoTopup,
+      fundingSources,
+      manualTopup: (amountUsd, source = autoTopup.fundingSource) =>
+        manualTopupMutation.mutateAsync({ amountUsd, source }),
+      isManualTopupRunning: manualTopupMutation.isPending,
+      manualTopupError: manualTopupMutation.error ?? undefined,
+      manualTopupResult: manualTopupMutation.data,
     }),
     [
       handle,
@@ -341,12 +542,19 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
       receiveMutation,
       sendMutation,
       ppq.balance?.balance_usd,
+      ppq.account,
       ppq.isBalanceLoading,
       ppq.refreshBalance,
+      ppqQueryHistoryQuery.data,
+      ppqQueryHistoryQuery.isLoading,
+      ppqQueryHistoryQuery.error,
+      refreshPpqQueryHistory,
       autoTopup,
       setAutoTopup,
       autoTopupRun,
       triggerAutoTopup,
+      fundingSources,
+      manualTopupMutation,
     ],
   );
 }

@@ -49,10 +49,16 @@ describe("useOperatorWallet", () => {
     const { result } = renderHook(() => useOperatorWallet());
 
     expect(result.current.seed).toBe("operator seed words");
-    expect(mocks.useWallet).toHaveBeenCalledWith({
-      walletId: "operator:operator-pubkey",
-      mnemonic: "operator seed words",
-    });
+    expect(mocks.useWallet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        walletId: "operator:operator-pubkey",
+        mnemonic: "operator seed words",
+        autoTopup: expect.objectContaining({
+          enabled: false,
+          fundingSource: "operator",
+        }),
+      }),
+    );
   });
 
   it("prefers the VITE_WALLET_SEED env override over the envelope", () => {
@@ -61,10 +67,12 @@ describe("useOperatorWallet", () => {
     const { result } = renderHook(() => useOperatorWallet());
 
     expect(result.current.seed).toBe("env override seed");
-    expect(mocks.useWallet).toHaveBeenCalledWith({
-      walletId: "operator:operator-pubkey",
-      mnemonic: "env override seed",
-    });
+    expect(mocks.useWallet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        walletId: "operator:operator-pubkey",
+        mnemonic: "env override seed",
+      }),
+    );
   });
 
   it("does not connect when no seed is available", () => {
@@ -72,10 +80,12 @@ describe("useOperatorWallet", () => {
 
     renderHook(() => useOperatorWallet());
 
-    expect(mocks.useWallet).toHaveBeenCalledWith({
-      walletId: undefined,
-      mnemonic: undefined,
-    });
+    expect(mocks.useWallet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        walletId: undefined,
+        mnemonic: undefined,
+      }),
+    );
   });
 
   it("does not assign a walletId when no user is logged in", () => {
@@ -86,9 +96,11 @@ describe("useOperatorWallet", () => {
     // Mnemonic still passes so the SDK can preload, but the walletId
     // is omitted — the badge is gated on `isLoggedIn` upstream so this
     // path is rare in practice.
-    expect(mocks.useWallet).toHaveBeenCalledWith({
-      walletId: undefined,
-      mnemonic: "operator seed words",
-    });
+    expect(mocks.useWallet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        walletId: undefined,
+        mnemonic: "operator seed words",
+      }),
+    );
   });
 });

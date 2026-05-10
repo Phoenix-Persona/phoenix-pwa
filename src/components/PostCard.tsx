@@ -169,16 +169,16 @@ export function PostCard({ event, className }: PostCardProps) {
 
       <div className="mt-4 border-t border-border/60 pt-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-xs text-muted-foreground">
             <time
               dateTime={new Date(event.created_at * 1000).toISOString()}
               title={absoluteTime}
             >
               {relativeTime(event.created_at)}
             </time>
+            <PostInteractionBadges eventId={event.id} />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <PostInteractionBadges eventId={event.id} />
             <Button
               asChild
               variant="outline"

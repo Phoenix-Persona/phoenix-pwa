@@ -61,6 +61,19 @@ export interface RunAutoTopupArgs {
   pollTimeoutMs?: number;
 }
 
+export interface RunManualTopupArgs {
+  /** Connected Spark wallet. */
+  wallet: WalletHandle;
+  /** Current ppq.ai api_key — used to issue a topup invoice. */
+  ppqApiKey: string;
+  /** USD amount to buy. */
+  amountUsd: number;
+  /** Optional abort signal — applies to the polling loop and the wallet pay. */
+  signal?: AbortSignal;
+  pollIntervalMs?: number;
+  pollTimeoutMs?: number;
+}
+
 const DEFAULT_POLL_INTERVAL_MS = 3_000;
 const DEFAULT_POLL_TIMEOUT_MS = 5 * 60 * 1_000;
 
@@ -93,14 +106,67 @@ export async function runAutoTopupOnce(
   }
   if (ppqBalanceUsd >= config.thresholdUsd) return null;
 
-  const needUsd = round2(config.targetUsd - ppqBalanceUsd);
-  if (needUsd <= 0) return null;
+  return payPpqTopupInvoice({
+    wallet,
+    ppqApiKey,
+    amountUsd: config.topupAmountUsd,
+    signal,
+    pollIntervalMs,
+    pollTimeoutMs,
+    label: "auto-topup",
+  });
+}
+
+export async function runManualTopupOnce(
+  args: RunManualTopupArgs,
+): Promise<AutoTopupRunResult> {
+  const {
+    wallet,
+    ppqApiKey,
+    amountUsd,
+    signal,
+    pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+    pollTimeoutMs = DEFAULT_POLL_TIMEOUT_MS,
+  } = args;
+
+  return payPpqTopupInvoice({
+    wallet,
+    ppqApiKey,
+    amountUsd,
+    signal,
+    pollIntervalMs,
+    pollTimeoutMs,
+    label: "manual top-up",
+  });
+}
+
+async function payPpqTopupInvoice({
+  wallet,
+  ppqApiKey,
+  amountUsd,
+  signal,
+  pollIntervalMs,
+  pollTimeoutMs,
+  label,
+}: {
+  wallet: WalletHandle;
+  ppqApiKey: string;
+  amountUsd: number;
+  signal: AbortSignal | undefined;
+  pollIntervalMs: number;
+  pollTimeoutMs: number;
+  label: string;
+}): Promise<AutoTopupRunResult> {
+  const topupUsd = round2(amountUsd);
+  if (topupUsd <= 0 || !Number.isFinite(topupUsd)) {
+    throw new WalletError("Top-up amount must be greater than zero");
+  }
 
   // 1. Ask ppq.ai for a Lightning invoice.
   const invoice = await createTopupInvoice(
     ppqApiKey,
     "btc-lightning",
-    needUsd,
+    topupUsd,
     "USD",
     { signal },
   );
@@ -121,8 +187,8 @@ export async function runAutoTopupOnce(
     const info = await loadWalletInfo(wallet);
     if (info.balanceSats < requiredSats) {
       throw new WalletError(
-        `Spark wallet has ${info.balanceSats} sats but the topup invoice for ` +
-          `${needUsd} ${invoice.currency} requires ${requiredSats} sats. ` +
+        `Spark wallet has ${info.balanceSats} sats but the ${label} invoice for ` +
+          `${topupUsd} ${invoice.currency} requires ${requiredSats} sats. ` +
           `Fund the wallet with at least ${requiredSats - info.balanceSats} ` +
           `more sats and retry.`,
       );
@@ -137,7 +203,7 @@ export async function runAutoTopupOnce(
     if (/insufficient\s+funds/i.test(msg)) {
       throw new WalletError(
         `Spark wallet rejected the payment: insufficient funds for the ` +
-          `${requiredSats ?? "(unknown)"}-sat topup invoice. Fund the wallet ` +
+          `${requiredSats ?? "(unknown)"}-sat ${label} invoice. Fund the wallet ` +
           `first via tests/wallet/bootstrap-spark-wallet-e2e.ts → Receive.`,
         err,
       );
@@ -159,7 +225,7 @@ export async function runAutoTopupOnce(
     });
     if (isTopupSettled(status.status)) {
       return {
-        toppedUpUsd: needUsd,
+        toppedUpUsd: topupUsd,
         invoiceId: invoice.invoice_id,
         paymentRequest: bolt11,
         status: String(status.status),

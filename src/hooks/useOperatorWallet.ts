@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import { readEnv } from "@/lib/env";
+import { DEFAULT_AUTO_TOPUP_CONFIG } from "@/lib/wallet/types";
 
 import { useCurrentUser } from "./useCurrentUser";
 import { useOperatorEnvelope } from "./useOperatorEnvelope";
@@ -30,9 +31,18 @@ export function useOperatorWallet() {
   const { user } = useCurrentUser();
   const operator = useOperatorEnvelope();
   const seed = readEnv("VITE_WALLET_SEED") ?? operator.envelope?.wallet?.seed;
+  const autoTopup = useMemo(
+    () => ({
+      ...DEFAULT_AUTO_TOPUP_CONFIG,
+      enabled: false,
+      fundingSource: "operator" as const,
+    }),
+    [],
+  );
   const wallet = useWallet({
     walletId: user && seed ? `operator:${user.pubkey}` : undefined,
     mnemonic: seed,
+    autoTopup,
   });
 
   return useMemo(

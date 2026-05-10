@@ -31,6 +31,7 @@ import {
   PersonaPictureStager,
   type StagedPersonaPicture,
 } from "@/components/PersonaPictureStager";
+import { AiAssistButton } from "@/components/AiAssistField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -390,9 +391,28 @@ const Onboard = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="persona-bio">
-                      Bio (public, lives on the persona's kind 0 profile)
-                    </Label>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <Label htmlFor="persona-bio">
+                        Bio (public, lives on the persona's kind 0 profile)
+                      </Label>
+                      <AiAssistButton
+                        fieldLabel="Bio"
+                        fieldPurpose="A concise public Nostr profile bio for the persona."
+                        currentValue={bio}
+                        surroundingContext={[
+                          `Display name: ${fieldContextValue(name)}`,
+                          `Username: ${fieldContextValue(username)}`,
+                          `Lightning address: ${
+                            lightningUsername
+                              ? `${lightningUsername}@${SPARK_LN_DOMAIN}`
+                              : "(empty)"
+                          }`,
+                          `Current system prompt: ${fieldContextValue(systemPrompt)}`,
+                        ]}
+                        defaultInstruction="Draft a concise public bio for this persona."
+                        onReplace={setBio}
+                      />
+                    </div>
                     <Textarea
                       id="persona-bio"
                       rows={2}
@@ -403,9 +423,28 @@ const Onboard = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="persona-system-prompt">
-                      System prompt (private, encrypted in the backup)
-                    </Label>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <Label htmlFor="persona-system-prompt">
+                        System prompt (private, encrypted in the backup)
+                      </Label>
+                      <AiAssistButton
+                        fieldLabel="System prompt"
+                        fieldPurpose="Private instructions that define how the persona should write, what it stands for, and constraints it should follow."
+                        currentValue={systemPrompt}
+                        surroundingContext={[
+                          `Display name: ${fieldContextValue(name)}`,
+                          `Username: ${fieldContextValue(username)}`,
+                          `Lightning address: ${
+                            lightningUsername
+                              ? `${lightningUsername}@${SPARK_LN_DOMAIN}`
+                              : "(empty)"
+                          }`,
+                          `Current bio: ${fieldContextValue(bio)}`,
+                        ]}
+                        defaultInstruction="Draft a clear private system prompt for this persona."
+                        onReplace={setSystemPrompt}
+                      />
+                    </div>
                     <Textarea
                       id="persona-system-prompt"
                       rows={5}
@@ -482,6 +521,10 @@ const Onboard = () => {
 
 function truncate(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, n).trimEnd() + "…";
+}
+
+function fieldContextValue(value: string): string {
+  return value.trim() || "(empty)";
 }
 
 function UsernameAvailabilityHint({

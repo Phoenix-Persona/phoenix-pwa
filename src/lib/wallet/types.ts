@@ -107,29 +107,88 @@ export interface SendResult {
 
 /* ---------- Auto-topup ---------- */
 
+export type PpqFundingSource = "operator" | "persona";
+
 /**
  * Default-on policy: when ppq.ai's USD balance dips below `thresholdUsd`,
- * top it up to `targetUsd` by paying a Lightning invoice issued by ppq.ai
- * out of the Phoenix wallet.
+ * buy `topupAmountUsd` more credits by paying a Lightning invoice issued
+ * by ppq.ai out of the selected Spark wallet.
  */
 export interface AutoTopupConfig {
   enabled: boolean;
   /** Trigger when ppq balance < this many USD. */
   thresholdUsd: number;
-  /** After topping up, ppq balance should be at least this many USD. */
-  targetUsd: number;
+  /** Buy this many USD of PPQ credits when the threshold is crossed. */
+  topupAmountUsd: number;
+  /** Which Spark wallet pays PPQ top-up invoices. */
+  fundingSource: PpqFundingSource;
+}
+
+export interface PersistedAutoTopupConfig {
+  enabled?: boolean;
+  threshold_usd?: number;
+  topup_amount_usd?: number;
+  funding_source?: PpqFundingSource;
+  /** Legacy field kept for backups published before top-up amount was editable. */
+  target_usd?: number;
 }
 
 /**
- * Default policy: if the ppq.ai credit balance dips below $5, top it back
- * up to $5. The threshold and target match by design — "if below $5, get
- * to $5" — so the resulting balance is exactly $5 right after settlement.
+ * Default policy: if the ppq.ai credit balance dips below $5, buy another
+ * $5 in credits from the persona's Spark wallet.
  */
 export const DEFAULT_AUTO_TOPUP_CONFIG: AutoTopupConfig = {
   enabled: true,
   thresholdUsd: 5,
-  targetUsd: 5,
+  topupAmountUsd: 5,
+  fundingSource: "operator",
 };
+
+export function autoTopupConfigFromPersisted(
+  persisted: PersistedAutoTopupConfig | null | undefined,
+): AutoTopupConfig {
+  return {
+    enabled:
+      typeof persisted?.enabled === "boolean"
+        ? persisted.enabled
+        : DEFAULT_AUTO_TOPUP_CONFIG.enabled,
+    thresholdUsd: readPositiveFinite(
+      persisted?.threshold_usd,
+      DEFAULT_AUTO_TOPUP_CONFIG.thresholdUsd,
+    ),
+    topupAmountUsd: readPositiveFinite(
+      persisted?.topup_amount_usd ?? persisted?.target_usd,
+      DEFAULT_AUTO_TOPUP_CONFIG.topupAmountUsd,
+    ),
+    fundingSource:
+      persisted?.funding_source === "operator" ||
+      persisted?.funding_source === "persona"
+        ? persisted.funding_source
+        : "persona",
+  };
+}
+
+export function autoTopupConfigToPersisted(
+  config: AutoTopupConfig,
+): Required<
+  Pick<
+    PersistedAutoTopupConfig,
+    "enabled" | "threshold_usd" | "topup_amount_usd" | "funding_source"
+  >
+> {
+  return {
+    enabled: config.enabled,
+    threshold_usd: config.thresholdUsd,
+    topup_amount_usd: config.topupAmountUsd,
+    funding_source: config.fundingSource,
+  };
+}
+
+function readPositiveFinite(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : fallback;
+}
 
 export interface AutoTopupRunResult {
   /** What we asked ppq.ai to top up by, in USD. */

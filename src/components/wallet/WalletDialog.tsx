@@ -11,6 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import type { UseWalletResult } from "@/hooks/useWallet";
+import type { AutoTopupConfig } from "@/lib/wallet/types";
 import { WalletPanel } from "./WalletPanel";
 
 interface WalletDialogProps {
@@ -20,6 +21,7 @@ interface WalletDialogProps {
   personaName?: string;
   /** Forwarded to WalletPanel — see its prop docs. */
   editPersonaHref?: string;
+  onAutoTopupSave?: (config: AutoTopupConfig) => void | Promise<void>;
 }
 
 export function WalletDialog({
@@ -28,10 +30,11 @@ export function WalletDialog({
   onOpenChange,
   personaName,
   editPersonaHref,
+  onAutoTopupSave,
 }: WalletDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="grid max-h-[min(90vh,760px)] max-w-lg grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
         <DialogHeader>
           <DialogTitle>
             {personaName ? `${personaName}'s wallet` : "Wallet"}
@@ -41,7 +44,16 @@ export function WalletDialog({
             inference is paid from here automatically.
           </DialogDescription>
         </DialogHeader>
-        <WalletPanel wallet={wallet} editPersonaHref={editPersonaHref} />
+        <div
+          data-testid="wallet-dialog-body"
+          className="min-h-0 overflow-y-auto pr-1"
+        >
+          <WalletPanel
+            wallet={wallet}
+            editPersonaHref={editPersonaHref}
+            onAutoTopupSave={onAutoTopupSave}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

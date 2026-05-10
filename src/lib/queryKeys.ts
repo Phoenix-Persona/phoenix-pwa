@@ -37,6 +37,8 @@ export const queryKeys = {
     account: () => ["ppq", "account"] as const,
     balance: (creditId: string | undefined) => ["ppq", "balance", creditId] as const,
     allBalances: () => ["ppq", "balance"] as const,
+    queryHistory: (creditId: string | undefined) =>
+      ["ppq", "query-history", creditId ?? ""] as const,
     topup: (invoiceId: string | null | undefined) =>
       ["ppq", "topup", invoiceId] as const,
     nwcAutoTopup: () => ["ppq", "nwc-auto-topup"] as const,
