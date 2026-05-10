@@ -27,10 +27,12 @@ export interface AiAssistFieldContext {
 
 type AiAssistButtonProps = AiAssistFieldContext & {
   className?: string;
+  disabled?: boolean;
+  title?: string;
 };
 
 const SYSTEM_PROMPT =
-  "You help draft concise persona creation form fields. Return only the replacement field text.";
+  "You help draft concise app form fields. Return only the replacement field text.";
 
 export function AiAssistButton({
   fieldLabel,
@@ -40,6 +42,8 @@ export function AiAssistButton({
   defaultInstruction,
   onReplace,
   className,
+  disabled,
+  title,
 }: AiAssistButtonProps) {
   const inference = usePpqInference();
   const [open, setOpen] = useState(false);
@@ -124,7 +128,9 @@ export function AiAssistButton({
         variant="outline"
         size="sm"
         className={cn("h-8 gap-1.5 rounded-full px-3", className)}
+        disabled={disabled}
         onClick={() => setOpen(true)}
+        title={title}
       >
         <Sparkles className="size-3.5" aria-hidden="true" />
         AI Assist

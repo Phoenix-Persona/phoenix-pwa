@@ -296,6 +296,8 @@ const Dashboard = () => {
 
           {personaConfig && (
             <DashboardComposerCard
+              personaName={personaConfig.name}
+              personaBio={publicBio}
               raw={raw}
               sourcesInput={sourcesInput}
               hintsInput={hintsInput}

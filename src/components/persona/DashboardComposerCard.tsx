@@ -6,10 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { AiAssistButton } from "@/components/AiAssistField";
 import { ResearchPanel } from "@/components/persona/ResearchPanel";
 import type { Persona } from "@/lib/persona";
 
 interface DashboardComposerCardProps {
+  personaName: string;
+  personaBio?: string;
   raw: string;
   sourcesInput: string;
   hintsInput: string;
@@ -44,6 +47,8 @@ interface DashboardComposerCardProps {
 type ComposerTab = "post" | "video";
 
 export function DashboardComposerCard({
+  personaName,
+  personaBio,
   raw,
   sourcesInput,
   hintsInput,
@@ -71,10 +76,20 @@ export function DashboardComposerCard({
   const styleTitle = !walletSeed
     ? "Create a new persona to enable AI styling"
     : "Rewrite the idea in the persona's voice (PPQ chat)";
+  const assistDisabled = isStyling || isPublishing || !walletSeed;
+  const assistTitle = !walletSeed
+    ? "Create a new persona to enable AI Assist"
+    : "Draft or rewrite the idea with AI";
   const wizardDisabled = isStyling || isPublishing || !walletSeed;
   const wizardTitle = !walletSeed
     ? "Create a new persona to enable the post wizard"
     : "Build a post with an AI-guided wizard";
+  const baseAssistContext = [
+    `Persona: ${fieldContextValue(personaName)}`,
+    `Persona bio: ${fieldContextValue(personaBio ?? "")}`,
+    `Sources: ${fieldContextValue(sourcesInput)}`,
+    `Style hints: ${fieldContextValue(hintsInput)}`,
+  ];
 
   const crossPostBanner = showCrossPost ? (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-rw-sky/25 bg-rw-sky/5 px-4 py-2.5 text-xs">
@@ -189,6 +204,20 @@ export function DashboardComposerCard({
                   <Sparkles className="mr-2 size-4" aria-hidden="true" />
                   Post Wizard
                 </Button>
+                <AiAssistButton
+                  fieldLabel="Post idea"
+                  fieldPurpose="The raw idea or draft that will be styled in the persona's voice before publishing as a Nostr post."
+                  currentValue={raw}
+                  surroundingContext={[
+                    "Composer mode: Write a post",
+                    ...baseAssistContext,
+                  ]}
+                  defaultInstruction="Draft or improve this post idea."
+                  onReplace={onRawChange}
+                  disabled={assistDisabled}
+                  title={assistTitle}
+                  className="h-9 rounded-md"
+                />
                 <Button
                   onClick={onStyle}
                   disabled={styleDisabled}
@@ -308,6 +337,20 @@ export function DashboardComposerCard({
                     <Sparkles className="mr-2 size-4" aria-hidden="true" />
                     Post Wizard
                   </Button>
+                  <AiAssistButton
+                    fieldLabel="Video idea"
+                    fieldPurpose="The raw video brief that will become a script, visual direction, and caption in the persona's voice."
+                    currentValue={raw}
+                    surroundingContext={[
+                      "Composer mode: Compose a video",
+                      ...baseAssistContext,
+                    ]}
+                    defaultInstruction="Draft or improve this video idea."
+                    onReplace={onRawChange}
+                    disabled={assistDisabled}
+                    title={assistTitle}
+                    className="h-9 rounded-md"
+                  />
                   <Button
                     onClick={onStyle}
                     disabled={styleDisabled}
@@ -359,4 +402,8 @@ export function DashboardComposerCard({
       />
     </Card>
   );
+}
+
+function fieldContextValue(value: string): string {
+  return value.trim() || "(empty)";
 }
