@@ -362,6 +362,17 @@
 
   /* Honor user reduced-motion preference globally for any CSS animation
      not already gated by a motion-safe Tailwind variant. */
+  /* Hide scrollbar on all platforms — the app uses its own scroll
+     container and pointer-scroll interactions. Keep scroll behavior
+     intact so keyboard / assistive-tech scrolling still works. */
+  html {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  html::-webkit-scrollbar {
+    display: none;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     ::before,
