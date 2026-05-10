@@ -35,6 +35,7 @@ const config: CapacitorConfig = {
   plugins: {
     SystemBars: {
       insetsHandling: 'css',
+      style: 'LIGHT',
     },
   },
 };

@@ -336,7 +336,7 @@
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
     font-feature-settings: "cv11", "ss01", "ss03";
-    overflow-x: hidden;
+    overscroll-behavior-x: none;
   }
 
   h1,
@@ -369,7 +369,7 @@
   html {
     scrollbar-width: none;
     -ms-overflow-style: none;
-    overflow-x: hidden;
+    overscroll-behavior-x: none;
   }
   html::-webkit-scrollbar {
     display: none;
