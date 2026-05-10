@@ -19,6 +19,8 @@
 import { useRef, useState } from "react";
 import { Loader2, Sparkles, Trash2, Upload } from "lucide-react";
 
+import type { NostrSigner } from "@nostrify/types";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,6 +49,23 @@ interface PersonaPictureFieldProps {
    * only fires when PPQ is unavailable.
    */
   allowFreeFallback?: boolean;
+  /**
+   * Persona signer that authorizes the BUD-01 Blossom upload event.
+   *
+   * **Privacy-critical.** Without this, the operator's pubkey appears on
+   * every kind 24242 auth event, correlating operator ↔ persona for any
+   * party with access to those events. Every consumer of this component
+   * MUST pass a persona-keypair signer when uploading a persona's picture.
+   */
+  signer?: NostrSigner;
+  /**
+   * Optional Blossom server override for persona uploads. Used verbatim;
+   * the operator's NIP-65-aware list is bypassed. When unset and `signer`
+   * is provided, the underlying `useUploadFile` falls back to
+   * `APP_BLOSSOM_SERVERS` so the persona never inherits the operator's
+   * server preferences.
+   */
+  blossomServers?: string[];
   className?: string;
 }
 
@@ -78,10 +97,12 @@ export function PersonaPictureField({
   onChange,
   promptHint,
   allowFreeFallback = false,
+  signer,
+  blossomServers,
   className,
 }: PersonaPictureFieldProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const upload = useUploadFile();
+  const upload = useUploadFile({ signer, blossomServers });
   const generate = usePpqImage();
   const { toast } = useToast();
 

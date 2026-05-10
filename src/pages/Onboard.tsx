@@ -14,7 +14,7 @@
  * the same publish path when it's ready.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 import {
@@ -24,6 +24,8 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
+import { NSecSigner } from "@nostrify/nostrify";
+import { hexToBytes } from "@noble/hashes/utils.js";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
@@ -43,6 +45,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useCreatePersona } from "@/hooks/useCreatePersona";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 
+import { generatePersonaKeypair } from "@/lib/personaKey";
 import {
   slugifyForUsername,
   isValidLightningUsername,
@@ -76,6 +79,24 @@ const Onboard = () => {
 
   // Picture
   const [pictureUrl, setPictureUrl] = useState("");
+
+  // Generate the persona's keypair UPFRONT — before the picture step.
+  //
+  // **Privacy.** The picture upload happens before publish; if we wait
+  // until createPersona to mint the keypair, the upload's BUD-01 auth
+  // event is signed by the operator and correlates operator ↔ persona
+  // on every Blossom server. Generating early lets us pass an
+  // NSecSigner through to PersonaPictureField so the auth event uses
+  // the persona's pubkey only.
+  //
+  // useState lazy initializer so the keypair persists across re-renders
+  // and is not re-generated on every render. The same kp is then handed
+  // to useCreatePersona via the `keypair` field.
+  const [personaKeypair] = useState(() => generatePersonaKeypair());
+  const personaSigner = useMemo(
+    () => new NSecSigner(hexToBytes(personaKeypair.hex.sk)),
+    [personaKeypair.hex.sk],
+  );
 
   const publishing = createPersona.isPending;
 
@@ -138,6 +159,7 @@ const Onboard = () => {
         bio,
         systemPrompt,
         pictureUrl: pictureUrl || undefined,
+        keypair: personaKeypair,
       });
 
       if (result.warning) {
@@ -353,6 +375,11 @@ const Onboard = () => {
                     // ship a portrait. EditPersona keeps PPQ-only
                     // (post-onboarding the user has the paid path).
                     allowFreeFallback
+                    // Persona-keypair signer for the BUD-01 Blossom auth
+                    // event. Without this, the upload would be signed by
+                    // the operator and correlate operator ↔ persona on
+                    // every Blossom server.
+                    signer={personaSigner}
                   />
 
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">

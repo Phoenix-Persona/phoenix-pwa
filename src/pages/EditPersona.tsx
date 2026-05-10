@@ -19,17 +19,20 @@
  * re-mounts the form rather than re-using stale state.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import type { NostrEvent } from "@nostrify/nostrify";
+import { NSecSigner } from "@nostrify/nostrify";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe } from "@/components/ImigongoBand";
 import { EditPersonaCrossPostFields } from "@/components/persona/EditPersonaCrossPostFields";
 import { EditPersonaIdentityFields } from "@/components/persona/EditPersonaIdentityFields";
 import { EditPersonaPublicProfileFields } from "@/components/persona/EditPersonaPublicProfileFields";
+import { decodePersonaNsec } from "@/lib/personaKey";
+import { hexToBytes } from "@noble/hashes/utils.js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -134,6 +137,20 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   const crossPostEnabled = featureFlags.crossPost;
 
   const original = envelope.persona;
+
+  // Persona signer for the Blossom upload (BUD-01 auth).
+  //
+  // **Privacy.** The kind 24242 auth event MUST be signed by the persona's
+  // keypair, NOT the operator. If we use the operator signer, every
+  // Blossom server (and any party that observes its auth events) sees the
+  // operator pubkey on every upload — correlating operator ↔ persona.
+  //
+  // Memoised by persona pubkey: the parent re-mounts on persona change, but
+  // we still memoise to be explicit about the dependency.
+  const personaSigner = useMemo(() => {
+    const kp = decodePersonaNsec(original.nsec);
+    return new NSecSigner(hexToBytes(kp.hex.sk));
+  }, [original.nsec]);
 
   // Initialize directly from props — the parent passes a `key` of the
   // persona pubkey so a different persona triggers a full remount.
@@ -315,6 +332,7 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
           loadingBio={profileQuery.isLoading}
           onBioChange={setBio}
           onPictureUrlChange={setPictureUrl}
+          pictureSigner={personaSigner}
         />
 
         <div className="space-y-2">
