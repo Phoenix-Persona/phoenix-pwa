@@ -167,5 +167,5 @@ spec in current code (`PHOENIX_PAYLOAD_APP = "phoenix-persona"`,
 - `dev/PROJECT.md` §5 (canonical for the planned schema)
 - `src/lib/persona.ts`, `src/lib/personaCrypto.ts` (canonical for what
   the code actually does today)
-- `docs/guides/nostr-nips.md` (NIP-01, NIP-44, NIP-78, NIP-92, NIP-94)
-- `docs/guides/blossom.md` (media storage)
+- `../dev/docs/nostr-nips.md` (NIP-01, NIP-44, NIP-78, NIP-92, NIP-94)
+- `../dev/docs/blossom.md` (media storage)

@@ -57,7 +57,7 @@ const finalMessage = await s.result();
 
 ### Pointing at PPQ
 
-PPQ is OpenAI-compatible (see `docs/guides/ppq.md`). `pi-ai` exposes
+PPQ is OpenAI-compatible (see `./ppq.md`). `pi-ai` exposes
 this through its **Custom Models** API: you build a `Model<>` object
 with `baseUrl` set to PPQ and pass `apiKey` per call.
 
@@ -89,7 +89,7 @@ bearer, which is all Zuka needs. PPQ also supports L402
 per-request but only on a subset of endpoints; the credits system
 covers the whole API surface, so Zuka uses credits across the
 board (image gen and TTS go through the same `credit_id` + bearer
-even when called outside `pi-ai`). See `docs/guides/ppq.md` for the
+even when called outside `pi-ai`). See `./ppq.md` for the
 credits flow and the `/nwc-auto-topup/connect` wiring.
 
 If `pi-ai`'s defaults fail against PPQ on specific fields (e.g.

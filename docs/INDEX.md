@@ -17,16 +17,8 @@ these docs distill or extend it for engineers reading code.
 | [`SCOPE.md`](./SCOPE.md) | V1 / V1.5 / V2 / out-of-scope checklist. Mirrors `PROJECT.md` §8. |
 | [`GLOSSARY.md`](./GLOSSARY.md) | Vocabulary: user keypair, persona keypair, PPQ, pi-mono, NIP-44/49/57/78, etc. |
 
-## Third-party guides — `guides/`
+## Third-party guides
 
-External libraries and protocols Zuka depends on. Each guide has a
-"Source" footer pointing at upstream — fall back to that when in doubt.
-
-| Doc | What it covers |
-| --- | --- |
-| [`guides/nostr-nips.md`](./guides/nostr-nips.md) | NIPs Zuka uses: 01, 44, 49, 57, 78, 92, 94. Plus event-kind cheat sheet. |
-| [`guides/nostrify.md`](./guides/nostrify.md) | `@nostrify/nostrify` + `@nostrify/react` — `NPool`, `NRelay1`, `NSecSigner`, hooks. |
-| [`guides/blossom.md`](./guides/blossom.md) | Content-addressed media protocol for Nostr. Endpoints, BUDs, kind 24242 auth. |
-| [`guides/ppq.md`](./guides/ppq.md) | PayPerQ inference API — base URL, OpenAI-compat surface, payment model. |
-| [`guides/pi-mono.md`](./guides/pi-mono.md) | `pi-ai` + `pi-agent-core` + `pi-web-ui`. Forward-looking — agent harness deferred for V1. |
-| [`guides/breez-spark.md`](./guides/breez-spark.md) | `@breeztech/breez-sdk-spark` — per-persona Lightning wallet. Forward-looking; integration pending. |
+Guides for the external libraries and protocols Zuka depends on
+(`@nostrify`, NIPs, Blossom, PPQ, `pi-mono`, Breez Spark) live under
+[`../dev/docs/`](../dev/INDEX.md#third-party-guides).

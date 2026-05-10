@@ -115,4 +115,4 @@ hard-code the list.
 - `ppq.ai` — site
 - `ppq.ai/api-docs` — full API docs (credits, L402, model lists)
 - `dev/PROJECT.md` §6 (AI capabilities), §7 (wallet → PPQ flow), §10
-- `docs/guides/pi-mono.md` — how `pi-ai` is configured against PPQ
+- `./pi-mono.md` — how `pi-ai` is configured against PPQ

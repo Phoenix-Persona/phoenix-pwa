@@ -343,7 +343,7 @@ picture is currently published with empty `picture` (`Onboard.tsx:206`).
 The `lib/ppq/*` and `hooks/usePpq*` layers are complete but no page
 calls them yet. The eventual seams. **PPQ and Breez Spark are complementary,
 not alternatives:** the per-persona Breez Spark wallet (PROJECT.md §7,
-`docs/guides/breez-spark.md`) is the source of funds; the persona's wallet
+`../dev/docs/breez-spark.md`) is the source of funds; the persona's wallet
 exposes itself as a NIP-47 NWC endpoint, and PPQ's auto-topup pulls
 from it on demand. Breez Spark integration is still pending; PPQ NWC
 primitives are wired below.

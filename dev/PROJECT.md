@@ -385,7 +385,7 @@ sustains itself: anyone who funds the wallet (donations via zaps,
 direct invoice top-ups) keeps the credits flowing, no operator
 intervention needed.
 
-See `docs/guides/ppq.md` for the PPQ surface and `docs/guides/pi-mono.md`
+See `./docs/ppq.md` for the PPQ surface and `./docs/pi-mono.md`
 for how `pi-ai` is configured against it.
 
 > **L402 — investigated, deferred.** PPQ exposes per-request L402 on
@@ -431,7 +431,7 @@ the wizard with a small tool set (`propose_name(name, rationale)`,
 `propose_bio(bio)`, `propose_system_prompt(prompt)`,
 `generate_profile_image(prompt)`, `generate_voice_sample(text, voice_id)`,
 `finalize_persona()`), with `pi-web-ui` rendering the conversation
-surface. See `docs/guides/pi-mono.md` for the integration shape when
+surface. See `./docs/pi-mono.md` for the integration shape when
 we revisit.
 
 ---
@@ -717,7 +717,7 @@ wallet/agent/Nostr/image-gen seams are where bugs will live.
   PPQ's **credits system**: per-persona `credit_id` funded by NIP-47
   NWC auto-topup from the persona's Spark wallet, bearer-authed on
   every API request. One auth surface for the whole API. See
-  `docs/guides/ppq.md` and §6.
+  `./docs/ppq.md` and §6.
 - **L402** — Lightning-native HTTP 402 payment protocol (per-request
   invoice, no standing account). PPQ supports it on `/v1/images/*`
   and `/v1/videos` but not on `/v1/chat/completions`. **Zuka V1

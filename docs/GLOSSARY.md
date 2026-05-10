@@ -27,18 +27,18 @@
 - **PPQ** — `ppq.ai`. OpenAI-compatible inference API. Zuka uses
   PPQ's **credits system**: a per-persona `credit_id` funded by
   Lightning from the persona's Spark wallet (NWC auto-topup) auths
-  every API request via a bearer token. See `docs/guides/ppq.md`.
+  every API request via a bearer token. See `../dev/docs/ppq.md`.
 
 - **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit. V1 uses
   **`pi-ai`** (LLM client) only. `pi-agent-core` (agent runtime) and
   `pi-web-ui` (chat surface) are reserved for the V2 agent-driven
-  wizard. See `docs/guides/pi-mono.md`.
+  wizard. See `../dev/docs/pi-mono.md`.
 
 - **Spark / Breez Spark SDK** — `@breeztech/breez-sdk-spark`. Breez's
   wrapping of Lightspark's Spark protocol. Per-persona Lightning
   wallets, with a hosted Lightning Address at `spark.money` (no
   self-hosted LNURL endpoint). BIP-39 seed recoverable from the
-  encrypted kind 30078 backup. See `docs/guides/breez-spark.md`.
+  encrypted kind 30078 backup. See `../dev/docs/breez-spark.md`.
 
 - **NIP-44** — Nostr encrypted-payload spec. Used for the persona's
   encrypted backup event (self-encrypted to the operator).
@@ -66,10 +66,10 @@
 
 - **Blossom** — content-addressed media server protocol used by Nostr
   clients. Profile pictures and post media live here. See
-  `docs/guides/blossom.md`.
+  `../dev/docs/blossom.md`.
 
 - **Nostrify** — `@nostrify/nostrify` and `@nostrify/react`. The Nostr
-  framework already wired into the scaffold. See `docs/guides/nostrify.md`.
+  framework already wired into the scaffold. See `../dev/docs/nostrify.md`.
 
 - **MKStack** — the React/Vite/Tailwind/Nostrify boilerplate that Zuka
   was scaffolded from.

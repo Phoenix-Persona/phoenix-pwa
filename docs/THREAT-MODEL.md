@@ -150,4 +150,4 @@ every wallet, and post as every persona under that operator.
 
 - `dev/PROJECT.md` §3 (canonical for the identity model), §10
 - `docs/GLOSSARY.md` — "Operator", "Persona keypair"
-- `docs/guides/nostr-nips.md` — NIP-44, NIP-49 details
+- `../dev/docs/nostr-nips.md` — NIP-44, NIP-49 details
