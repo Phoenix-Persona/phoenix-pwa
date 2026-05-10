@@ -27,10 +27,11 @@ import type { NostrEvent } from "@nostrify/nostrify";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe } from "@/components/ImigongoBand";
-import { PersonaPictureField } from "@/components/PersonaPictureField";
+import { EditPersonaCrossPostFields } from "@/components/persona/EditPersonaCrossPostFields";
+import { EditPersonaIdentityFields } from "@/components/persona/EditPersonaIdentityFields";
+import { EditPersonaPublicProfileFields } from "@/components/persona/EditPersonaPublicProfileFields";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -44,7 +45,6 @@ import { type PhoenixEnvelope } from "@/lib/persona";
 import {
   isValidLightningUsername,
   slugifyForUsername,
-  SPARK_LN_DOMAIN,
 } from "@/lib/wallet/lightningAddress";
 import { parseCommaList } from "@/lib/text";
 
@@ -299,64 +299,23 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
         </h2>
       </div>
       <CardContent className="space-y-5 pt-5">
-        <div className="space-y-2">
-          <Label htmlFor="edit-name">Display name</Label>
-          <Input
-            id="edit-name"
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">
-            Shown in posts and on the persona's public profile.
-          </p>
-        </div>
+        <EditPersonaIdentityFields
+          name={name}
+          username={username}
+          initialUsername={initialUsername}
+          availability={availability}
+          onNameChange={onNameChange}
+          onUsernameChange={onUsernameChange}
+        />
 
-        <div className="space-y-2">
-          <Label htmlFor="edit-username">Username</Label>
-          <div className="flex items-center gap-1.5">
-            <Input
-              id="edit-username"
-              value={username}
-              onChange={(e) => onUsernameChange(e.target.value)}
-              placeholder="username"
-              className="font-mono text-sm"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <span className="text-sm text-muted-foreground whitespace-nowrap">
-              @{SPARK_LN_DOMAIN}
-            </span>
-          </div>
-          <UsernameAvailabilityHint
-            state={availability}
-            originalUsername={initialUsername}
-            currentUsername={username}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="edit-bio">Bio (public profile)</Label>
-          <Textarea
-            id="edit-bio"
-            rows={2}
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            placeholder={profileQuery.isLoading ? "Loading…" : ""}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Profile picture</Label>
-          <PersonaPictureField
-            value={pictureUrl}
-            onChange={setPictureUrl}
-            promptHint={
-              name && bio
-                ? `Stylized portrait of ${name}: ${bio.slice(0, 80)}`
-                : `Stylized portrait of ${name}`
-            }
-          />
-        </div>
+        <EditPersonaPublicProfileFields
+          bio={bio}
+          pictureUrl={pictureUrl}
+          name={name}
+          loadingBio={profileQuery.isLoading}
+          onBioChange={setBio}
+          onPictureUrlChange={setPictureUrl}
+        />
 
         <div className="space-y-2">
           <Label htmlFor="edit-system-prompt">
@@ -371,44 +330,12 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
         </div>
 
         {crossPostEnabled ? (
-          <div className="space-y-3 pt-2 border-t border-border">
-            <div className="space-y-1">
-              <Label htmlFor="edit-cross-post-url">
-                Cross-posting webhook (optional)
-              </Label>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Paste a webhook URL from your social-media aggregator
-                (Buffer, Zapier, Make.com, n8n, etc.). On every persona
-                publish, Zuka POSTs the event payload there so the
-                aggregator can fan it out to X / Facebook / Instagram /
-                TikTok / wherever you've connected. Leave blank to
-                disable.
-              </p>
-            </div>
-            <Input
-              id="edit-cross-post-url"
-              type="url"
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-              placeholder="https://hooks.zapier.com/hooks/catch/..."
-              autoComplete="off"
-            />
-            <div className="space-y-1">
-              <Label htmlFor="edit-cross-post-platforms" className="text-xs">
-                Platforms hint (comma separated, optional)
-              </Label>
-              <Input
-                id="edit-cross-post-platforms"
-                value={webhookPlatformsInput}
-                onChange={(e) => setWebhookPlatformsInput(e.target.value)}
-                placeholder="x, facebook, instagram"
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Passed to your webhook as a `platforms` array — your
-                aggregator decides what to honor.
-              </p>
-            </div>
-          </div>
+          <EditPersonaCrossPostFields
+            webhookUrl={webhookUrl}
+            webhookPlatformsInput={webhookPlatformsInput}
+            onWebhookUrlChange={setWebhookUrl}
+            onWebhookPlatformsInputChange={setWebhookPlatformsInput}
+          />
         ) : null}
 
         <div className="flex justify-between gap-2 pt-2">
@@ -439,65 +366,6 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
       </CardContent>
     </Card>
   );
-}
-
-function UsernameAvailabilityHint({
-  state,
-  originalUsername,
-  currentUsername,
-}: {
-  state: ReturnType<typeof useUsernameAvailability>;
-  originalUsername: string;
-  currentUsername: string;
-}) {
-  // If the user hasn't actually changed the username, the live probe
-  // is suppressed (the hook is wired to a blank input). Render a
-  // status that reflects that — and warn that registration won't run.
-  if (currentUsername === originalUsername) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        Current Lightning Address. Edit to claim a different one — Spark
-        replaces the old registration on rename.
-      </p>
-    );
-  }
-  switch (state.status) {
-    case "idle":
-      return null;
-    case "invalid":
-      return (
-        <p className="text-xs text-amber-600 dark:text-amber-500">
-          Lowercase letters, digits, and hyphens only — must start with a letter
-          or digit.
-        </p>
-      );
-    case "checking":
-      return (
-        <p className="text-xs text-muted-foreground">
-          Checking <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code>…
-        </p>
-      );
-    case "available":
-      return (
-        <p className="text-xs text-emerald-600 dark:text-emerald-500">
-          <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code> is
-          available.
-        </p>
-      );
-    case "taken":
-      return (
-        <p className="text-xs text-amber-600 dark:text-amber-500">
-          <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code> is
-          taken — pick a different name before saving.
-        </p>
-      );
-    case "error":
-      return (
-        <p className="text-xs text-muted-foreground">
-          Couldn't reach the LNURL host — registration will run anyway.
-        </p>
-      );
-  }
 }
 
 export default EditPersona;
