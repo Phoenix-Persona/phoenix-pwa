@@ -313,6 +313,30 @@ const Dashboard = () => {
               onStyle={onStyle}
               onPost={onPost}
               onOpenVideo={() => setVideoDialogOpen(true)}
+              // Research-panel injection: append to the existing
+              // sources field (comma-separated, becomes `r` tags) and
+              // to the idea textarea (the styling pass rewrites it in
+              // voice). Both helpers dedupe so re-clicking the same
+              // result doesn't duplicate.
+              onAppendSource={(url) =>
+                setSourcesInput((prev) => {
+                  const parts = prev
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                  if (parts.includes(url)) return prev;
+                  return parts.length === 0 ? url : `${prev.trimEnd().replace(/,$/, "")}, ${url}`;
+                })
+              }
+              onAppendIdea={(text) =>
+                setRaw((prev) =>
+                  prev.includes(text)
+                    ? prev
+                    : prev.trim().length === 0
+                      ? text
+                      : `${prev.trimEnd()}\n\n${text}`,
+                )
+              }
             />
           )}
 
