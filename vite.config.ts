@@ -27,12 +27,23 @@ function loadMergedViteEnv(mode: string): Record<string, string> {
   const rootEnv = loadEnv(mode, REPO_ROOT, "");
   const devEnv = loadEnv(mode, path.join(REPO_ROOT, "dev"), "");
   const merged: Record<string, string> = {};
-  // Dev first, root second — root wins for any key present in both.
+  // Layered, last-wins:
+  //   1. dev/.env       (lowest priority — shared developer defaults)
+  //   2. <root>/.env    (per-checkout overrides)
+  //   3. process.env    (highest — CI / GitHub Actions secrets, exported
+  //                      shell vars). Required for production builds where
+  //                      `.env` isn't committed and secrets come from the
+  //                      build environment instead.
   for (const [k, v] of Object.entries(devEnv)) {
     if (k.startsWith("VITE_")) merged[k] = v;
   }
   for (const [k, v] of Object.entries(rootEnv)) {
     if (k.startsWith("VITE_")) merged[k] = v;
+  }
+  for (const [k, v] of Object.entries(process.env)) {
+    if (k.startsWith("VITE_") && typeof v === "string" && v.length > 0) {
+      merged[k] = v;
+    }
   }
   return merged;
 }
