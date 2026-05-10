@@ -143,14 +143,15 @@ Across `21ee4d0`, `9d3d9bb`, `6386d59`, `68d8cdc`, `bd6d542`, `4d69f7d`:
 
 - **Product source of truth:** `dev/PROJECT.md` (sections numbered;
   §5.2 has the schema, §6 has the AI/payment flow, §7 has wallet).
-- **Recent shipped plan:** `dev/plans/2026-05-09-wallet-followups.md`
-  (status banner at the top — already shipped via this branch).
+- **Recent shipped plans (kept for historical context):**
+  - `dev/plans/2026-05-09-wallet-followups.md` (PR #20)
+  - `dev/plans/2026-05-10-follow-up-refactoring.md` (PR #20)
+  - `dev/plans/2026-05-10-adopt-extracted-persona-components.md` (PR #21)
 - **Codebase audit:** `dev/reports/codebase-audit-2026-05-10.md` — read
-  if you're touching cross-cutting infrastructure.
-- **Derek's plan / open items:** `tasks/derek-plan.md` — has the
-  outstanding non-Derek items at the top.
-- **Capacitor work in flight:** `derek/capacitor-android-scaffold`
-  branch on remote — that's likely the PR the user is waiting on.
+  if you're touching cross-cutting infrastructure (predates PRs #20-#21,
+  most findings are now resolved).
+- **Capacitor Android shipped** in PRs #14 + #18 + #25 (privacy fix) +
+  #27 (v1.0.1 bump). Live on the device.
 
 ---
 

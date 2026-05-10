@@ -2,7 +2,7 @@
 
 **Read [`PROJECT.md`](./dev/PROJECT.md) first.** It is the authoritative design document for Zuka — the user-facing problem, the identity model, the persona Nostr schema, the wallet model, the AI capabilities, the V1 scope, and the demo arc. When this file and `PROJECT.md` disagree on *what* to build, **`PROJECT.md` wins**. This file describes *how* to build on the codebase (Nostr conventions, security, file layout, lint rules).
 
-The active hackathon plan against the V1 scope lives in [`tasks/todo.md`](./tasks/todo.md).
+V1 has shipped. Per-feature plans live under [`dev/plans/`](./dev/plans/); shipped plans stay there as historical context, with a status banner at the top.
 
 **Doc indexes:** [`docs/INDEX.md`](./docs/INDEX.md) (engineering & architecture) · [`dev/INDEX.md`](./dev/INDEX.md) (design plan, parallel build streams).
 
