@@ -450,15 +450,6 @@ const Onboard = () => {
                     </Button>
 
                     <div className="flex flex-wrap gap-2">
-                      {!stagedPicture && (
-                        <Button
-                          variant="outline"
-                          onClick={publishPersona}
-                          disabled={publishing || !user}
-                        >
-                          Skip &amp; create
-                        </Button>
-                      )}
                       <Button
                         onClick={publishPersona}
                         disabled={publishing || !user}

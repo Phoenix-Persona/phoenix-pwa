@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -48,5 +48,14 @@ describe("PersonaPictureStager", () => {
       source: "upload",
     });
     expect(URL.createObjectURL).toHaveBeenCalledWith(file);
+  });
+
+  it("uses a multiline prompt field for generated portraits", () => {
+    render(<PersonaPictureStager value={null} onChange={vi.fn()} />);
+
+    const prompt = screen.getByLabelText("Image prompt");
+
+    expect(prompt.tagName).toBe("TEXTAREA");
+    expect(prompt).toHaveAttribute("rows", "4");
   });
 });

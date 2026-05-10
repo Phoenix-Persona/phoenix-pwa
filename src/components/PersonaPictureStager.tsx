@@ -7,8 +7,8 @@ import { useRef, useState } from "react";
 import { Loader2, Sparkles, Trash2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePpqImage } from "@/hooks/usePpqImage";
 import { useToast } from "@/hooks/useToast";
@@ -244,7 +244,7 @@ export function PersonaPictureStager({
       />
 
       {!value && (
-        <div className="grid sm:grid-cols-2 gap-3">
+        <div className="space-y-3">
           <div className="rounded-xl border border-imigongo-clay/15 bg-card p-4 space-y-3">
             <div className="space-y-1">
               <p className="text-xs uppercase tracking-[0.14em] text-imigongo-clay font-semibold">
@@ -280,18 +280,14 @@ export function PersonaPictureStager({
               <Label htmlFor="picture-prompt" className="sr-only">
                 Image prompt
               </Label>
-              <Input
+              <Textarea
                 id="picture-prompt"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder={promptHint ?? "Describe the persona's portrait"}
                 disabled={generating}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !generating) {
-                    e.preventDefault();
-                    handleGenerate();
-                  }
-                }}
+                rows={4}
+                className="resize-y"
               />
               <Button
                 type="button"

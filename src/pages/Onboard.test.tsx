@@ -134,4 +134,13 @@ describe("Onboard", () => {
     expect(screen.getByText(/already taken\. Try another handle\./i)).toBeInTheDocument();
     expect(screen.queryByText(/before creating the persona/i)).not.toBeInTheDocument();
   });
+
+  it("does not show a separate skip button on the picture step", () => {
+    render(<Onboard />);
+
+    fireEvent.click(screen.getByRole("button", { name: /next: profile picture/i }));
+
+    expect(screen.getByRole("button", { name: /create persona/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /skip/i })).not.toBeInTheDocument();
+  });
 });
