@@ -6,18 +6,51 @@
             name="viewport"
             content="width=device-width, initial-scale=1.0, viewport-fit=cover">
         <meta http-equiv="content-security-policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' https:; font-src 'self'; base-uri 'self'; manifest-src 'self'; connect-src 'self' blob: https: wss:; img-src 'self' data: blob: https:; media-src 'self' https:; worker-src 'self' blob:">
+
+        <!-- Search-engine policy: preview deployments (zuka.surge.sh) stay out of the index; flip to "index, follow" once the production domain locks. -->
+        <meta name="robots" content="noindex, nofollow">
+
+        <!-- Generic SEO -->
         <meta
             name="description"
-            content="Zuka — AI personas on Nostr. Voices that can be amplified but not silenced.">
+            content="Zuka — AI personas on Nostr. Voices that can be amplified but not silenced. Built for the activists whose words have weight.">
+        <link rel="canonical" href="https://zuka.surge.sh/">
+
+        <!-- Open Graph (Facebook / LinkedIn / Discord / Slack / generic) -->
         <meta property="og:type" content="website">
+        <meta property="og:site_name" content="Zuka">
         <meta property="og:title" content="Zuka — Uncensorable Voices">
         <meta
             property="og:description"
+            content="AI personas on Nostr. Voices that can be amplified but not silenced. Built for the activists whose words have weight.">
+        <meta property="og:url" content="https://zuka.surge.sh/">
+        <meta property="og:image" content="https://zuka.surge.sh/og-image.png">
+        <meta property="og:image:type" content="image/png">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
+        <meta
+            property="og:image:alt"
+            content="Zuka — Uncensorable Voices. AI personas on Nostr.">
+        <meta property="og:locale" content="en_US">
+
+        <!-- Twitter / X card -->
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="Zuka — Uncensorable Voices">
+        <meta
+            name="twitter:description"
             content="AI personas on Nostr. Voices that can be amplified but not silenced.">
+        <meta name="twitter:image" content="https://zuka.surge.sh/og-image.png">
+        <meta
+            name="twitter:image:alt"
+            content="Zuka — Uncensorable Voices. AI personas on Nostr.">
+
+        <!-- Theme + PWA chrome -->
         <meta name="theme-color" content="#a8431b">
+        <meta name="color-scheme" content="light">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="Zuka">
+
         <link
             rel="manifest"
             href="/manifest.webmanifest">
@@ -29,6 +62,7 @@
         <link
             rel="apple-touch-icon"
             href="/icon-192.png">
+
         <title>Zuka — Uncensorable Voices</title>
     </head>
     <body>
