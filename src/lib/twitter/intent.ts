@@ -16,6 +16,8 @@
  * device, on demand.
  */
 
+import { downloadFile } from "@/lib/downloadFile";
+
 const TWITTER_INTENT_BASE = "https://twitter.com/intent/tweet";
 
 export interface ComposeIntentArgs {
@@ -40,42 +42,14 @@ export function buildTwitterIntentUrl(text: string): string {
 }
 
 /**
- * Trigger a browser download of `url` with the given filename. The
- * fetch path lets us drop a real Blob into the download (so the file
- * is named correctly even when the server doesn't set
- * Content-Disposition) and bypasses cross-origin "open in new tab"
- * fallback that browsers do when `<a download>` points at a different
- * origin.
- *
- * Failures are non-fatal — the X compose tab still opens, and the
- * user can right-click → Save the video from the kind 1 in their feed
- * if the auto-download didn't work.
- */
-export async function downloadVideoForAttach(
-  url: string,
-  filename?: string,
-): Promise<void> {
-  const name = filename ?? deriveFilename(url);
-  try {
-    const res = await fetch(url, { credentials: "omit" });
-    if (!res.ok) throw new Error(`download fetch ${res.status}`);
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    triggerAnchorDownload(objectUrl, name);
-    // Revoke after the click has had a tick to register.
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 5_000);
-  } catch {
-    // Cross-origin fetch blocked? Fall back to a same-tab anchor click —
-    // browsers usually still grant the download when navigated directly.
-    triggerAnchorDownload(url, name);
-  }
-}
-
-/**
  * Open the X compose tab AND start downloading the video so the user
  * can attach it once they're in the composer. Both happen in
  * parallel — we don't await the download because the X tab opens
  * faster and the file finishes in the background.
+ *
+ * Files cannot be attached via deep-link (Twitter API limitation), so
+ * the download is the bridge: the user drags the file from Downloads
+ * into the X composer.
  */
 export function postToTwitterIntent(args: ComposeIntentArgs): void {
   const text = args.mediaUrl
@@ -84,7 +58,7 @@ export function postToTwitterIntent(args: ComposeIntentArgs): void {
   const intent = buildTwitterIntentUrl(text);
 
   if (args.mediaUrl) {
-    void downloadVideoForAttach(args.mediaUrl, args.filename);
+    void downloadFile(args.mediaUrl, args.filename);
   }
 
   // Open in a new tab. `noopener` cuts the opener reference so X can't
@@ -99,27 +73,4 @@ function appendMediaUrl(text: string, mediaUrl: string): string {
   if (trimmed.includes(mediaUrl)) return trimmed;
   if (trimmed.length === 0) return mediaUrl;
   return `${trimmed}\n\n${mediaUrl}`;
-}
-
-function deriveFilename(url: string): string {
-  try {
-    const u = new URL(url);
-    const last = u.pathname.split("/").filter(Boolean).pop();
-    if (last && /\.[a-z0-9]{2,5}$/i.test(last)) return last;
-    if (last) return `${last}.mp4`;
-  } catch {
-    /* fall through */
-  }
-  return "video.mp4";
-}
-
-function triggerAnchorDownload(href: string, filename: string): void {
-  const a = document.createElement("a");
-  a.href = href;
-  a.download = filename;
-  a.rel = "noopener noreferrer";
-  a.style.display = "none";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
 }

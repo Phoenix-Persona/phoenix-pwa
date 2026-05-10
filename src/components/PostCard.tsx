@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { NostrEvent } from "@nostrify/nostrify";
 
+import { BrandedVideo } from "./BrandedVideo";
 import { PostBody } from "./PostBody";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,16 +67,11 @@ export function PostCard({ event, className }: PostCardProps) {
       {videos.length > 0 && (
         <div className="mt-4 space-y-1.5">
           {videos.slice(0, 2).map((v, idx) => (
-            <video
+            <BrandedVideo
               key={`${v.url}-${idx}`}
               src={v.url}
               poster={v.poster}
-              controls
-              preload="metadata"
-              playsInline
-              crossOrigin="anonymous"
-              aria-label={v.alt}
-              className="w-full max-h-[28rem] rounded-lg bg-imigongo-charcoal"
+              alt={v.alt}
             />
           ))}
         </div>
