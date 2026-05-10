@@ -1,11 +1,18 @@
 @import "tailwindcss";
-/* tailwindcss-safe-area provides *-safe utilities (pt-safe, pb-safe,
-   px-safe, h-dvh-safe, …) backed by env(safe-area-inset-*). Must
-   come AFTER `tailwindcss` so its utilities can pick up the variables.
-   Capacitor's SystemBars plugin (configured in capacitor.config.ts
-   with insetsHandling: 'css') injects --safe-area-inset-* on Android
-   to work around Chromium WebView <140 reporting env() as 0. */
 @import "tailwindcss-safe-area";
+/*
+  Bridge Capacitor's --safe-area-inset-* → tailwindcss-safe-area
+  --twsa-safe-area-inset-*: on Android WebView < 140, env() returns 0,
+  so we prefer the CSS variables that the Capacitor SystemBars plugin
+  injects. Must come AFTER the @import above so these override the
+  plugin's :root defaults.
+*/
+:root {
+  --twsa-safe-area-inset-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --twsa-safe-area-inset-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --twsa-safe-area-inset-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --twsa-safe-area-inset-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+}
 @import "tw-animate-css";
 
 /* Rwandan-rooted typography:
@@ -326,7 +333,7 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground antialiased pt-safe pb-safe;
     font-family: var(--font-sans);
     font-feature-settings: "cv11", "ss01", "ss03";
   }
