@@ -155,6 +155,14 @@ const Onboard = () => {
       });
       return;
     }
+    if (availability.status === "taken") {
+      toast({
+        title: "Lightning address taken",
+        description: `${availability.username}@${SPARK_LN_DOMAIN} is already taken. Pick a different Lightning address before continuing.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setStep("picture");
   }
 
@@ -524,7 +532,7 @@ function UsernameAvailabilityHint({
       return (
         <p className="text-xs text-amber-600 dark:text-amber-500">
           <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code> is
-          taken — we'll append a short random suffix during creation.
+          taken — pick a different Lightning address before creating the persona.
         </p>
       );
     case "error":

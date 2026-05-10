@@ -83,34 +83,17 @@ export async function probeLightningUsernameAvailability(
   }
 }
 
-/**
- * 4 lowercase-alphanumeric chars. Picked from a 32-char alphabet
- * (no easily-confused 0/o, 1/l) so the suffix stays readable.
- */
-export function randomUsernameSuffix(): string {
-  const alphabet = "abcdefghjkmnpqrstuvwxyz23456789";
-  let s = "";
-  for (let i = 0; i < 4; i++) {
-    s += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
-  return s;
-}
-
 export interface RegisterLightningAddressOptions {
-  /** Username to try first (already slugified). Falls back to `default`-`{rand}` if empty/invalid. */
+  /** Username to register. Falls back to `fallbackBase` if empty/invalid. */
   baseUsername: string;
   /** Free-form description embedded in the LNURL metadata. */
   description?: string;
-  /** Max retries on collision. Default 5. */
-  maxRetries?: number;
   /** Fallback base username if `baseUsername` is empty/invalid. Defaults to "user". */
   fallbackBase?: string;
-  /** When true, do not suffix on collision; fail so deliberate renames are explicit. */
-  noSuffixOnCollision?: boolean;
 }
 
 export interface ResolvedLightningAddress {
-  /** Final username we successfully registered (`base` or `base-xxxx`). */
+  /** Final username we successfully registered. */
   username: string;
   /** Full address, e.g. `imani-7k2p@breez.tips`. */
   lightningAddress: string;
@@ -119,9 +102,8 @@ export interface ResolvedLightningAddress {
 }
 
 /**
- * Probe for availability and register, retrying with random suffixes on
- * collision. Throws if all retries collide (extremely unlikely with a
- * 4-char suffix from a 31-char alphabet — ~10^6 namespace per base).
+ * Probe for availability and register the exact requested Lightning Address.
+ * Throws when the requested username is taken or registration collides.
  */
 export async function registerLightningAddressWithRetry(
   handle: WalletHandle,
@@ -129,59 +111,39 @@ export async function registerLightningAddressWithRetry(
 ): Promise<ResolvedLightningAddress> {
   const fallbackBase = opts.fallbackBase ?? "user";
   const slugged = slugifyForUsername(opts.baseUsername);
-  const base = isValidLightningUsername(slugged) ? slugged : fallbackBase;
-  const maxRetries = opts.maxRetries ?? 5;
+  const candidate = isValidLightningUsername(slugged) ? slugged : fallbackBase;
 
-  let candidate = base;
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    let available: boolean;
-    try {
-      available = await handle.checkLightningAddressAvailable({
-        username: candidate,
-      });
-    } catch (err) {
-      // Network/SDK hiccup on the probe — try a fresh suffix rather
-      // than abort. Don't let a transient probe failure cascade into
-      // a permanent registration failure.
-      lastError = err;
-      candidate = `${base}-${randomUsernameSuffix()}`;
-      continue;
-    }
-
-    if (!available) {
-      if (opts.noSuffixOnCollision) {
-        throw new LightningUsernameTakenError(candidate);
-      }
-      candidate = `${base}-${randomUsernameSuffix()}`;
-      continue;
-    }
-
-    try {
-      const info = await handle.registerLightningAddress({
-        username: candidate,
-        ...(opts.description !== undefined ? { description: opts.description } : {}),
-      });
-      return {
-        username: info.username,
-        lightningAddress: info.lightningAddress,
-        // The SDK's LnurlInfo carries both the URL and a bech32 LNURL string.
-        // We keep the bech32 form — that's what wallets accept on paste.
-        lnurl: info.lnurl?.bech32,
-      };
-    } catch (err) {
-      if (opts.noSuffixOnCollision) {
-        throw new LightningUsernameTakenError(candidate);
-      }
-      // Race condition: probe said available, register collided. Retry.
-      lastError = err;
-      candidate = `${base}-${randomUsernameSuffix()}`;
-    }
+  let available: boolean;
+  try {
+    available = await handle.checkLightningAddressAvailable({
+      username: candidate,
+    });
+  } catch (err) {
+    throw new Error(
+      err instanceof Error
+        ? `Could not check Lightning Address availability: ${err.message}`
+        : "Could not check Lightning Address availability.",
+      { cause: err },
+    );
   }
 
-  throw new Error(
-    `Could not register a Lightning Address after ${maxRetries + 1} attempts. ` +
-      (lastError instanceof Error ? `Last error: ${lastError.message}` : ""),
-  );
+  if (!available) {
+    throw new LightningUsernameTakenError(candidate);
+  }
+
+  try {
+    const info = await handle.registerLightningAddress({
+      username: candidate,
+      ...(opts.description !== undefined ? { description: opts.description } : {}),
+    });
+    return {
+      username: info.username,
+      lightningAddress: info.lightningAddress,
+      // The SDK's LnurlInfo carries both the URL and a bech32 LNURL string.
+      // We keep the bech32 form — that's what wallets accept on paste.
+      lnurl: info.lnurl?.bech32,
+    };
+  } catch {
+    throw new LightningUsernameTakenError(candidate);
+  }
 }

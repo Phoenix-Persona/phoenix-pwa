@@ -5,7 +5,6 @@ import {
   LightningUsernameTakenError,
   isValidLightningUsername,
   probeLightningUsernameAvailability,
-  randomUsernameSuffix,
   registerLightningAddressWithRetry,
   slugifyForUsername,
 } from "./lightningAddress";
@@ -58,16 +57,6 @@ describe("Lightning Address helpers", () => {
     expect(isValidLightningUsername("a".repeat(31))).toBe(false);
   });
 
-  it("generates readable random suffixes", () => {
-    const seen = new Set<string>();
-    for (let i = 0; i < 1000; i++) {
-      const suffix = randomUsernameSuffix();
-      expect(suffix).toMatch(/^[a-hjkmnpqrstuvwxyz23456789]{4}$/);
-      seen.add(suffix);
-    }
-    expect(seen.size).toBeGreaterThanOrEqual(950);
-  });
-
   it("probes username availability via the LUD-16 endpoint", async () => {
     const fetchMock = vi.fn<typeof fetch>();
     vi.stubGlobal("fetch", fetchMock);
@@ -98,14 +87,13 @@ describe("Lightning Address helpers", () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
-  it("throws without suffixing when a deliberate rename collides", async () => {
+  it("throws when the requested Lightning Address username is taken", async () => {
     const handle = makeHandle({ available: [false] });
 
     await expect(
       registerLightningAddressWithRetry(handle, {
         baseUsername: "imani",
         fallbackBase: "persona",
-        noSuffixOnCollision: true,
       }),
     ).rejects.toMatchObject({
       name: "LightningUsernameTakenError",
@@ -115,26 +103,13 @@ describe("Lightning Address helpers", () => {
     expect(handle.registerLightningAddress).not.toHaveBeenCalled();
   });
 
-  it("wraps register-time collisions when suffixing is disabled", async () => {
+  it("wraps register-time collisions as username-taken errors", async () => {
     const handle = makeHandle({ available: [true], registerRejects: true });
 
     await expect(
       registerLightningAddressWithRetry(handle, {
         baseUsername: "imani",
-        noSuffixOnCollision: true,
       }),
     ).rejects.toBeInstanceOf(LightningUsernameTakenError);
-  });
-
-  it("still suffixes collisions for first-time registration", async () => {
-    const handle = makeHandle({ available: [false, true] });
-
-    const resolved = await registerLightningAddressWithRetry(handle, {
-      baseUsername: "imani",
-      fallbackBase: "persona",
-    });
-
-    expect(resolved.username).toMatch(/^imani-[a-hjkmnpqrstuvwxyz23456789]{4}$/);
-    expect(resolved.lightningAddress).toBe(`${resolved.username}@breez.tips`);
   });
 });

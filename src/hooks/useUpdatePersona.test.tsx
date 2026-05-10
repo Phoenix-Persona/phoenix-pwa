@@ -352,7 +352,6 @@ describe("useUpdatePersona", () => {
       { id: "wallet" },
       expect.objectContaining({
         baseUsername: "new-voice",
-        noSuffixOnCollision: true,
       }),
     );
     expect(mocks.signEvent).not.toHaveBeenCalled();

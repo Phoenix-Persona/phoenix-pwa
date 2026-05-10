@@ -100,7 +100,6 @@ export function useUpdatePersona() {
               baseUsername: input.lightningUsername,
               description: `Donations to ${input.name.trim() || original.name}`,
               fallbackBase: "persona",
-              noSuffixOnCollision: true,
             });
             registeredAddress = ln.lightningAddress;
             registeredLnurl = ln.lnurl;

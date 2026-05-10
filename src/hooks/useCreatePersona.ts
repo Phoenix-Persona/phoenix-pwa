@@ -31,9 +31,11 @@ import {
 } from "@/lib/wallet/client";
 import { DEFAULT_AUTO_TOPUP_CONFIG } from "@/lib/wallet/types";
 import {
+  LightningUsernameTakenError,
   isValidLightningUsername,
   registerLightningAddressWithRetry,
   slugifyForUsername,
+  SPARK_LN_DOMAIN,
 } from "@/lib/wallet/lightningAddress";
 
 import { useCurrentUser } from "./useCurrentUser";
@@ -107,6 +109,12 @@ export function useCreatePersona() {
           await disconnectWallet(handle).catch(() => undefined);
         }
       } catch (err) {
+        if (err instanceof LightningUsernameTakenError) {
+          throw new Error(
+            `${err.username}@${SPARK_LN_DOMAIN} is already taken. Pick a different Lightning address before creating the persona.`,
+            { cause: err },
+          );
+        }
         warning =
           err instanceof Error
             ? err.message
