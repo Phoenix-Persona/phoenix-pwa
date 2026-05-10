@@ -56,6 +56,8 @@ import {
   registerLightningAddressWithRetry,
   slugifyForUsername,
 } from "@/lib/wallet/lightningAddress";
+import { buildPersonaProfileMetadata } from "@/lib/personaProfile";
+import { parseCommaList } from "@/lib/text";
 
 const EditPersona = () => {
   const { npub = "" } = useParams();
@@ -287,7 +289,7 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
       // don't bloat the encrypted payload with empty fields. Empty
       // string clears the configuration entirely.
       const trimmedWebhook = webhookUrl.trim();
-      const webhookPlatforms = parseList(webhookPlatformsInput, []);
+      const webhookPlatforms = parseCommaList(webhookPlatformsInput, []);
       const cross_post = trimmedWebhook
         ? {
             webhook_url: trimmedWebhook,
@@ -347,8 +349,8 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
         username: resolvedUsername,
         system_prompt: systemPrompt,
         voice_id: voiceId.trim() || original.voice_id,
-        languages: parseList(languagesInput, original.languages),
-        tags: parseList(tagsInput, []),
+        languages: parseCommaList(languagesInput, original.languages),
+        tags: parseCommaList(tagsInput, []),
         reference_image_url: pictureUrl || undefined,
         cross_post,
       };
@@ -408,22 +410,14 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
           const { finalizeEvent } = await import("nostr-tools/pure");
           const finalLightningAddress =
             registeredAddress ?? envelope.wallet?.lightning_address;
-          const kind0Content: Record<string, unknown> = {
-            name: updated.username ?? updated.name,
-            display_name: updated.display_name ?? updated.name,
-            about: bio,
-            picture: pictureUrl || "",
-            bot: true,
-          };
-          if (finalLightningAddress) {
-            kind0Content.lud16 = finalLightningAddress;
-          }
-          if (pictureUrl) {
-            kind0Content.phoenix = {
-              reference_image: pictureUrl,
-              version: 1,
-            };
-          }
+          const kind0Content = buildPersonaProfileMetadata({
+            name: updated.name,
+            username: updated.username,
+            displayName: updated.display_name ?? updated.name,
+            bio,
+            pictureUrl: pictureUrl || undefined,
+            lightningAddress: finalLightningAddress,
+          });
           const profileTemplate = {
             kind: 0,
             created_at: Math.floor(Date.now() / 1000),
@@ -642,14 +636,6 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
       </CardContent>
     </Card>
   );
-}
-
-function parseList(raw: string, fallback: string[]): string[] {
-  const parts = raw
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  return parts.length > 0 ? parts : fallback;
 }
 
 function UsernameAvailabilityHint({

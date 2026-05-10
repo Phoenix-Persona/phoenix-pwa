@@ -68,6 +68,8 @@ import {
   generateMnemonic,
 } from "@/lib/wallet/client";
 import { DEFAULT_AUTO_TOPUP_CONFIG } from "@/lib/wallet/types";
+import { buildPersonaProfileMetadata } from "@/lib/personaProfile";
+import { parseCommaList } from "@/lib/text";
 import {
   registerLightningAddressWithRetry,
   slugifyForUsername,
@@ -220,8 +222,8 @@ const Onboard = () => {
         display_name: trimmedName,
         system_prompt: systemPrompt,
         voice_id: voiceId,
-        languages: parseList(languagesInput, ["en"]),
-        tags: parseList(tagsInput, []),
+        languages: parseCommaList(languagesInput, ["en"]),
+        tags: parseCommaList(tagsInput, []),
         // The picture doubles as the canonical reference image used
         // by future post-image generation for likeness consistency.
         reference_image_url: pictureUrl || undefined,
@@ -267,27 +269,14 @@ const Onboard = () => {
       //      kind 0 `name`         ← persona.username (slug; LUD-16 LHS)
       //      kind 0 `display_name` ← persona.display_name (rich)
       //      kind 0 `lud16`        ← persona.wallet.lightning_address
-      const kind0Content: Record<string, unknown> = {
-        name: persona.username ?? persona.name,
-        display_name: persona.display_name ?? persona.name,
-        about: bio,
-        picture: pictureUrl || "",
-        bot: true,
-      };
-      if (lightningAddress) {
-        // LUD-16 (https://github.com/lnurl/luds/blob/luds/16.md): the
-        // human-readable lightning address, used by Nostr clients for
-        // the zap button.
-        kind0Content.lud16 = lightningAddress;
-      }
-      // Phoenix-namespace extension: the canonical reference image
-      // (PROJECT.md §5.1). Same URL as the picture for V1.
-      if (pictureUrl) {
-        kind0Content.phoenix = {
-          reference_image: pictureUrl,
-          version: 1,
-        };
-      }
+      const kind0Content = buildPersonaProfileMetadata({
+        name: persona.name,
+        username: persona.username,
+        displayName: persona.display_name ?? persona.name,
+        bio,
+        pictureUrl: pictureUrl || undefined,
+        lightningAddress,
+      });
       const profileEvent = signWithPersona(
         {
           kind: 0,
@@ -622,14 +611,6 @@ const Onboard = () => {
     </div>
   );
 };
-
-function parseList(raw: string, fallback: string[]): string[] {
-  const parts = raw
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  return parts.length > 0 ? parts : fallback;
-}
 
 function truncate(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, n).trimEnd() + "…";

@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 import { ShieldCheck } from "lucide-react";
-import { nip19 } from "nostr-tools";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
@@ -14,16 +13,7 @@ import { Button } from "@/components/ui/button";
 import { useAuthor } from "@/hooks/useAuthor";
 import { usePersonaPosts } from "@/hooks/usePersona";
 import { genUserName } from "@/lib/genUserName";
-
-function npubToHex(npub: string): string | null {
-  try {
-    const decoded = nip19.decode(npub);
-    if (decoded.type !== "npub") return null;
-    return decoded.data;
-  } catch {
-    return null;
-  }
-}
+import { npubToHex } from "@/lib/nostrIds";
 
 const PersonaFeed = () => {
   const { npub = "" } = useParams();

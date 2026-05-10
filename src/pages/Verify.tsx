@@ -26,7 +26,7 @@ import {
   ShieldCheck,
   XCircle,
 } from "lucide-react";
-import { nip19, verifyEvent } from "nostr-tools";
+import { verifyEvent } from "nostr-tools";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
@@ -36,17 +36,8 @@ import { Badge } from "@/components/ui/badge";
 import { useAuthor } from "@/hooks/useAuthor";
 import { usePersonaPosts } from "@/hooks/usePersona";
 import { genUserName } from "@/lib/genUserName";
+import { npubToHex } from "@/lib/nostrIds";
 import { cn } from "@/lib/utils";
-
-function npubToHex(npub: string): string | null {
-  try {
-    const decoded = nip19.decode(npub);
-    if (decoded.type !== "npub") return null;
-    return decoded.data;
-  } catch {
-    return null;
-  }
-}
 
 const Verify = () => {
   const { npub = "" } = useParams();

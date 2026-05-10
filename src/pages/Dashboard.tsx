@@ -32,18 +32,8 @@ import { usePersonaPublish } from "@/hooks/usePersonaPublish";
 import { usePpqInference } from "@/hooks/usePpqInference";
 import { useRegisterPersonaLightningAddress } from "@/hooks/useRegisterPersonaLightningAddress";
 import { useWallet } from "@/hooks/useWallet";
+import { npubToHex } from "@/lib/nostrIds";
 import { buildPersonaPostTemplate } from "@/lib/personaPost";
-import { nip19 } from "nostr-tools";
-
-function npubToHex(npub: string): string | null {
-  try {
-    const decoded = nip19.decode(npub);
-    if (decoded.type !== "npub") return null;
-    return decoded.data;
-  } catch {
-    return null;
-  }
-}
 
 const Dashboard = () => {
   const { npub = "" } = useParams();

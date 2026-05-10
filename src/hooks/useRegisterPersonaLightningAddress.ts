@@ -36,6 +36,7 @@ import {
 } from "@/lib/personaCrypto";
 import { connectWallet, disconnectWallet } from "@/lib/wallet/client";
 import { registerLightningAddressWithRetry } from "@/lib/wallet/lightningAddress";
+import { buildPersonaProfileMetadata } from "@/lib/personaProfile";
 import { useCurrentUser } from "./useCurrentUser";
 
 export interface RegisterPersonaLightningAddressArgs {
@@ -170,20 +171,14 @@ export function useRegisterPersonaLightningAddress(
           // Use defaults.
         }
 
-        const kind0Content: Record<string, unknown> = {
-          name: resolved.username,
-          display_name: updatedEnvelope.persona.display_name ?? persona.name,
-          about: bio,
-          picture,
-          bot: true,
-          lud16: resolved.lightningAddress,
-        };
-        if (picture) {
-          kind0Content.phoenix = {
-            reference_image: picture,
-            version: 1,
-          };
-        }
+        const kind0Content = buildPersonaProfileMetadata({
+          name: persona.name,
+          username: resolved.username,
+          displayName: updatedEnvelope.persona.display_name ?? persona.name,
+          bio,
+          pictureUrl: picture || undefined,
+          lightningAddress: resolved.lightningAddress,
+        });
 
         const profileTemplate = {
           kind: 0,
