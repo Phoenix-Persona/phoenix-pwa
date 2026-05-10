@@ -1,5 +1,14 @@
 apply plugin: 'com.android.application'
 
+// Load keystore properties for the release-signing config. The
+// .properties file is gitignored — fall back to env vars if missing
+// (CI / fresh-clone scenarios).
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "live.zuka.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,11 +25,27 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            storeFile file(keystoreProperties['storeFile'] ?: System.getProperty("user.home") + "/.android-keys/zuka-keystore.jks")
+            storePassword keystoreProperties['storePassword'] ?: System.getenv("ZUKA_KEYSTORE_PASSWORD")
+            keyAlias keystoreProperties['keyAlias'] ?: "zuka-key"
+            keyPassword keystoreProperties['keyPassword'] ?: System.getenv("ZUKA_KEYSTORE_PASSWORD")
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+    }
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 }
 
