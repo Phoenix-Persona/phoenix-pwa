@@ -131,7 +131,7 @@ const personaSchema = z.object({
     .optional(),
 });
 
-const walletSchema = z.object({
+export const walletSchema = z.object({
   // Phoenix V1 uses Breez Spark SDK (`@breeztech/breez-sdk-spark`).
   // Future SDK variants land as a discriminated union.
   kind: z.literal("spark"),

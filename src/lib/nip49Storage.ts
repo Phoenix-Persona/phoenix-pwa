@@ -28,6 +28,21 @@ import { encrypt as nip49Encrypt, decrypt as nip49Decrypt } from "nostr-tools/ni
 /** Where the encrypted user nsec is parked. */
 const STORAGE_KEY = "zuka:user:ncryptsec";
 
+/**
+ * Per-tab session flag — set when the user has unlocked or completed
+ * a fresh signup in this tab. Lives in `sessionStorage` so it survives
+ * F5 reloads in the same tab, but a brand-new tab gets `null` and
+ * triggers the unlock prompt.
+ *
+ * Used by `main.tsx` to decide whether to clear Nostrify's persisted
+ * nsec login on page load — see the pre-render hook there.
+ */
+const SESSION_UNLOCK_KEY = "zuka:session-unlocked";
+
+/** Where Nostrify persists its login array. We touch this from
+ *  `main.tsx` to force-clear stale sessions on a new tab. */
+export const NOSTR_LOGIN_STORAGE_KEY = "nostr:login";
+
 /** scrypt difficulty — Derek's locked default. */
 export const DEFAULT_LOG_N = 18;
 
@@ -112,4 +127,72 @@ export function clearUserNcryptsec(): void {
 /** Whether the user has a Phoenix-managed ncryptsec stored on this device. */
 export function hasUserNcryptsec(): boolean {
   return loadUserNcryptsec() !== null;
+}
+
+// ─────────── per-tab session flag ───────────
+
+function safeSessionStorage(): Storage | null {
+  try {
+    if (typeof window === "undefined") return null;
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Mark this tab as "unlocked" — the user has either entered the
+ * passphrase via `<UnlockGate>` or just completed a fresh signup.
+ * Lives in sessionStorage so it survives F5 in the same tab but
+ * brand-new tabs see `null` and re-prompt.
+ */
+export function markSessionUnlocked(): void {
+  const storage = safeSessionStorage();
+  if (!storage) return;
+  storage.setItem(SESSION_UNLOCK_KEY, "1");
+}
+
+/** Whether this tab has unlocked / completed signup. */
+export function isSessionUnlocked(): boolean {
+  const storage = safeSessionStorage();
+  if (!storage) return false;
+  return storage.getItem(SESSION_UNLOCK_KEY) === "1";
+}
+
+/**
+ * Clear the per-tab session flag. Called by Settings → "Lock now"
+ * (which forces re-prompt on next signer use within this tab) and
+ * by "Forget device" (which clears everything).
+ */
+export function clearSessionUnlocked(): void {
+  const storage = safeSessionStorage();
+  if (!storage) return;
+  storage.removeItem(SESSION_UNLOCK_KEY);
+}
+
+/**
+ * Pre-render hook called from `main.tsx` BEFORE React boots.
+ *
+ * If the user has an at-rest ncryptsec on this device AND this tab
+ * hasn't unlocked yet, clear Nostrify's persisted login from
+ * localStorage. Without this, Nostrify hydrates the prior session's
+ * nsec on every page load and the unlock gate never fires.
+ *
+ * The function is idempotent: if no ncryptsec is parked, or the tab
+ * is already unlocked, it does nothing.
+ *
+ * Safe to call multiple times (e.g. via React 18 strict-mode double-
+ * mount semantics) — both reads and the conditional write are
+ * cheap.
+ */
+export function clearStaleNostrLoginIfLocked(): void {
+  if (typeof window === "undefined") return;
+  if (!hasUserNcryptsec()) return;
+  if (isSessionUnlocked()) return;
+
+  try {
+    window.localStorage.removeItem(NOSTR_LOGIN_STORAGE_KEY);
+  } catch {
+    /* best effort */
+  }
 }

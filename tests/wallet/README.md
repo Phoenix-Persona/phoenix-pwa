@@ -11,10 +11,10 @@ the real Breez Spark SDK.
 | [`fund-spark-wallet-with-sats.ts`](./fund-spark-wallet-with-sats.ts) | Top-up only. Reconnects the existing wallet and prints a single BOLT11 invoice for whatever amount you specify, then polls until it settles. Use this when the wallet is too lean to cover the next auto-topup. |
 | [`test-auto-topup-and-inference.ts`](./test-auto-topup-and-inference.ts) | Follow-up. Reuses the persisted state from `bootstrap-spark-wallet-e2e.ts` and exercises three flows: a "hello world" inference call against ppq.ai, the disabled-policy short-circuit, and an auto-topup pass that uses `DEFAULT_AUTO_TOPUP_CONFIG`. |
 
-All three load `dev/.env` automatically; just put your API key there:
+All three load `.env` automatically; just put your API key there:
 
 ```bash
-echo 'VITE_BREEZ_API_KEY=your_key' >> dev/.env
+echo 'VITE_BREEZ_API_KEY=your_key' >> .env
 ```
 
 ## Run them

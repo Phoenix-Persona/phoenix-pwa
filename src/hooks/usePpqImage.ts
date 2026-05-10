@@ -11,27 +11,22 @@
 
 import { useMutation, type UseMutationResult } from "@tanstack/react-query";
 
-import { createAccount, generateImage } from "@/lib/ppq/client";
-import { ppqAccountStore } from "@/lib/ppq/storage";
+import { generateImage } from "@/lib/ppq/client";
 import type { PpqImageRequest, PpqImageResponse } from "@/lib/ppq/types";
-
-async function ensureAccountForCall() {
-  const existing = ppqAccountStore.load();
-  if (existing) return existing;
-  const fresh = await createAccount();
-  ppqAccountStore.save(fresh);
-  return fresh;
-}
+import { usePpqAccount } from "./usePpqAccount";
 
 export function usePpqImage(): UseMutationResult<
   PpqImageResponse,
   Error,
   PpqImageRequest
 > {
+  // Resolution lives in usePpqAccount: env > operator envelope > cache > mint.
+  const { account, ensureAccount } = usePpqAccount();
+
   return useMutation({
     mutationFn: async (req) => {
-      const { api_key } = await ensureAccountForCall();
-      return generateImage(api_key, req);
+      const acct = account ?? (await ensureAccount());
+      return generateImage(acct.api_key, req);
     },
   });
 }

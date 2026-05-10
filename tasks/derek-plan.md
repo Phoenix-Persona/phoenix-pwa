@@ -11,9 +11,9 @@
 
 ---
 
-## Status (as of PR #3 merge — `5a9f9d0`)
+## Status (as of PR #5 merge — `59eacb8`)
 
-**Shipped — Derek-owned V1 slice complete:**
+**Shipped — Derek-owned V1 slice complete + V1.5 polish:**
 
 - Persona schema + crypto + scan-and-decrypt cache (PR #1)
 - NIP-49 at-rest layer + UnlockGate (PR #1)
@@ -23,41 +23,57 @@
 - Settings page: Account (Lock / Forget / Change passphrase / Download backup) + Relays (NIP-65 manager) + Personas (PR #3)
 - AuthDialog NIP-49 import — kill-and-resurrect ready (PR #3)
 - Verify page with real client-side signature checks (PR #3)
-- Phoenix → Feniksi rebrand (PR #3)
+- Phoenix → Feniksi rebrand (PR #3); Feniksi → Zuka rebrand (PR #5)
 - Modern Rwandan flag accents (sky / gold / green) (PR #3)
 - NostrSync resets relay/Blossom on user change + invalidates persona caches (PR #3)
 - Spike C Part 1 deliverable — `docs/spike-nostr.md` (PR #1)
+- PWA install prompt + manifest + relay-set expansion to 7 (PR #4)
+- NIP-92 imeta image rendering on PostCard (PR #4)
+- Settings → Media: BUD-03 Blossom server manager (PR #4)
+- MyPersonas + Settings card stats (post count + last-active) (PR #5)
+- NIP-92 imeta video rendering on PostCard (PR #5)
+- Cross-post webhook scaffold (schema + `useCrossPost` hook + EditPersona UI) (PR #5)
+- Composer reframe: video-first with text-only fallback (PR #5)
 
-**Outstanding (Derek-owned, this branch and beyond):**
-- PWA polish — manifest, service worker, install prompt (V1.5)
-- Mobile QA pass — iPhone Safari + Android Chrome at 360 / 414 / 768 px
+**Outstanding (Derek-owned, not blocked):**
+- Real-device mobile QA pass — iPhone Safari + Android Chrome at 360 / 414 / 768 px (needs a phone)
 - Live-relay verification runbook (5 min with Anaïse)
 - Mobile NIP-49 latency measurement on Anaïse's phone
-- MyPersonas card secondary stats (post count, last-active timestamp)
-- Render NIP-92 `imeta` images on PersonaFeed posts
-- Persona nsec backup multi-device rehearsal (Phase 5 demo prep)
-- Refactor: extract `useCreatePersona` hook (defer until V2 wizard work)
+- Phase 5 demo prep: kill-and-resurrect rehearsal, persona nsec backups multi-device, demo-laptop sign-in tests
+- Optional: Dashboard "no persona resolves" → redirect to `/my-personas` instead of empty state
+- Optional: `extractImetaVideos` unit test coverage
+- Optional refactor (defer to V2): extract `useCreatePersona` hook
 
 **Outstanding (waiting on others — not Derek's lane):**
 - Compose AI styling (Jim — PPQ `useStyle` hook)
+- Video generation pipeline end-to-end: prompt build + `usePpqVideo` call + Blossom mirror + imeta on publish (Jim — owns the wiring)
 - Inline post-image generation in compose (Jim)
 - Wallet UI: balance / receive / send / tx history (Jim)
 - `mintPersonaWallet` seam in Onboard publish flow (Jim)
 - Settings → per-task model picker reading PPQ `/v1/models` (Jim)
+- **Cross-post advanced paths — Twitter/X PKCE direct, Meta/TikTok/YouTube OAuth (Jim)**
 - Voice sample generation in wizard (Topher)
 - Donate button on PersonaFeed + zap receipt rendering (Topher)
-- Imigongo palette / pattern / type pairing (Anaïse)
+- Imigongo palette / pattern / type pairing sign-off (Anaïse)
+- Real PWA icon artwork (Anaïse)
 
 **V2 (deferred per PROJECT.md §6, §8):**
 - Agent-driven character creator (`pi-agent-core` interview)
 - Multi-operator-per-device
 
-**Promoted from V2 → V1.5 (product pivot, see "Cross-post + video composer" below):**
-- Video generation as the **primary** content format
-
 ---
 
-## Cross-post + video composer (V1.5 / V2 — major scope, not in current PR)
+## Cross-post + video composer (V1.5 — JIM owns ongoing; Derek did the scaffold)
+
+> **Ownership note (post PR #5):** the architectural plan, the
+> webhook scaffold (`cross_post` schema, `useCrossPost` hook,
+> EditPersona UI, Dashboard wiring), and the composer brief-shape
+> reframe shipped in PR #5 as the V1.5 starting point. **Jim is
+> picking up the rest of the cross-post + video pipeline from here**
+> — direct OAuth paths (Twitter/X PKCE, Meta), the
+> `usePpqVideo` → Blossom → imeta wiring, and the empty-wallet UX
+> on the composer. Derek's lane now is read-only on this section
+> (touch only on Jim's request).
 
 **Why this exists.** The product positioning is shifting: AI personas
 publish primarily as *short-form video* and the value prop is
@@ -155,18 +171,18 @@ non-fatal (the Nostr publish has already succeeded by then).
 
 ### Roadmap entry
 
-| Item | Phase | Owner |
-|---|---|---|
-| Update marketing copy + homepage SpeakVisual to show video + cross-post | now (current branch) | Derek ✅ |
-| Composer multi-step UI (idea + sources + hints) | V1.5 | Derek + Jim seam |
-| `extractImetaVideos()` + `<video>` element in PostCard | V1.5 | Derek |
-| Video generation in compose via `usePpqVideo` | V1.5 | Derek + Jim seam |
-| Blossom video upload + size-limit-aware server pick | V1.5 | Derek |
-| Cross-post webhook (option d) — Settings UI + `useCrossPost` hook | V1.5 | Derek |
-| Twitter/X PKCE direct (option b) | V1.5 | Derek |
-| Meta / TikTok / YouTube full OAuth | V3 — needs backend decision first | TBD |
-
----
+| Item | Phase | Owner | Status |
+|---|---|---|---|
+| Marketing copy + homepage SpeakVisual showing video + cross-post | done | Derek | ✅ PR #4 |
+| Composer brief-shape UI (idea + sources + hints) | done | Derek | ✅ PR #5 |
+| `extractImetaImages` + `<img>` grid render in PostCard | done | Derek | ✅ PR #4 |
+| `extractImetaVideos` + `<video>` element in PostCard | done | Derek | ✅ PR #5 |
+| Cross-post webhook (option d) — schema + `useCrossPost` hook + EditPersona UI + Dashboard dispatch | done | Derek | ✅ PR #5 |
+| Composer reframe: video-first with text-only fallback | done | Derek | ✅ PR #5 |
+| `usePpqVideo` → Blossom → imeta on publish (the actual video gen pipeline) | V1.5 | **Jim** | — |
+| Blossom video size-aware server selection | V1.5 | **Jim** | — |
+| Twitter/X PKCE direct (option b) | V1.5 | **Jim** | — |
+| Meta / TikTok / YouTube full OAuth | V3 — needs backend decision first | **Jim / TBD** | — |
 
 ---
 
@@ -350,7 +366,8 @@ V1 ships the form-based wizard (`Onboard.tsx`); the picture step uses PPQ image 
 
 ### PersonaFeed reads real events — partial
 - [x] `usePersonaPosts(npub)` shipped and correct
-- [ ] Render `imeta` images on posts (NIP-92 helpers from the `note-content` skill)
+- [x] Render `imeta` images on posts (PR #4 — `extractImetaImages` + responsive grid)
+- [x] Render `imeta` videos on posts (PR #5 — `extractImetaVideos` + `<video controls>`)
 - [ ] Zap-receipt strip: query kind 9735, decode bolt11, render — Topher seam mostly
 
 ### Verify page — ✅ shipped (PR #3)
@@ -363,7 +380,7 @@ V1 ships the form-based wizard (`Onboard.tsx`); the picture step uses PPQ image 
 - [ ] Optional: if no persona resolves, redirect to `/my-personas` instead of showing the empty state
 
 ### Relay set
-- [ ] Finalize 7–10 relays in `AppContext` defaults. Currently 3: Ditto, Primal, Damus. Plan adds: nos.lol, nostr.band, nostr.wine, plus 1–2 regional.
+- [x] Finalize 7+ relays in `AppContext` defaults (PR #4 — currently 7: damus, primal, nos.lol, ditto, nostr.band, nostr.wine, nostr.bg).
 
 ---
 
@@ -377,8 +394,8 @@ V1 ships the form-based wizard (`Onboard.tsx`); the picture step uses PPQ image 
 - [x] Profile-picture avatar on each card (PR #3 follow-up)
 - [x] 3-dot Edit/Delete menu with confirm dialog (PR #3)
 - [x] "New persona" CTA prominent in cover band
-- [ ] Post count per card (small Derek task)
-- [ ] Last-active timestamp per card (small Derek task)
+- [x] Post count per card (PR #5 — `usePersonaActivityStats` batched query + `<PersonaStatsBadge>`)
+- [x] Last-active timestamp per card (PR #5 — same)
 - [ ] Wallet balance per card — Jim seam
 
 ### Public PersonaFeed polish — partial
@@ -419,10 +436,11 @@ discriminator, the GitHub repo URL (`Phoenix-Persona/phoenix-pwa`),
 internal function/type names that reference the protocol concept.
 
 ### PWA — current branch (`derek/phase-3-polish`)
-- [ ] `vite-plugin-pwa` manifest with Imigongo-themed 192 / 512 / maskable icons (config exists; icons need real artwork beyond the favicon)
-- [ ] Service worker: cache app shell, last-fetched feed, profile assets. Offline shell falls back to "you're offline; recent posts shown below."
-- [ ] Install prompt — fires after first successful sign-in (not on first load — too aggressive)
+- [x] `vite-plugin-pwa` manifest with 192 / 512 / maskable icons (PR #4 — placeholder Imigongo glyph; final artwork pending Anaïse)
+- [x] Service worker shell-caching via Workbox runtime (PR #4 — `feniksi-shell` → renamed `zuka-shell`)
+- [x] Install prompt — fires once the browser fires `beforeinstallprompt`, gated on signed-in user, dismissible for 30 days (PR #4)
 - [ ] App shortcuts manifest entry for "New persona" / "My personas"
+- [ ] Offline-mode messaging in service worker fallback
 
 ### Mobile QA — current branch (`derek/phase-3-polish`)
 - [ ] iPhone Safari + Android Chrome at 360 / 414 / 768 px

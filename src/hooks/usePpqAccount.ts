@@ -1,5 +1,19 @@
 /**
- * React entry point for the ppq.ai account.
+ * React entry point for the operator's PPQ account.
+ *
+ * Resolution priority (PROJECT.md §6 / `dev/.env.example`):
+ *
+ *   1. **Env override**: `VITE_PPQ_API_KEY` (+ optional
+ *      `VITE_PPQ_CREDIT_ID`). Pins a known account; skips lookup and
+ *      mint flows. Useful for dev so a fresh browser doesn't burn a
+ *      brand-new PPQ account each time.
+ *   2. **Operator envelope** (`useOperatorEnvelope`): the encrypted
+ *      kind-30078 backup carrying the operator's persistent PPQ
+ *      credentials. Source of truth for production.
+ *   3. **localStorage cache** (`ppqAccountStore`): legacy fast path.
+ *      Kept for back-compat with personas/sessions created before
+ *      operator envelopes shipped; will be retired once that's
+ *      migrated.
  *
  *   const { account, ensureAccount, balance, refreshBalance, signOut } =
  *     usePpqAccount();
@@ -7,13 +21,14 @@
  *   // First call boots the account if missing; subsequent calls are no-ops.
  *   const acct = await ensureAccount();
  *
- * `ensureAccount()` is the *only* mutation that creates a new ppq.ai account,
- * and it stores credentials via the pluggable `ppqAccountStore`. The hook
- * deliberately does NOT auto-create on mount — we only spend a credit_id
- * when the operator actually exercises an AI service.
+ * `ensureAccount()` is the *only* mutation that creates a new ppq.ai
+ * account, and after creating one it *also* writes the resulting
+ * credentials into the operator envelope (publishing a kind-30078
+ * update) so the operator carries them across devices. The localStorage
+ * cache is updated alongside for fast subsequent loads.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { readEnv } from "@/lib/env";
@@ -21,65 +36,73 @@ import { createAccount, getBalance } from "@/lib/ppq/client";
 import { ppqAccountStore } from "@/lib/ppq/storage";
 import type { PpqAccount } from "@/lib/ppq/types";
 
-/**
- * "Free credits" path: when the operator has been issued a direct ppq.ai
- * api_key (e.g. from ppq.ai's team) without a credit_id-backed account,
- * they can drop it into Vite's env (`VITE_PPQ_API_KEY` in `.env` or
- * `dev/.env`) and the hook surfaces it as a virtual account. No
- * auto-create-account, no localStorage write, no balance check (the
- * `/credits/balance` endpoint requires a credit_id which we don't have).
- *
- * Returns null when the env key isn't set; callers fall through to the
- * existing localStorage / auto-create flow.
- */
-function readEnvAccount(): PpqAccount | null {
-  const apiKey = readEnv("VITE_PPQ_API_KEY");
-  if (!apiKey) return null;
-  return {
-    api_key: apiKey,
-    // Empty credit_id signals "env-only — skip balance queries".
-    credit_id: "",
-  };
-}
+import { useOperatorEnvelope } from "./useOperatorEnvelope";
 
 const ACCOUNT_QK = ["ppq", "account"] as const;
 const BALANCE_QK = (creditId: string | undefined) =>
   ["ppq", "balance", creditId] as const;
 
+/**
+ * "Free credits" / pinned-account path: when `VITE_PPQ_API_KEY` is set
+ * (in `.env` or `dev/.env`), surface that key as a virtual account and
+ * skip the auto-create + envelope-write flows. Optional
+ * `VITE_PPQ_CREDIT_ID` enables balance queries; when omitted, balance
+ * lookup is skipped and inference still works.
+ */
+function envAccount(): PpqAccount | null {
+  const apiKey = readEnv("VITE_PPQ_API_KEY");
+  if (!apiKey) return null;
+  const creditId = readEnv("VITE_PPQ_CREDIT_ID") ?? "";
+  return { api_key: apiKey, credit_id: creditId };
+}
+
 export function usePpqAccount() {
   const qc = useQueryClient();
+  const operator = useOperatorEnvelope();
 
-  // Resolution order: VITE_PPQ_API_KEY env wins, then localStorage. The
-  // env path is read once at mount (env doesn't change at runtime); the
-  // localStorage path stays reactive via the storage event below.
-  const [account, setAccount] = useState<PpqAccount | null>(
-    () => readEnvAccount() ?? ppqAccountStore.load(),
-  );
-
-  // Re-hydrate if another tab updated the credential. Env wins over
-  // storage, so if the env key is set we ignore storage events.
-  useEffect(() => {
-    if (readEnvAccount()) return;
-    const onStorage = () => setAccount(ppqAccountStore.load());
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
+  // Resolve in priority: env > operator envelope > localStorage cache.
+  const account = useMemo<PpqAccount | null>(() => {
+    return (
+      envAccount() ??
+      operator.envelope?.ppq ??
+      ppqAccountStore.load()
+    );
+  }, [operator.envelope?.ppq]);
 
   const ensureAccount = useMutation<PpqAccount, Error, void>({
     mutationKey: [...ACCOUNT_QK, "ensure"],
     mutationFn: async () => {
-      // Env path short-circuits — never auto-create when the operator
-      // already has a working api_key handed to them.
-      const fromEnv = readEnvAccount();
+      // env wins — never mint over a pinned account.
+      const fromEnv = envAccount();
       if (fromEnv) return fromEnv;
-      const existing = ppqAccountStore.load();
-      if (existing) return existing;
+
+      // operator envelope is the production source of truth.
+      const fromOperator = operator.envelope?.ppq;
+      if (fromOperator) return fromOperator;
+
+      // localStorage fallback (back-compat).
+      const cached = ppqAccountStore.load();
+      if (cached) {
+        // Lift it into the operator envelope so it survives across
+        // devices going forward. Don't block on this if the operator
+        // doesn't exist yet — fall back gracefully.
+        if (operator.envelope || operator.event) {
+          await operator.ensureWithPpq(cached).catch(() => {/* best-effort */});
+        }
+        return cached;
+      }
+
+      // Mint a brand-new ppq.ai account, write to both stores.
       const fresh = await createAccount();
       ppqAccountStore.save(fresh);
+      await operator.ensureWithPpq(fresh).catch((err) => {
+        // If the envelope write fails, the localStorage cache still
+        // unblocks the current request; log and move on.
+        console.warn("[usePpqAccount] failed to persist to operator envelope:", err);
+      });
       return fresh;
     },
     onSuccess: (acct) => {
-      setAccount(acct);
       qc.invalidateQueries({ queryKey: BALANCE_QK(acct.credit_id) });
     },
   });
@@ -88,7 +111,7 @@ export function usePpqAccount() {
     queryKey: BALANCE_QK(account?.credit_id),
     enabled: Boolean(account?.credit_id),
     queryFn: async ({ signal }) => {
-      if (!account) throw new Error("No ppq account");
+      if (!account?.credit_id) throw new Error("No ppq credit_id");
       return getBalance(account.credit_id, { signal });
     },
     staleTime: 15_000,
@@ -101,13 +124,13 @@ export function usePpqAccount() {
   }, [account, qc]);
 
   /**
-   * Forget the local credential. The remote account still exists at ppq.ai;
-   * this just clears localStorage. Use this when the operator wants to start
-   * fresh or hand control to another machine.
+   * Forget the local credential cache. The remote ppq.ai account still
+   * exists and the operator envelope copy is untouched; this just
+   * clears localStorage. Use to force a re-load from the operator
+   * envelope, or before signing out of the operator entirely.
    */
   const signOut = useCallback(() => {
     ppqAccountStore.clear();
-    setAccount(null);
     qc.removeQueries({ queryKey: ["ppq"] });
   }, [qc]);
 
@@ -130,5 +153,5 @@ export function usePpqAccount() {
  * non-component code that needs an api_key on demand.
  */
 export function getStoredPpqAccount(): PpqAccount | null {
-  return readEnvAccount() ?? ppqAccountStore.load();
+  return envAccount() ?? ppqAccountStore.load();
 }

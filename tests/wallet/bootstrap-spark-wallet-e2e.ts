@@ -20,7 +20,7 @@
  * Run:
  *   npx tsx tests/wallet/bootstrap-spark-wallet-e2e.ts
  *
- * Loads `dev/.env` automatically; just put your `VITE_BREEZ_API_KEY` there.
+ * Loads `.env` automatically; just put your `VITE_BREEZ_API_KEY` there.
  *
  * Persisted state (gitignored, mode 0600):
  *   tests/wallet/.operator.json   — operator nsec used to (de)crypt the envelope
@@ -340,7 +340,7 @@ async function main(): Promise<void> {
   console.log("Phoenix wallet bootstrap (full smoke walk)");
   if (!process.env.VITE_BREEZ_API_KEY) {
     console.warn(
-      "VITE_BREEZ_API_KEY not found — add it to dev/.env or export it in the shell.",
+      "VITE_BREEZ_API_KEY not found — add it to .env or export it in the shell.",
     );
   }
 

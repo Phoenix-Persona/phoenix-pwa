@@ -22,7 +22,7 @@
  * Run:
  *   npx tsx tests/wallet/test-auto-topup-and-inference.ts
  *
- * Loads `dev/.env` automatically.
+ * Loads `.env` automatically.
  *
  * Flags:
  *   --skip-inference         Don't run the chat completion call
@@ -281,7 +281,7 @@ async function main(): Promise<void> {
   console.log("Phoenix wallet — auto-topup + inference test");
   if (!process.env.VITE_BREEZ_API_KEY) {
     console.warn(
-      "VITE_BREEZ_API_KEY not found — add it to dev/.env or export it in the shell.",
+      "VITE_BREEZ_API_KEY not found — add it to .env or export it in the shell.",
     );
   }
 

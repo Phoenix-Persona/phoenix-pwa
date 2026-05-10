@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Menu, Settings as SettingsIcon } from "lucide-react";
 
 import { FlagStripe } from "@/components/ImigongoBand";
 import { LoginArea } from "@/components/auth/LoginArea";
+import { WalletBadge } from "@/components/wallet/WalletBadge";
+import { WalletDialog } from "@/components/wallet/WalletDialog";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -13,10 +16,18 @@ import {
   SheetClose,
 } from "@/components/ui/sheet";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useOperatorEnvelope } from "@/hooks/useOperatorEnvelope";
+import { useWallet } from "@/hooks/useWallet";
+import { readEnv } from "@/lib/env";
 
 export function AppHeader() {
   const { user } = useCurrentUser();
   const isLoggedIn = Boolean(user);
+  const operator = useOperatorEnvelope();
+  const operatorSeed =
+    readEnv("VITE_WALLET_SEED") ?? operator.envelope?.wallet?.seed;
+  const operatorWallet = useWallet({ mnemonic: operatorSeed });
+  const [walletOpen, setWalletOpen] = useState(false);
 
   return (
     <header className="relative bg-card/85 backdrop-blur-md sticky top-0 z-30 border-b border-imigongo-clay/15">
@@ -71,6 +82,12 @@ export function AppHeader() {
         )}
 
         <div className="flex items-center gap-2">
+          {isLoggedIn && operatorSeed ? (
+            <WalletBadge
+              wallet={operatorWallet}
+              onClick={() => setWalletOpen(true)}
+            />
+          ) : null}
           <LoginArea className="max-w-60" />
 
           {/* Mobile menu trigger */}
@@ -136,6 +153,15 @@ export function AppHeader() {
 
       {/* Rwandan-flag accent stripe */}
       <FlagStripe height={3} />
+
+      {operatorSeed ? (
+        <WalletDialog
+          wallet={operatorWallet}
+          open={walletOpen}
+          onOpenChange={setWalletOpen}
+          personaName="Operator"
+        />
+      ) : null}
     </header>
   );
 }

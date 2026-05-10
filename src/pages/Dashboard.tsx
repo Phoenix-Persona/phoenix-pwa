@@ -9,7 +9,7 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
-import { FileText, Film, Loader2, Sparkles } from "lucide-react";
+import { FileText, Film, Loader2, Sparkles, Wand2 } from "lucide-react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
@@ -17,6 +17,8 @@ import { PersonaActionsMenu } from "@/components/PersonaActionsMenu";
 import { PostCard } from "@/components/PostCard";
 import { PostListSkeleton } from "@/components/Skeletons";
 import { VideoComposerDialog } from "@/components/VideoComposerDialog";
+import { WalletBadge } from "@/components/wallet/WalletBadge";
+import { WalletDialog } from "@/components/wallet/WalletDialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,6 +29,8 @@ import { useCrossPost } from "@/hooks/useCrossPost";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePersona, usePersonaPosts } from "@/hooks/usePersona";
 import { usePersonaPublish } from "@/hooks/usePersonaPublish";
+import { usePpqInference } from "@/hooks/usePpqInference";
+import { useWallet } from "@/hooks/useWallet";
 import { buildPersonaPostTemplate } from "@/lib/personaPost";
 import { nip19 } from "nostr-tools";
 
@@ -70,18 +74,56 @@ const Dashboard = () => {
   // Generate video button so it carries the current `raw` / sources /
   // hints when launched.
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
+  const [walletOpen, setWalletOpen] = useState(false);
 
   const envelope = persona.data?.envelope ?? null;
   const personaConfig = envelope?.persona ?? null;
+  // Persona wallets are NOT subject to env override — donations go to
+  // each persona's own wallet, always. The operator's `VITE_WALLET_SEED`
+  // pin only applies to the header (operator) wallet badge. PPQ env
+  // overrides still apply globally for inference (PROJECT.md §6).
+  const walletSeed = envelope?.wallet?.seed;
+  const stylingModel =
+    envelope?.model_prefs?.agent ?? "anthropic/claude-sonnet-4.5";
+
+  const wallet = useWallet({ mnemonic: walletSeed });
+  const styling = usePpqInference();
+
+  async function onStyle() {
+    if (!personaConfig || !raw.trim()) return;
+    try {
+      const res = await styling.mutateAsync({
+        model: stylingModel,
+        messages: [
+          { role: "system", content: personaConfig.system_prompt },
+          { role: "user", content: raw },
+        ],
+      });
+      const styled = res.choices?.[0]?.message?.content?.trim();
+      if (styled) {
+        setRaw(styled);
+        wallet.refreshPpqBalance();
+        wallet.refreshInfo();
+      }
+    } catch (e) {
+      toast({
+        title: "Styling failed",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }
 
   async function onPost() {
     if (!personaConfig || !user || !raw.trim()) return;
     try {
-      // No AI styling yet — publish the raw text directly. The
-      // hints field is captured for the future styling pipeline
-      // but not surfaced in the published event (style is shape,
-      // not content). Sources DO go on the event as `r` tags so
-      // attribution rides the post immediately.
+      // The hints field is captured for the future styling pipeline
+      // but not surfaced in the published event (style is shape, not
+      // content). Sources DO go on the event as `r` tags so
+      // attribution rides the post immediately. AI styling is opt-in
+      // via the "Style in voice" button — by the time we get here,
+      // `raw` is whatever the user wants to publish (literal or
+      // styled).
       const sources = sourcesInput
         .split(",")
         .map((s) => s.trim())
@@ -223,16 +265,23 @@ const Dashboard = () => {
                       ))}
                     </div>
                   )}
-                  <PersonaActionsMenu
-                    npub={npub}
-                    backupEvent={persona.data!.event}
-                    personaPubkey={personaConfig.pubkey}
-                    personaName={personaConfig.name}
-                    variant="inline"
-                    publicFeedNpub={npub}
-                    inverse
-                    className="pt-2"
-                  />
+                  <div className="flex items-center gap-2 pt-2">
+                    {walletSeed ? (
+                      <WalletBadge
+                        wallet={wallet}
+                        onClick={() => setWalletOpen(true)}
+                      />
+                    ) : null}
+                    <PersonaActionsMenu
+                      npub={npub}
+                      backupEvent={persona.data!.event}
+                      personaPubkey={personaConfig.pubkey}
+                      personaName={personaConfig.name}
+                      variant="inline"
+                      publicFeedNpub={npub}
+                      inverse
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -267,6 +316,16 @@ const Dashboard = () => {
 
         {/* Composer + feed body */}
         <div className="container py-10 max-w-4xl space-y-8">
+          {personaConfig && !walletSeed ? (
+            <Card className="border-dashed border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20">
+              <CardContent className="py-4 px-6 text-sm text-amber-900 dark:text-amber-200">
+                This persona was created before wallets were wired. AI styling
+                and image generation are disabled. Mint a new persona from the
+                onboard wizard to enable them.
+              </CardContent>
+            </Card>
+          ) : null}
+
           {personaConfig && (
             <Card className="border-imigongo-clay/20 bg-gradient-to-br from-card via-card to-rw-gold-soft/10 overflow-hidden">
               <div className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center gap-2">
@@ -403,7 +462,9 @@ const Dashboard = () => {
                 {/* Action row — primary 'Generate video' (disabled until
                     Jim's PPQ video → Blossom seam lands), secondary
                     'Publish text-only' fallback that ships the kind 1
-                    immediately. */}
+                    immediately. "Style in voice" rewrites the idea
+                    text using the persona's system prompt before
+                    publish (PPQ chat completion). */}
                 <div className="space-y-3 pt-1">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <Button
@@ -413,17 +474,56 @@ const Dashboard = () => {
                         setSourcesInput("");
                         setHintsInput("");
                       }}
-                      disabled={publish.isPending || crossPost.isPending}
+                      disabled={
+                        publish.isPending ||
+                        crossPost.isPending ||
+                        styling.isPending
+                      }
                     >
                       Discard
                     </Button>
                     <div className="flex flex-wrap gap-2">
                       <Button
                         variant="outline"
+                        onClick={onStyle}
+                        disabled={
+                          styling.isPending ||
+                          publish.isPending ||
+                          crossPost.isPending ||
+                          !raw.trim() ||
+                          !walletSeed
+                        }
+                        title={
+                          !walletSeed
+                            ? "Mint a new persona to enable AI styling"
+                            : "Rewrite the idea in the persona's voice (PPQ chat)"
+                        }
+                      >
+                        {styling.isPending ? (
+                          <>
+                            <Loader2
+                              className="mr-2 size-4 animate-spin"
+                              aria-hidden="true"
+                            />
+                            Styling…
+                          </>
+                        ) : (
+                          <>
+                            <Wand2
+                              className="mr-2 size-4"
+                              aria-hidden="true"
+                            />
+                            Style in voice
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
                         onClick={onPost}
                         disabled={
                           publish.isPending ||
                           crossPost.isPending ||
+                          styling.isPending ||
                           !raw.trim()
                         }
                         title="Publish a text-only kind 1 note (no video)"
@@ -532,6 +632,14 @@ const Dashboard = () => {
           }}
         />
       )}
+      {walletSeed && personaConfig ? (
+        <WalletDialog
+          wallet={wallet}
+          open={walletOpen}
+          onOpenChange={setWalletOpen}
+          personaName={personaConfig.name}
+        />
+      ) : null}
     </div>
   );
 };
