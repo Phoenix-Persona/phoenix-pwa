@@ -15,6 +15,7 @@
  * never gates UX.
  */
 
+import { Capacitor } from "@capacitor/core";
 import { Download, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,8 @@ export function InstallBanner() {
   //   - signed in only (engaged user)
   //   - browser actually offered install
   //   - not in the 30-day cooldown after a dismissal
+  //   - NOT inside a native Capacitor build (we ARE the installed app)
+  if (Capacitor.isNativePlatform()) return null;
   if (!user) return null;
   if (!canInstall) return null;
   if (dismissedAt) return null;
