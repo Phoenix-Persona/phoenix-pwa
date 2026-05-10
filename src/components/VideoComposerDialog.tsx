@@ -43,7 +43,9 @@ import {
   findResumableForPersona,
   type ChainSummary,
 } from "@/lib/video/chainStore";
+import { postToTwitterIntent } from "@/lib/twitter/intent";
 import type { Persona } from "@/lib/persona";
+import { XLogo } from "@/components/icons/XLogo";
 
 const DURATION_MIN_SECS = 10;
 const DURATION_MAX_SECS = 120;
@@ -349,6 +351,7 @@ function PhaseView(props: {
         <DoneStep
           stitchedUrl={phase.stitchedUrl}
           eventId={phase.eventId}
+          caption={phase.caption}
           onCopyEventId={onCopyEventId}
           onClose={onClose}
         />
@@ -647,7 +650,23 @@ function ReadyToPostStep(props: {
           className="resize-y"
         />
       </div>
-      <div className="flex justify-end gap-2 pt-1">
+      <div className="flex justify-end gap-2 pt-1 flex-wrap">
+        <Button
+          variant="outline"
+          onClick={() =>
+            postToTwitterIntent({
+              text: caption,
+              mediaUrl: stitchedUrl,
+              filename: "phoenix-video.mp4",
+            })
+          }
+          disabled={!caption.trim()}
+          title="Open the X compose tab with this caption + start downloading the video so you can attach it"
+          className="bg-black text-white hover:bg-black/85 hover:text-white border-black"
+        >
+          <XLogo className="mr-2 size-3.5" aria-hidden="true" />
+          Post to X
+        </Button>
         <Button
           onClick={() => onPublish(caption)}
           disabled={!caption.trim()}
@@ -656,6 +675,10 @@ function ReadyToPostStep(props: {
           Post to Nostr
         </Button>
       </div>
+      <p className="text-[11px] text-muted-foreground text-right">
+        Posting to X opens a new tab with the caption pre-filled and
+        downloads the video — drag it into the X composer to attach.
+      </p>
     </div>
   );
 }
@@ -663,10 +686,11 @@ function ReadyToPostStep(props: {
 function DoneStep(props: {
   stitchedUrl: string;
   eventId: string;
+  caption: string;
   onCopyEventId: (eventId: string) => void;
   onClose: () => void;
 }) {
-  const { stitchedUrl, eventId, onCopyEventId, onClose } = props;
+  const { stitchedUrl, eventId, caption, onCopyEventId, onClose } = props;
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3">
@@ -702,7 +726,22 @@ function DoneStep(props: {
           Copy note id
         </Button>
       </div>
-      <div className="flex justify-end pt-2">
+      <div className="flex justify-end gap-2 pt-2 flex-wrap">
+        <Button
+          variant="outline"
+          onClick={() =>
+            postToTwitterIntent({
+              text: caption,
+              mediaUrl: stitchedUrl,
+              filename: "phoenix-video.mp4",
+            })
+          }
+          title="Open the X compose tab with this caption + start downloading the video"
+          className="bg-black text-white hover:bg-black/85 hover:text-white border-black"
+        >
+          <XLogo className="mr-2 size-3.5" aria-hidden="true" />
+          Also post to X
+        </Button>
         <Button onClick={onClose}>Done</Button>
       </div>
     </div>
