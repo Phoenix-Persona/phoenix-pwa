@@ -299,6 +299,16 @@ export function DashboardComposerCard({
                 </Button>
                 <div className="flex flex-wrap gap-2">
                   <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onOpenPostWizard}
+                    disabled={wizardDisabled}
+                    title={wizardTitle}
+                  >
+                    <Sparkles className="mr-2 size-4" aria-hidden="true" />
+                    Post Wizard
+                  </Button>
+                  <Button
                     onClick={onStyle}
                     disabled={styleDisabled}
                     className="shadow-lg shadow-primary/20"
