@@ -140,6 +140,7 @@ describe("useUpdatePersona", () => {
         npub: "npub1persona",
         name: "Voice",
         username: "voice",
+        lightningUsername: "voice",
         systemPrompt: "System",
         bio: "",
         originalBio: "",
@@ -175,6 +176,7 @@ describe("useUpdatePersona", () => {
         npub: "npub1persona",
         name: "Voice",
         username: "voice",
+        lightningUsername: "voice",
         systemPrompt: "System",
         bio: "",
         originalBio: "",
@@ -210,6 +212,7 @@ describe("useUpdatePersona", () => {
         npub: "npub1persona",
         name: "Voice",
         username: "voice",
+        lightningUsername: "voice",
         systemPrompt: "System",
         bio: "Updated bio",
         originalBio: "",
@@ -251,6 +254,7 @@ describe("useUpdatePersona", () => {
           npub: "npub1persona",
           name: "Voice",
           username: "voice",
+          lightningUsername: "voice",
           systemPrompt: "System",
           bio: "Updated bio",
           originalBio: "",
@@ -271,7 +275,44 @@ describe("useUpdatePersona", () => {
     warn.mockRestore();
   });
 
-  it("fails deliberate renames to taken usernames without publishing", async () => {
+  it("updates the persona username without registering a Lightning address", async () => {
+    const envelope = makeEnvelope("stable-dtag");
+    const { result } = renderHook(() => useUpdatePersona(), { wrapper });
+
+    let updatedUsername: string | undefined;
+    await act(async () => {
+      const updated = await result.current.mutateAsync({
+        backupEvent: {
+          id: "old",
+          pubkey: "operator-pubkey",
+          kind: 30078,
+          created_at: 1,
+          tags: [["d", "stable-dtag"]],
+          content: "old",
+          sig: "sig",
+        },
+        envelope,
+        npub: "npub1persona",
+        name: "Voice",
+        username: "public-voice",
+        lightningUsername: "voice",
+        systemPrompt: "System",
+        bio: "",
+        originalBio: "",
+        bioHydrated: true,
+        pictureUrl: "",
+        originalPicture: "",
+        pictureHydrated: true,
+        crossPost: undefined,
+      });
+      updatedUsername = updated.updated.username;
+    });
+
+    expect(updatedUsername).toBe("public-voice");
+    expect(mocks.registerLightningAddressWithRetry).not.toHaveBeenCalled();
+  });
+
+  it("fails deliberate Lightning address renames without publishing", async () => {
     mocks.registerLightningAddressWithRetry.mockRejectedValueOnce(
       new LightningUsernameTakenError("new-voice"),
     );
@@ -293,7 +334,8 @@ describe("useUpdatePersona", () => {
           envelope,
           npub: "npub1persona",
           name: "Voice",
-          username: "new-voice",
+          username: "voice",
+          lightningUsername: "new-voice",
           systemPrompt: "System",
           bio: "",
           originalBio: "",

@@ -131,7 +131,8 @@ describe("useCreatePersona", () => {
     await act(async () => {
       const created = await result.current.mutateAsync({
         name: "Voice",
-        username: "voice",
+        username: "public-voice",
+        lightningUsername: "donate-voice",
         bio: "Bio",
         systemPrompt: "System",
         pictureUrl: "https://example.com/pic.png",
@@ -139,6 +140,7 @@ describe("useCreatePersona", () => {
 
       expect(created.npub).toBe("npub1persona");
       expect(created.envelope.persona.dTag).toBeTruthy();
+      expect(created.envelope.persona.username).toBe("public-voice");
       expect(created.envelope.wallet?.lightning_address).toBe(
         "voice@breez.tips",
       );
@@ -149,6 +151,12 @@ describe("useCreatePersona", () => {
       expect.objectContaining({
         kind: 30078,
         content: "ciphertext",
+      }),
+    );
+    expect(mocks.registerLightningAddressWithRetry).toHaveBeenCalledWith(
+      { id: "wallet" },
+      expect.objectContaining({
+        baseUsername: "donate-voice",
       }),
     );
     expect(
@@ -178,12 +186,14 @@ describe("useCreatePersona", () => {
     await act(async () => {
       const created = await result.current.mutateAsync({
         name: "Voice",
-        username: "voice",
+        username: "public-voice",
+        lightningUsername: "donate-voice",
         bio: "Bio",
         systemPrompt: "System",
       });
 
       expect(created.envelope.wallet?.lightning_address).toBeUndefined();
+      expect(created.envelope.persona.username).toBe("public-voice");
       expect(created.warning).toBe("address taken");
     });
 

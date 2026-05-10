@@ -6,19 +6,23 @@ import { SPARK_LN_DOMAIN } from "@/lib/wallet/lightningAddress";
 export interface EditPersonaIdentityFieldsProps {
   name: string;
   username: string;
-  initialUsername: string;
+  lightningUsername: string;
+  initialLightningUsername: string;
   availability: UsernameAvailabilityState;
   onNameChange: (value: string) => void;
   onUsernameChange: (value: string) => void;
+  onLightningUsernameChange: (value: string) => void;
 }
 
 export function EditPersonaIdentityFields({
   name,
   username,
-  initialUsername,
+  lightningUsername,
+  initialLightningUsername,
   availability,
   onNameChange,
   onUsernameChange,
+  onLightningUsernameChange,
 }: EditPersonaIdentityFieldsProps) {
   return (
     <>
@@ -36,11 +40,27 @@ export function EditPersonaIdentityFields({
 
       <div className="space-y-2">
         <Label htmlFor="edit-username">Username</Label>
+        <Input
+          id="edit-username"
+          value={username}
+          onChange={(e) => onUsernameChange(e.target.value)}
+          placeholder="username"
+          className="font-mono text-sm"
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <p className="text-xs text-muted-foreground">
+          Public handle for the persona profile.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="edit-lightning-username">Lightning address</Label>
         <div className="flex items-center gap-1.5">
           <Input
-            id="edit-username"
-            value={username}
-            onChange={(e) => onUsernameChange(e.target.value)}
+            id="edit-lightning-username"
+            value={lightningUsername}
+            onChange={(e) => onLightningUsernameChange(e.target.value)}
             placeholder="username"
             className="font-mono text-sm"
             autoComplete="off"
@@ -52,8 +72,8 @@ export function EditPersonaIdentityFields({
         </div>
         <UsernameAvailabilityHint
           state={availability}
-          originalUsername={initialUsername}
-          currentUsername={username}
+          originalUsername={initialLightningUsername}
+          currentUsername={lightningUsername}
         />
       </div>
     </>
@@ -112,7 +132,7 @@ function UsernameAvailabilityHint({
           <code className="font-mono">
             {state.username}@{SPARK_LN_DOMAIN}
           </code>{" "}
-          is taken — pick a different name before saving.
+          is taken — pick a different Lightning address before saving.
         </p>
       );
     case "error":

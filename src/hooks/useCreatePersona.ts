@@ -41,6 +41,7 @@ import { useCurrentUser } from "./useCurrentUser";
 export interface CreatePersonaInput {
   name: string;
   username: string;
+  lightningUsername: string;
   bio: string;
   systemPrompt: string;
   pictureUrl?: string;
@@ -80,27 +81,28 @@ export function useCreatePersona() {
       const kp = input.keypair ?? generatePersonaKeypair();
       const dTag = generatePersonaDTag();
       const trimmedName = input.name.trim() || "Untitled";
-      const baseUsername = (
+      const personaUsername = (
         input.username || slugifyForUsername(trimmedName)
+      ).trim();
+      const baseLightningUsername = (
+        input.lightningUsername || slugifyForUsername(trimmedName)
       ).trim();
 
       const mnemonic = await generateMnemonic();
 
       let lightningAddress: string | undefined;
       let lnurl: string | undefined;
-      let resolvedUsername: string | undefined;
       let warning: string | undefined;
       try {
         const handle = await connectWallet({ mnemonic });
         try {
           const ln = await registerLightningAddressWithRetry(handle, {
-            baseUsername,
+            baseUsername: baseLightningUsername,
             description: `Donations to ${trimmedName}`,
             fallbackBase: "persona",
           });
           lightningAddress = ln.lightningAddress;
           lnurl = ln.lnurl;
-          resolvedUsername = ln.username;
         } finally {
           await disconnectWallet(handle).catch(() => undefined);
         }
@@ -112,8 +114,7 @@ export function useCreatePersona() {
       }
 
       const finalUsername =
-        resolvedUsername ??
-        (isValidLightningUsername(baseUsername) ? baseUsername : undefined);
+        isValidLightningUsername(personaUsername) ? personaUsername : undefined;
 
       const persona: Persona = {
         pubkey: kp.hex.pk,

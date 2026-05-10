@@ -112,6 +112,8 @@ describe("Onboard", () => {
       expect(mocks.mutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
           keypair: expect.objectContaining({ nsec: "nsec1persona" }),
+          username: "voice-of-rwanda",
+          lightningUsername: "voice-of-rwanda",
           pictureUrl: undefined,
         }),
       ),

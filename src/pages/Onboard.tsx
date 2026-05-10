@@ -68,11 +68,14 @@ const Onboard = () => {
 
   // Details
   const [name, setName] = useState("Voice of Rwanda");
-  // Username drives the breez.tips LN address. Auto-derives from
-  // `name` while untouched; once the user edits it, we stop syncing
-  // (tracked by `usernameDirty`).
+  // Persona handle auto-derives from `name` while untouched; once the
+  // user edits it, we stop syncing (tracked by `usernameDirty`).
   const [username, setUsername] = useState(slugifyForUsername("Voice of Rwanda"));
   const [usernameDirty, setUsernameDirty] = useState(false);
+  const [lightningUsername, setLightningUsername] = useState(
+    slugifyForUsername("Voice of Rwanda"),
+  );
+  const [lightningUsernameDirty, setLightningUsernameDirty] = useState(false);
   const [bio, setBio] = useState(
     "An AI-assisted voice. Press freedom, civil society, the long memory."
   );
@@ -86,10 +89,10 @@ const Onboard = () => {
 
   const publishing = creating || createPersona.isPending;
 
-  // Live availability hint for the username field. Debounced HTTP probe
+  // Live availability hint for the Lightning address field. Debounced HTTP probe
   // against the public LUD-16 endpoint. The create path's authoritative
   // SDK check still runs and fixes any race against this preview.
-  const availability = useUsernameAvailability(username);
+  const availability = useUsernameAvailability(lightningUsername);
 
   useEffect(() => {
     return () => {
@@ -104,8 +107,12 @@ const Onboard = () => {
   // `username` *only* if `usernameDirty` is false.
   function onNameChange(next: string) {
     setName(next);
+    const slug = slugifyForUsername(next);
     if (!usernameDirty) {
-      setUsername(slugifyForUsername(next));
+      setUsername(slug);
+    }
+    if (!lightningUsernameDirty) {
+      setLightningUsername(slug);
     }
   }
 
@@ -115,6 +122,12 @@ const Onboard = () => {
     const cleaned = next.toLowerCase().replace(/[^a-z0-9-]/g, "");
     setUsername(cleaned);
     setUsernameDirty(true);
+  }
+
+  function onLightningUsernameChange(next: string) {
+    const cleaned = next.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    setLightningUsername(cleaned);
+    setLightningUsernameDirty(true);
   }
 
   function goNext() {
@@ -130,6 +143,14 @@ const Onboard = () => {
       toast({
         title: "Invalid username",
         description: "Usernames must start with a letter or digit and contain only lowercase letters, digits, and hyphens.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (lightningUsername && !isValidLightningUsername(lightningUsername)) {
+      toast({
+        title: "Invalid Lightning address",
+        description: "Lightning addresses must start with a letter or digit and contain only lowercase letters, digits, and hyphens.",
         variant: "destructive",
       });
       return;
@@ -168,6 +189,7 @@ const Onboard = () => {
         username,
         bio,
         systemPrompt,
+        lightningUsername,
         pictureUrl,
         keypair,
       });
@@ -321,11 +343,32 @@ const Onboard = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="persona-username">Username</Label>
+                    <Input
+                      id="persona-username"
+                      value={username}
+                      onChange={(e) => onUsernameChange(e.target.value)}
+                      placeholder="voice-of-rwanda"
+                      className="bg-background/60 font-mono text-sm"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Public handle for the persona profile. Lowercase letters,
+                      digits, and hyphens only.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="persona-lightning-username">
+                      Lightning address
+                    </Label>
                     <div className="flex items-center gap-1.5">
                       <Input
-                        id="persona-username"
-                        value={username}
-                        onChange={(e) => onUsernameChange(e.target.value)}
+                        id="persona-lightning-username"
+                        value={lightningUsername}
+                        onChange={(e) =>
+                          onLightningUsernameChange(e.target.value)
+                        }
                         placeholder="voice-of-rwanda"
                         className="bg-background/60 font-mono text-sm"
                         autoComplete="off"
@@ -454,7 +497,7 @@ function UsernameAvailabilityHint({
       return (
         <p className="text-xs text-muted-foreground">
           URL-friendly handle. Becomes the persona's Lightning Address — donors
-          zap <code className="font-mono">username@{SPARK_LN_DOMAIN}</code>.
+          zap <code className="font-mono">handle@{SPARK_LN_DOMAIN}</code>.
         </p>
       );
     case "invalid":

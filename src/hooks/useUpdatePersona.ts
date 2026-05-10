@@ -33,6 +33,7 @@ export interface UpdatePersonaInput {
   npub: string;
   name: string;
   username: string;
+  lightningUsername: string;
   systemPrompt: string;
   bio: string;
   originalBio: string;
@@ -56,6 +57,10 @@ type MyPersonaRecord = {
   npub: string;
 };
 
+function lightningUsernameFromAddress(address: string | undefined): string | undefined {
+  return address?.split("@")[0];
+}
+
 export function useUpdatePersona() {
   const { nostr } = useNostr();
   const { user } = useCurrentUser();
@@ -73,27 +78,36 @@ export function useUpdatePersona() {
 
       let registeredAddress: string | undefined;
       let registeredLnurl: string | undefined;
-      let resolvedUsername = input.username || original.username;
+      const resolvedUsername = input.username || original.username;
       const usernameChanged =
         input.username.length > 0 && input.username !== original.username;
+      const currentLightningUsername =
+        lightningUsernameFromAddress(envelope.wallet?.lightning_address) ??
+        original.username ??
+        "";
+      const lightningUsernameChanged =
+        input.lightningUsername.length > 0 &&
+        input.lightningUsername !== currentLightningUsername;
       const seed = envelope.wallet?.seed;
-      if (usernameChanged && seed) {
+      if (lightningUsernameChanged && !seed) {
+        throw new Error("No wallet seed available to update Lightning Address.");
+      }
+      if (lightningUsernameChanged && seed) {
         const handle = await connectWallet({ mnemonic: seed });
         try {
           try {
             const ln = await registerLightningAddressWithRetry(handle, {
-              baseUsername: input.username,
+              baseUsername: input.lightningUsername,
               description: `Donations to ${input.name.trim() || original.name}`,
               fallbackBase: "persona",
               noSuffixOnCollision: true,
             });
             registeredAddress = ln.lightningAddress;
             registeredLnurl = ln.lnurl;
-            resolvedUsername = ln.username;
           } catch (err) {
             if (err instanceof LightningUsernameTakenError) {
               throw new Error(
-                `${input.username}@${SPARK_LN_DOMAIN} is already taken. Pick a different username before saving.`,
+                `${input.lightningUsername}@${SPARK_LN_DOMAIN} is already taken. Pick a different Lightning address before saving.`,
                 { cause: err },
               );
             }
