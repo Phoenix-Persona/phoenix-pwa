@@ -3,14 +3,16 @@ import type { NostrEvent } from "@nostrify/nostrify";
 
 import { PostBody } from "./PostBody";
 import { Badge } from "@/components/ui/badge";
-import { extractSourceDomains } from "@/lib/personaPost";
+import {
+  extractImetaImages,
+  extractImetaVideos,
+  extractSourceDomains,
+} from "@/lib/personaPost";
 import { cn } from "@/lib/utils";
 
 interface PostCardProps {
   event: NostrEvent;
   className?: string;
-  /** Show a subtle "Phoenix-styled" badge in the operator's own dashboard. Off by default. */
-  showOperatorBadge?: boolean;
 }
 
 function relativeTime(unixSec: number): string {
@@ -31,12 +33,23 @@ function relativeTime(unixSec: number): string {
   });
 }
 
-export function PostCard({ event, className, showOperatorBadge }: PostCardProps) {
+export function PostCard({ event, className }: PostCardProps) {
   const domains = useMemo(() => extractSourceDomains(event.tags), [event.tags]);
+  const images = useMemo(() => extractImetaImages(event.tags), [event.tags]);
+  const videos = useMemo(() => extractImetaVideos(event.tags), [event.tags]);
   const absoluteTime = useMemo(
     () => new Date(event.created_at * 1000).toLocaleString(),
     [event.created_at]
   );
+
+  // Layout: 1 image fills full width; 2 images split half-half;
+  // 3+ images use a 2-column grid with the first one spanning.
+  const imageGridClass =
+    images.length === 1
+      ? "grid grid-cols-1"
+      : images.length === 2
+      ? "grid grid-cols-2 gap-1.5"
+      : "grid grid-cols-2 gap-1.5";
 
   return (
     <article
@@ -47,7 +60,62 @@ export function PostCard({ event, className, showOperatorBadge }: PostCardProps)
     >
       <PostBody content={event.content} />
 
-      {(domains.length > 0 || showOperatorBadge) && (
+      {videos.length > 0 && (
+        <div className="mt-4 space-y-1.5">
+          {videos.slice(0, 2).map((v, idx) => (
+            <video
+              key={`${v.url}-${idx}`}
+              src={v.url}
+              poster={v.poster}
+              controls
+              preload="metadata"
+              playsInline
+              crossOrigin="anonymous"
+              aria-label={v.alt}
+              className="w-full max-h-[28rem] rounded-lg bg-imigongo-charcoal"
+            />
+          ))}
+        </div>
+      )}
+
+      {images.length > 0 && (
+        <div className={cn("mt-4 overflow-hidden rounded-lg", imageGridClass)}>
+          {images.slice(0, 4).map((img, idx) => {
+            // First image of a 3+ set spans both columns.
+            const span =
+              images.length >= 3 && idx === 0 ? "col-span-2" : "";
+            return (
+              <a
+                key={`${img.url}-${idx}`}
+                href={img.url}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                className={cn(
+                  "block bg-muted overflow-hidden",
+                  images.length === 1 ? "rounded-lg" : "rounded-md",
+                  span
+                )}
+                aria-label={img.alt ?? "Post image"}
+              >
+                <img
+                  src={img.url}
+                  alt={img.alt ?? ""}
+                  loading="lazy"
+                  crossOrigin="anonymous"
+                  className={cn(
+                    "w-full h-full object-cover",
+                    images.length === 1
+                      ? "max-h-[28rem]"
+                      : "aspect-square"
+                  )}
+                />
+              </a>
+            );
+          })}
+        </div>
+      )}
+
+      {domains.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-1.5">
           {domains.map((d) => (
             <Badge
@@ -58,19 +126,14 @@ export function PostCard({ event, className, showOperatorBadge }: PostCardProps)
               {d}
             </Badge>
           ))}
-          {showOperatorBadge && (
-            <Badge
-              variant="secondary"
-              className="text-[10px] font-medium bg-rw-gold/15 text-imigongo-charcoal border-rw-gold/30"
-            >
-              Phoenix-styled
-            </Badge>
-          )}
         </div>
       )}
 
       <div className="mt-3 pt-3 border-t border-border/60 text-xs text-muted-foreground">
-        <time dateTime={new Date(event.created_at * 1000).toISOString()} title={absoluteTime}>
+        <time
+          dateTime={new Date(event.created_at * 1000).toISOString()}
+          title={absoluteTime}
+        >
           {relativeTime(event.created_at)}
         </time>
       </div>

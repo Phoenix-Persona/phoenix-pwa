@@ -2,7 +2,7 @@ import { useSeoMeta } from "@unhead/react";
 import { Link, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 
-import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { AppHeader } from "@/components/AppHeader";
 import { ImigongoSeal } from "@/components/ImigongoBand";
 import { Button } from "@/components/ui/button";
 
@@ -10,9 +10,9 @@ const NotFound = () => {
   const location = useLocation();
 
   useSeoMeta({
-    title: "Not found — Phoenix",
+    title: "Not found — Zuka",
     description:
-      "The page you are looking for could not be found. Return to Phoenix to continue.",
+      "The page you are looking for could not be found. Return to Zuka to continue.",
   });
 
   useEffect(() => {
@@ -24,7 +24,7 @@ const NotFound = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <PhoenixHeader />
+      <AppHeader />
 
       <main id="main-content" className="flex-1 grid place-items-center container py-20">
         <div className="text-center max-w-lg space-y-7 relative">

@@ -1,9 +1,172 @@
-# Derek's Plan — Phoenix Persona
+# Derek's Plan — Zuka (formerly Feniksi, originally Phoenix Persona)
+
+> Brand history: Phoenix → Feniksi (PR #3) → Zuka (current PR). Each
+> rebrand is user-visible only; the on-wire NIP-78 discriminator
+> stays `phoenix-persona` forever for protocol compatibility.
 
 **Role:** Frontend + Nostr + PWA (PROJECT.md §12).
-**Source of truth:** [`dev/PROJECT.md`](../dev/PROJECT.md). When this plan and PROJECT.md disagree, **PROJECT.md wins** — but see "Open items to escalate" below for two cases where I'm proposing PROJECT.md should change.
+**Source of truth:** [`dev/PROJECT.md`](../dev/PROJECT.md). When this plan and PROJECT.md disagree, **PROJECT.md wins**.
 
 > **Coordination rule.** Other devs (Anaïse, Jim, Topher) are working in parallel. To avoid merge conflicts, I touch only the files claimed below in "Files I own". Anything cross-cutting (`PROJECT.md`, `tasks/todo.md`, `App.tsx`, `AppRouter.tsx`, `package.json`) gets a heads-up in chat before I touch it.
+
+---
+
+## Status (as of PR #3 merge — `5a9f9d0`)
+
+**Shipped — Derek-owned V1 slice complete:**
+
+- Persona schema + crypto + scan-and-decrypt cache (PR #1)
+- NIP-49 at-rest layer + UnlockGate (PR #1)
+- Persona Edit + Delete (NIP-09 tombstone) (PR #3)
+- Two-step onboard wizard with profile picture upload / PPQ generate (PR #3)
+- Stable `persona.dTag` in encrypted plaintext (PR #3)
+- Settings page: Account (Lock / Forget / Change passphrase / Download backup) + Relays (NIP-65 manager) + Personas (PR #3)
+- AuthDialog NIP-49 import — kill-and-resurrect ready (PR #3)
+- Verify page with real client-side signature checks (PR #3)
+- Phoenix → Feniksi rebrand (PR #3)
+- Modern Rwandan flag accents (sky / gold / green) (PR #3)
+- NostrSync resets relay/Blossom on user change + invalidates persona caches (PR #3)
+- Spike C Part 1 deliverable — `docs/spike-nostr.md` (PR #1)
+
+**Outstanding (Derek-owned, this branch and beyond):**
+- PWA polish — manifest, service worker, install prompt (V1.5)
+- Mobile QA pass — iPhone Safari + Android Chrome at 360 / 414 / 768 px
+- Live-relay verification runbook (5 min with Anaïse)
+- Mobile NIP-49 latency measurement on Anaïse's phone
+- MyPersonas card secondary stats (post count, last-active timestamp)
+- Render NIP-92 `imeta` images on PersonaFeed posts
+- Persona nsec backup multi-device rehearsal (Phase 5 demo prep)
+- Refactor: extract `useCreatePersona` hook (defer until V2 wizard work)
+
+**Outstanding (waiting on others — not Derek's lane):**
+- Compose AI styling (Jim — PPQ `useStyle` hook)
+- Inline post-image generation in compose (Jim)
+- Wallet UI: balance / receive / send / tx history (Jim)
+- `mintPersonaWallet` seam in Onboard publish flow (Jim)
+- Settings → per-task model picker reading PPQ `/v1/models` (Jim)
+- Voice sample generation in wizard (Topher)
+- Donate button on PersonaFeed + zap receipt rendering (Topher)
+- Imigongo palette / pattern / type pairing (Anaïse)
+
+**V2 (deferred per PROJECT.md §6, §8):**
+- Agent-driven character creator (`pi-agent-core` interview)
+- Multi-operator-per-device
+
+**Promoted from V2 → V1.5 (product pivot, see "Cross-post + video composer" below):**
+- Video generation as the **primary** content format
+
+---
+
+## Cross-post + video composer (V1.5 / V2 — major scope, not in current PR)
+
+**Why this exists.** The product positioning is shifting: AI personas
+publish primarily as *short-form video* and the value prop is
+"one brief → one persona-signed video published everywhere at once."
+The marketing surfaces (homepage SpeakVisual, HowItWorks Chapter 02
+body copy) are updated to reflect this. The implementation lands in
+phases.
+
+### The composer pivot (Derek + Jim seam)
+
+The current Dashboard composer is text-only. The new composer takes:
+
+- **Idea** — short prompt describing the post
+- **Sources** — list of URLs to ground the message
+- **Style hints** — free-form tags (`measured`, `first-person`,
+  `cite sources`, `vertical 9:16`, etc.)
+
+Multi-step preview: text caption draft → video preview → platform
+selection → publish. Cost estimator surfaces the total bill (text
+styling + video gen + cross-post API calls). Empty-wallet UX gates.
+
+### Video generation (Topher / Jim seam)
+
+PPQ exposes Veo 3, Kling, Runway via `pi-ai`. The wiring already
+exists (`src/hooks/usePpqVideo.ts`); the composer just needs to call
+it. Output: PPQ URL → fetch → re-upload to Blossom → reference
+Blossom URL via NIP-92 imeta on the kind 1 publish.
+
+Cost concern: Veo 3 is $0.50–$2 per generation. Demo budget needs to
+fund this (Topher's `docs/spike-ppq.md` should track this; my own
+demo persona pre-fund needs ~10–15 video gens).
+
+### Blossom video upload
+
+Pattern matches the existing PersonaPictureField (PPQ → fetch → re-
+upload). Two extensions needed:
+
+- **Pick a Blossom server that accepts video/mp4 + reasonable size
+  limits** (5–50 MB typical). The current default set may need
+  curation.
+- **Extend `PostCard` imeta render** to handle videos (currently
+  images-only — `extractImetaImages()` rejects video MIME types). A
+  parallel `extractImetaVideos()` + `<video>` element with poster,
+  controls, lazy loading.
+
+### Cross-posting via OAuth — the architectural decision
+
+OAuth flows for Twitter/X/Facebook/Instagram all require a
+`client_secret` on the token-exchange step that **cannot live in a
+browser PWA**. This collides with PROJECT.md §4's "no Phoenix-owned
+backend" principle.
+
+**Four paths considered:**
+
+| Path | What | Cost |
+|---|---|---|
+| (a) Phoenix backend | Stand up an OAuth proxy service | Breaks PROJECT.md §4. Single point of failure that contradicts the entire pitch ("the voice doesn't depend on us"). **Rejected.** |
+| (b) Twitter PKCE only | OAuth 2.0 PKCE with no secret. Twitter v2 supports it. | Twitter-only. Per-user rate limits painful. ✅ for V1.5 power-user path. |
+| (c) BYO tokens in encrypted backup | User authenticates on platform's mobile/desktop app, pastes refresh tokens into Zuka. Tokens stored in `cross_post_tokens` field of the kind 30078 plaintext. Browser uses tokens directly to publish. | Privacy-preserving, no backend. UX brutal — token expiry, refresh per platform. Long tail. |
+| (d) Webhook to a third-party aggregator | User signs up at Buffer / Hootsuite / Zapier / Make.com, creates a webhook for cross-posting, pastes the webhook URL into Zuka. On publish, Zuka POSTs to the webhook with the post payload. Aggregator handles cross-posting. | **No backend. No tokens stored. User owns the aggregator account.** Cleanest no-backend path. ✅ **Recommended for V1.5 default.** |
+
+**Recommended cross-post architecture:**
+
+- **V1.5 default:** option (d). User pastes a webhook URL in Settings
+  → Cross-posting. Each persona has its own webhook (or shared per
+  user). On publish, Zuka POSTs `{caption, video_url, platforms[]}`
+  to the webhook. Aggregator does the platform fan-out.
+- **V1.5 power-user path:** option (b). For users who want a more
+  direct route, Twitter PKCE OAuth flow lets them post to X without
+  a third-party aggregator. PKCE flow runs entirely in the browser.
+  Refresh token stored in `cross_post_tokens.x` inside the kind 30078
+  plaintext.
+- **V2:** Meta (Facebook + Instagram) + TikTok + YouTube. Requires the
+  no-backend principle to be revisited at the team level OR a
+  user-signed proxy pattern (NIP-46-style "borrow my tokens").
+
+### Schema additions
+
+Encrypted persona payload (`persona.ts`) gains:
+
+```ts
+cross_post: {
+  // Webhook (option d) — the cleanest path
+  webhook_url?: string;       // POSTed on publish
+  webhook_platforms?: string[]; // labels: "twitter", "facebook", "instagram"
+  // Direct PKCE tokens (option b) — power-user only
+  x_refresh_token?: string;
+  // Future: facebook, instagram, tiktok, youtube
+}
+```
+
+`useCrossPost` hook on the composer dispatches to whichever paths are
+configured for the active persona. Failures per platform are
+non-fatal (the Nostr publish has already succeeded by then).
+
+### Roadmap entry
+
+| Item | Phase | Owner |
+|---|---|---|
+| Update marketing copy + homepage SpeakVisual to show video + cross-post | now (current branch) | Derek ✅ |
+| Composer multi-step UI (idea + sources + hints) | V1.5 | Derek + Jim seam |
+| `extractImetaVideos()` + `<video>` element in PostCard | V1.5 | Derek |
+| Video generation in compose via `usePpqVideo` | V1.5 | Derek + Jim seam |
+| Blossom video upload + size-limit-aware server pick | V1.5 | Derek |
+| Cross-post webhook (option d) — Settings UI + `useCrossPost` hook | V1.5 | Derek |
+| Twitter/X PKCE direct (option b) | V1.5 | Derek |
+| Meta / TikTok / YouTube full OAuth | V3 — needs backend decision first | TBD |
+
+---
 
 ---
 
@@ -96,242 +259,182 @@
 
 ---
 
-## Phase 0 — Lock contracts (Hours 0–2)
+## Phase 0 — Lock contracts (Hours 0–2) — ✅ COMPLETE
 
-### Coordination
-- [ ] Read PROJECT.md end-to-end with the team
-- [ ] Confirm role split (Derek=Nostr only; Jim takes Breeze; Topher PPQ + LNURL-pay)
-- [ ] Propose PROJECT.md amendments to Anaïse: §5.2 envelope keeps untrackable form; §10 #6 resolved (per-user, once-per-session, log_n=18). Get her sign-off before the inner-payload rewrite lands.
-- [ ] (Derek + Topher) Lock the §5.2 *inner payload* schema — the encrypted JSON the user signs over. Envelope tags are non-negotiable per the locked decision above.
-- [ ] (Derek + Jim) Lock the wizard agent tool set per §6 — agree on tool names + arg shapes Jim will implement and I'll surface in `pi-web-ui`
-- [ ] Pick default models per task with the team (PROJECT.md §6 table)
-- [ ] Demo arc agreed
+### Coordination — ✅
+- [x] Read PROJECT.md end-to-end with the team
+- [x] Confirm role split (Derek=Nostr only; Jim takes Breeze; Topher PPQ + LNURL-pay)
+- [x] Propose PROJECT.md amendments to Anaïse: §5.2 envelope keeps untrackable form; §10 #6 resolved (per-user, once-per-session, log_n=18). Sign-off received before the inner-payload rewrite landed.
+- [x] (Derek + Topher) Lock the §5.2 *inner payload* schema
+- [x] (Derek + Jim) Lock the wizard agent tool set per §6 (deferred to V2 — V1 ships form-based)
+- [x] Pick default models per task (PROJECT.md §6 table)
+- [x] Demo arc agreed
 
-### Spike — Nostr crypto (Spike C Part 1, ~1h)
-**Working dir:** `spikes/nostr-breeze/nostr/`
-**Deliverable:** `docs/spike-nostr.md` (Part 1 of the original spike — Jim writes the Breeze half separately)
+### Spike — Nostr crypto (Spike C Part 1, ~1h) — ✅ shipped
+**Working dir:** `spikes/nostr-breeze/nostr/round-trip.test.ts`
+**Deliverable:** `docs/spike-nostr.md` (Part 1; Jim's Breeze half separate)
 
-- [ ] Generate fresh user keypair (`nostr-tools/pure`)
-- [ ] Generate fresh persona keypair
-- [ ] NIP-44 self-encrypt a JSON payload to user pubkey; round-trip; assert equality
-- [ ] NIP-49 encrypt user nsec at log_n=18; measure derive time on desktop + a real mobile device; round-trip decrypt; assert equality
-- [ ] Build kind 30078 with **random UUID d-tag, no `t`, no `alt`**, sign with user, publish to a real relay
-- [ ] Query back with `{kinds:[30078], authors:[user_pubkey], limit:200}` on Damus, Ditto, primal, nostr.band — confirm all four return the event
-- [ ] Time the scan-and-decrypt loop with 1 / 10 / 100 candidate kind 30078 events (with NIP-44 cache off vs. on)
-- [ ] Document: signer NIP-44 self-encryption pattern (author == recipient), envelope shape, scan-decrypt latency, NIP-49 mobile latency
-
-### Spike deliverable note (`docs/spike-nostr.md`)
-Recommended Phase 1 approach captures:
-- Signer self-encrypt API call shape (what `user.signer.nip44.encrypt(user.pubkey, json)` looks like end-to-end)
-- Confirmed scan-and-decrypt query + cache strategy (cache decrypt results by event id; only decrypt new candidates on subsequent loads)
-- Measured scan-decrypt latency at expected scale; flag if a remote NIP-46 signer makes this painful
-- NIP-49 wrapper helper signature: `nip49.encrypt(skBytes, passphrase, log_n=18) -> ncryptsec` and the inverse, with WebWorker offload if log_n=18 jank tests poorly on mobile
-- Relay set we'll target
+- [x] Generate fresh user keypair (`nostr-tools/pure`)
+- [x] Generate fresh persona keypair
+- [x] NIP-44 self-encrypt a JSON payload to user pubkey; round-trip; assert equality
+- [x] NIP-49 encrypt user nsec at log_n=18; round-trip decrypt; assert equality (desktop measured: encrypt 682ms / decrypt 674ms)
+- [x] Build kind 30078 with **random UUID d-tag, no `t`, no `alt`**, sign with user
+- [ ] Live-relay query verification on Damus / Ditto / primal / nostr.band — **owed; runbook in `docs/spike-nostr.md`** (5 min with Anaïse)
+- [x] Time the scan-and-decrypt loop with cache off vs. on (100-event sim: cold 9.1ms → warm 0.03ms, 268× speedup)
+- [x] Document signer NIP-44 self-encryption pattern, envelope shape, scan-decrypt latency
+- [ ] Mobile NIP-49 latency on Anaïse's phone — **owed; affects WebWorker decision**
 
 ---
 
-## Phase 1 — Skeleton (Hours 2–8)
+## Phase 1 — Skeleton (Hours 2–8) — ✅ COMPLETE
 
-### Persona library rewrite (`src/lib/persona*`, `src/hooks/usePersona*`)
-Adapt — don't rewrite. **Outer envelope (event tags) stays untrackable per the locked decision.** **Inner payload (decrypted JSON) adopts §5.2 schema.**
+### Persona library rewrite (`src/lib/persona*`, `src/hooks/usePersona*`) — ✅
+- [x] `persona.ts`: §5.2 inner payload Zod schema, untrackable envelope tags, `app:"phoenix-persona"` discriminator, derive-and-verify, stable `persona.dTag` (added PR #3)
+- [x] `personaCrypto.ts`: NIP-44 self-encrypt + parsePhoenixEnvelope shipped
+- [x] `personaKey.ts`: kept as-is (correct)
+- [x] `personaPost.ts`: kept untrackable (no `t:phoenix`, no `client:phoenix`)
+- [x] `persona.test.ts`: 41 passing including dTag back-compat + tampered-envelope tests
+- [x] `usePersona.ts`: scan-and-decrypt + per-event-id NIP-44 decryption cache (268× warm-pass speedup measured)
+- [x] `usePersonaPublish.ts`: kept, no changes needed
+- [ ] **Refactor TODO (Tier 3, defer to V2):** extract `useCreatePersona` mutation hook. Currently the publish flow is inline in `Onboard.tsx` and partially mirrored in `EditPersona.tsx`. Best timed when the agent wizard begins so the extraction has a second consumer.
 
-- [ ] `persona.ts`:
-  - **Tags unchanged:** `[["d", <random-uuid>]]`. No `t`, no `alt`. (Existing `buildEncryptedPersonaTemplate` is correct.)
-  - **Inner payload Zod schema** updated to §5.2:
-    - `version: 1`
-    - `persona: { pubkey, nsec, name, system_prompt, voice_id, voice_sample_url?, reference_image_url?, languages[], tags[], created_at }`
-    - `wallet: { kind: "breeze", seed, lnurl? }`
-    - `model_prefs: { agent, image, tts, video? }`
-    - `settings: { default_relays[] }`
-  - Drop sketch-era fields: `region`, `cause`, `tone`, `frequencySec`, `sources`, `focus`, `personality`, `bio`, `voiceStyle`, `avoidTopics`. `bio` and any voice-style guidance fold into `system_prompt`. Topical tags move to `persona.tags`.
-  - Preserve `app: "phoenix-persona"` discriminator and `version: 1` pin inside the encrypted payload.
-  - Preserve derive-and-verify (`personaPubkey` claim must match `getPublicKey(personaNsec)`).
-- [ ] `personaCrypto.ts`: minimal change — NIP-44 self-encrypt is the same. Update types to point at the new payload schema.
-- [ ] `personaKey.ts`: keep as-is (already correct; no localStorage persistence).
-- [ ] `personaPost.ts`: **keep as-is.** No `t:phoenix`, no `client:phoenix`, no persona-name `alt:`. Existing comments document why.
-- [ ] `persona.test.ts`: rewrite for new payload schema; keep the tampered-envelope test (still valuable).
-- [ ] `usePersona.ts`: **keep the scan-and-decrypt approach.** Add a per-event-id NIP-44 decryption cache (in-memory map `Map<event.id, PhoenixEnvelope | "not-phoenix">`) so subsequent persona switches don't re-decrypt the same events. Keep the d-tag dedup (newest revision per d-tag wins).
-- [ ] `usePersonaPublish.ts`: keep; verify timeout still right.
-- [ ] Add `useCreatePersona` mutation that bundles: generate persona keypair → build §5.2 inner payload → NIP-44 self-encrypt to user pubkey → publish kind 30078 with random UUID d-tag → publish kind 0 from persona keypair → return `{persona, event}` for the dashboard to pick up.
+### `src/lib/styleClient.ts` removal — ✅
+- [x] Deleted in PR #1
 
-### `src/lib/styleClient.ts` removal
-- [ ] Delete the file
-- [ ] Find all importers and update them to point at Jim's `src/lib/ppq/*` (or stub if Jim isn't ready — ImportError is preferable to a phantom `/style` endpoint)
+### User keypair onboarding + NIP-49 at-rest wrapper — ✅
+- [x] `AuthDialog.tsx` audited; "operator" → "user" terminology
+- [x] `src/lib/nip49Storage.ts` shipped (encryptNsec / decryptNcryptsec / store / load / clear / has)
+- [x] Signup flow inserts a `passphrase` step between `secure` and `profile` (PR #1)
+- [x] `<UnlockGate>` wraps `<AppRouter>`; first-signer-use prompt; once-per-session (PR #1)
+- [x] Settings → Danger Zone: Lock now / Forget device / **Change passphrase** / **Download backup** (PR #3)
+- [x] Documented threat-model boundary (defends passive disk reads + extensions + shared devices, NOT XSS)
+- [x] **NIP-49 import** in AuthDialog completes the kill-and-resurrect arc (PR #3)
+- ⚠️ **Architectural deviation:** `userSigner.ts` proxy signer was NOT built. Instead, the at-rest layer routes through Nostrify's standard `login.nsec()` flow gated by `<UnlockGate>`. Trade-off: during an active session, the unlocked nsec lives in Nostrify's localStorage; between sessions only the ncryptsec is parked. Documented in `nip49Storage.ts` header.
 
-### User keypair onboarding + NIP-49 at-rest wrapper
-The existing `AuthDialog.tsx` supports NIP-07, NIP-46 bunker URIs, nsec paste, and fresh-key signup. Adapt — don't rebuild.
+### Persona keypair generation — ✅
+- [x] `generatePersonaKeypair` correct as-is; never written to disk
+- [ ] `personaSession` in-memory active-persona map — **not built**; current per-mount `usePersona(npub)` is acceptable for V1
 
-- [ ] Audit `AuthDialog.tsx` for any "operator"-era language; rename to "user" for §3 consistency.
-- [ ] Add a copy line at signup: "Stronger custody available — install Amber (Android) or nsec.app and connect via 'Bunker URI' instead." Links to NIP-46.
+### Multi-persona switcher — ✅
+- [x] `useLoggedInAccounts` reused for user-account switcher
+- ❌ **Cancelled by Derek's review:** PersonaSwitcher dropdown was built then removed. Personas are reachable via the `/my-personas` link in the header and the Settings persona list.
 
-**NIP-49 at-rest layer (new, only for the fresh-Phoenix-generated path):**
-- [ ] `src/lib/nip49Storage.ts` — wraps the user nsec in NIP-49 ncryptsec at log_n=18 before writing to localStorage. Helpers:
-  - `encryptAndStore(nsecBytes, passphrase) -> ncryptsec` (writes `phoenix:user:ncryptsec`)
-  - `loadEncrypted() -> ncryptsec | null`
-  - `unlock(passphrase) -> nsecBytes` (called on first user-signer action of the session)
-  - `clear()` (logout)
-  - Heavy work in a WebWorker if main-thread benchmark says ≥150ms.
-- [ ] `src/lib/userSigner.ts` — proxy signer that holds the unlocked nsec in memory (closure, not state) and forwards `signEvent` / `nip44.encrypt` / `nip44.decrypt`. Implements `NLogin`'s signer interface so the rest of Nostrify is unchanged.
-- [ ] Hook into the signup flow: after `generateSecretKey()`, prompt for a passphrase (with strength meter; min 12 chars), encrypt+store, then `login()` with the proxy signer.
-- [ ] Hook into page-load: if `phoenix:user:ncryptsec` is present, present the unlock screen on first signer use (wrap routes in an `<UnlockGate>` that defers any user-signer action until unlocked). Once-per-session — don't re-prompt while the tab is alive.
-- [ ] Settings → Danger Zone: "Change passphrase" (decrypt → re-encrypt with new passphrase), "Forget device" (clear ncryptsec from this browser; backup must exist elsewhere).
-- [ ] Document this code path explicitly does NOT defend against XSS, only against passive disk reads / browser extensions / shared devices. Comment in `nip49Storage.ts`.
-
-**BYO users untouched:** NIP-07, NIP-46, nsec paste flows go straight to Nostrify's existing `login.*` actions. No NIP-49 layer (their key custody is whatever signer they brought).
-
-### Persona keypair generation
-- [ ] `personaKey.ts:generatePersonaKeypair` already correct — fresh nsec, never written to disk, returned to caller
-- [ ] Add an in-session `personaSession` map in `useCurrentUser` or a sibling hook so the active persona's nsec is available to the composer without re-decrypting kind 30078 on every publish
-
-### Multi-persona switcher
-- [ ] Reuse `useLoggedInAccounts` for the user-account switcher (already works)
-- [ ] Build a *separate* persona-switcher dropdown in the dashboard header — it's a different list (the user's personas), not the existing nostrify accounts. Sourced from `useMyPersonas()`.
-
-### Page shells
-Build the navigation skeleton; data wiring lands in Phase 2.
-- [ ] `Onboard.tsx` rewrite: wizard stage layout + progress indicator + nav state machine + `pi-web-ui` chat shell placeholder (Jim provides the agent loop in Phase 2)
-- [ ] `Dashboard.tsx` shell: composer textarea, preview pane, publish button, wallet badge (badge calls `useWallet()` from Jim)
-- [ ] `PersonaFeed.tsx` shell: profile header, post list (mock data), zap-receipt placeholder
-- [ ] `Settings.tsx` shell: per-task model picker (UI only, data not wired)
-- [ ] `MyPersonas.tsx` shell: list, switch, "create new persona" CTA → `Onboard`
-- [ ] `Verify.tsx` shell: pubkey, signature provenance row, post count placeholder
+### Page shells — ✅ all shipped, most polished beyond shell stage
+- [x] `Onboard.tsx` — two-step wizard (Details + Picture). Form-based; agent harness V2.
+- [x] `Dashboard.tsx` — composer + post feed + persona cover header. **Wallet badge pending Jim's seam.**
+- [x] `PersonaFeed.tsx` — profile header + posts. **Zap-receipt strip pending Topher's seam.**
+- [x] `Settings.tsx` — Account + Relays + Personas (PR #3). **Models section pending Jim's seam.**
+- [x] `MyPersonas.tsx` — list + 3-dot Edit/Delete menu + profile-picture avatars (PR #3)
+- [x] `Verify.tsx` — real signature checks + counts + timestamps (PR #3)
+- [x] `EditPersona.tsx` — same-d-tag re-publish for all editable fields (PR #3)
 
 ---
 
-## Phase 2 — Real integration (Hours 8–18)
+## Phase 2 — Real integration — partially complete
 
-### Wizard end-to-end (the headline V1 flow)
-The wizard runs Jim's agent. I host the chat surface, intercept tool calls that need user confirmation, and publish events on `finalize_persona`.
+### Agent-driven wizard — V2 deferred per PROJECT.md §6
+- [ ] (V2) Wire `pi-web-ui` chat surface inside `CharacterCreator.tsx`
+- [ ] (V2) Tool-call interception with proposal cards
+- [ ] (V2) `generate_profile_image` / `generate_voice_sample` agent tools
 
-- [ ] Wire `pi-web-ui` chat surface inside `CharacterCreator.tsx`
-- [ ] Tool-call interception: render proposal cards for `propose_name`, `propose_bio`, `propose_system_prompt` with edit/approve/regenerate buttons before the agent continues
-- [ ] `generate_profile_image(prompt)` → call Jim's PPQ image hook → upload result to Blossom via `useUploadFile` → return `{url, sha256}` to the agent and stash as `reference_image_url`
-- [ ] `generate_voice_sample(text, voice_id)` → call Jim's PPQ TTS hook → upload to Blossom → return URL → stash as `voice_sample_url`
-- [ ] `finalize_persona()`:
-  1. Call `useCreatePersona` (generates persona keypair, builds §5.2 envelope, encrypts to user, publishes kind 30078)
-  2. Sign and publish kind 0 from the persona keypair (with `phoenix.voice_sample` and `phoenix.reference_image` extensions per §5.1)
-  3. Pre-fund the persona wallet via Jim's `useWallet().mint(seed)` — Jim's seam, my call site
-  4. Navigate to `Dashboard` with the new persona active
-- [ ] Loading + error states for each stage; allow "go back" without losing the agent transcript
+V1 ships the form-based wizard (`Onboard.tsx`); the picture step uses PPQ image generation directly from a user-typed prompt without an agent loop.
 
-### Composer wired to PPQ styling
-- [ ] On publish: `useStyle()` (Jim's hook) → returns styled text → `buildPersonaPostTemplate` → `usePersonaPublish` with the active persona's nsec
-- [ ] Inline post-image generation in compose flow with a "regenerate" button; always pass `reference_image_url` to Jim's PPQ image hook
-- [ ] Show estimated sats cost before commit (Jim provides the estimator)
-- [ ] Disable the publish button when `useWallet().canAfford()` returns false; sticky banner with "Top up" sheet
+### Composer wired to PPQ styling — Jim seam
+- [ ] On publish: `useStyle()` (Jim's hook) → styled text → `buildPersonaPostTemplate` → `usePersonaPublish`
+- [ ] Inline post-image generation with reference image
+- [ ] Show estimated sats cost; disable publish when `useWallet().canAfford()` returns false
 
-### kind 1 publish
-- [ ] Tags from `personaPost.ts` only: `t:<region-slug>`, `t:<cause-slug>`, optional `t:<extra-topic>`, `r:<source-url>` per source, plus NIP-92 `imeta` tags for any attached images. **No `client:phoenix`, no `t:phoenix`, no persona name in `alt:`.**
-- [ ] **Do NOT route persona posts through `useNostrPublish`** — it auto-injects a `client` tag we deliberately want to omit. Persona posts go through `usePersonaPublish` (already correct).
-- [ ] If we want a generic `alt:` for accessibility, derive it from the post content (first 100 chars), not from persona metadata.
+### kind 1 publish — ✅
+- [x] `personaPost.ts` ships untrackable tags only (`t:<topic>` + `r:<source>`)
+- [x] Persona posts go through `usePersonaPublish` (no `client` tag injection)
 
-### PersonaFeed reads real events
-- [ ] `usePersonaPosts(npub)` already correct shape; verify it picks up posts within seconds of publish on the relay set we're using
-- [ ] Render `imeta` images with NIP-92 helpers (load `note-content` skill if I need the renderer)
-- [ ] Zap-receipt strip: query `{kinds:[9735], '#p':[persona_pubkey], limit:50}`, decode bolt11 amount, render with sender attribution where available
+### PersonaFeed reads real events — partial
+- [x] `usePersonaPosts(npub)` shipped and correct
+- [ ] Render `imeta` images on posts (NIP-92 helpers from the `note-content` skill)
+- [ ] Zap-receipt strip: query kind 9735, decode bolt11, render — Topher seam mostly
 
-### Verify page
-- [ ] Display: persona npub, kind 0 signature checked, kind 30078 backup exists (count), post count, latest post timestamp
-- [ ] All client-side verification — no trust assumptions on a server
+### Verify page — ✅ shipped (PR #3)
+- [x] Persona npub, kind 0 signature client-side check, post count, profile + first/latest timestamps
+- [x] AI-disclosure badge from kind 0 `bot: true`
+- [x] All checks happen in the browser; no server trust
 
 ### Persona event load on dashboard mount
-- [ ] On dashboard mount, if no active persona, redirect to `MyPersonas`
-- [ ] On persona-switcher selection, call `usePersona(npub)` → unlock envelope → set in-session active persona → invalidate dashboard queries
+- [x] `usePersona(npub)` per-mount works correctly
+- [ ] Optional: if no persona resolves, redirect to `/my-personas` instead of showing the empty state
 
 ### Relay set
-- [ ] Finalize 7–10 relays in `AppContext` defaults: `wss://relay.damus.io`, `wss://relay.primal.net`, `wss://relay.ditto.pub`, `wss://nos.lol`, `wss://relay.nostr.band`, `wss://nostr.wine`, plus 1–2 regional. Confirm all return our test kind 30078 + kind 1 events from the spike.
+- [ ] Finalize 7–10 relays in `AppContext` defaults. Currently 3: Ditto, Primal, Damus. Plan adds: nos.lol, nostr.band, nostr.wine, plus 1–2 regional.
 
 ---
 
-## Phase 3 — Polish (Hours 18–26)
+## Phase 3 — Polish — partially complete
 
-### Settings page wired
-- [ ] `useQuery` PPQ `/v1/models` (Jim's hook); render per-task pickers (agent, image, tts, video)
-- [ ] Persist selections by republishing the kind 30078 event with updated `model_prefs` — addressable replace handles the rest
-- [ ] Confirm the dashboard composer + image gen + TTS pull from `model_prefs`, with task-default fallback
+### Settings page wired — Jim seam
+- [x] Settings page shell with Account + Relays + Personas (PR #3)
+- [ ] Models section: per-task pickers reading PPQ `/v1/models`, persists into `model_prefs` via kind 30078 republish — Jim seam
 
-### MyPersonas polish
-- [ ] Card per persona: profile pic, name, post count, wallet balance, last-active timestamp
-- [ ] Swipe / dropdown switch to make the persona active
-- [ ] "Create new persona" CTA prominent
+### MyPersonas polish — partial
+- [x] Profile-picture avatar on each card (PR #3 follow-up)
+- [x] 3-dot Edit/Delete menu with confirm dialog (PR #3)
+- [x] "New persona" CTA prominent in cover band
+- [ ] Post count per card (small Derek task)
+- [ ] Last-active timestamp per card (small Derek task)
+- [ ] Wallet balance per card — Jim seam
 
-### Public PersonaFeed polish
-- [ ] Profile header with `picture`, `display_name`, `about`, `phoenix.voice_sample` audio control
-- [ ] Donate button: opens sheet with QR for Lightning Address + LNURL string + "Zap with Nostr" button (NIP-57 zap-request flow)
-- [ ] Inline zap receipts per post
+### Public PersonaFeed polish — partial
+- [x] Profile header with picture / display_name / about / npub badge / Verify CTA
+- [ ] `phoenix.voice_sample` audio control — needs Topher's voice gen first
+- [ ] Donate button with QR + LNURL + zap-with-Nostr — Topher seam mostly
+- [ ] Inline zap receipts per post — Topher seam mostly
 
-### Download-backup flow
-- [ ] In the wizard's final step (and from Settings → Danger Zone): generate a fresh NIP-49 ncryptsec from the user's nsec (separate passphrase from the at-rest one — user's choice; recommend distinct), trigger file download (`.ncryptsec`).
-- [ ] Reciprocal import path: in `AuthDialog`, accept `.ncryptsec` files and prompt for the export passphrase. After import, prompt for the at-rest passphrase to re-wrap for this device.
-- [ ] Reuses the same `nip49Storage.ts` helpers from Phase 1 — no new crypto.
+### Download-backup flow — ✅ shipped (PR #3)
+- [x] Settings → Account → Download key backup with separate export passphrase
+- [x] AuthDialog accepts `.ncryptsec` files; import step decrypts and logs in
+- [x] Imported ncryptsec installs verbatim as the at-rest backup (one passphrase)
 
-### Imigongo polish
-- [ ] Coordinate with Anaïse on the locked palette/pattern/type pairing
-- [ ] Apply tokens via Tailwind theme + CSS variables (load `theming` skill)
-- [ ] `ImigongoBand.tsx` already exists — verify it's on-brand
-- [ ] Splash + 404 + empty-state polish
+### Imigongo polish — partial
+- [x] Modern Rwandan flag accents (sky / gold / green) applied across all surfaces
+- [x] Imigongo earth-tone palette retained for warm decorative layers (photo halos, card borders)
+- [x] `ImigongoBand`, `FlagStripe`, `ImigongoSeal` components shipped
+- [ ] Final palette + type pairing sign-off from Anaïse
+- [x] Splash + 404 + empty-state polish
 
-### Rebrand: Phoenix → Feniksi (Kinyarwanda for "phoenix")
+### Brand history — Phoenix → Feniksi → Zuka (✅ shipped across PRs #3 and the current PR)
 
-**Decision needed before execution.** The rebrand splits into two
-layers with very different blast radii:
+**On-wire policy (locked):** the NIP-78 payload discriminator stays
+`phoenix-persona` regardless of brand changes. Rebrands shouldn't
+break parser compatibility — they're a UI concern, not a protocol
+concern. The `PHOENIX_PAYLOAD_APP` constant is a private wire-format
+detail; the function name `encryptPhoenixEnvelope` is similarly an
+internal API identifier.
 
-**Layer A — Visible / cosmetic (cheap, mostly safe):**
-- App name in `package.json`, `README.md`, `index.html` `<title>`
-- Documentation: `dev/PROJECT.md` (and the team should know — needs Anaïse's blessing), `AGENTS.md`, `tasks/todo.md`, `docs/*.md`, `tasks/derek-plan.md`
-- UI strings: `PhoenixHeader.tsx` brand mark, `useSeoMeta` titles ("— Phoenix" → "— Feniksi"), splash copy, dialog titles, error messages
-- Component file rename: `src/components/PhoenixHeader.tsx` → `FeniksiHeader.tsx` (or just `BrandHeader.tsx`)
-- Assets: any logo / favicon / OG image referencing "Phoenix"
-- PWA manifest `name` / `short_name` / `description`
-- Demo deck, one-pager, social copy (Anaïse's lane)
+**What changes per rebrand:** user-visible strings (`useSeoMeta`
+titles, AppHeader wordmark, hero/footer copy, dialog copy, toast
+copy), `package.json` `name`, `index.html` titles, PWA manifest
+name/short_name, app cache name, localStorage keys (e.g.
+`zuka:user:ncryptsec`).
 
-**Layer B — On-wire / persistent identifiers (REQUIRES TEAM DECISION):**
-- `PHOENIX_PAYLOAD_APP = "phoenix-persona"` — the magic discriminator inside every encrypted kind 30078 payload. Changing it makes existing personas unreadable.
-- The `client` tag value (currently we deliberately omit it for kind 1, so this is a non-issue for now).
-- Any future Lightning Address domain (`@phoenix.example`) — Topher's decision; should align with the rebrand.
-- The `app:` field inside the NIP-44 plaintext envelope (set to `"phoenix-persona"` via `PHOENIX_PAYLOAD_APP`).
+**What stays:** all on-wire identifiers, the `phoenix-persona`
+discriminator, the GitHub repo URL (`Phoenix-Persona/phoenix-pwa`),
+internal function/type names that reference the protocol concept.
 
-**Recommended on-wire strategy:**
-1. **Keep `phoenix-persona` as the on-wire discriminator forever.** It's the protocol identifier; rebrands shouldn't break parser compatibility. Comparable to how npm packages keep their original published name.
-2. Document this in `NIP.md` and `dev/PROJECT.md`: "The product is Feniksi. The on-wire NIP-78 payload discriminator stays `phoenix-persona` for forward/backward compatibility with V1 personas."
-3. Internal type names + comments + docs say Feniksi; the string constant `PHOENIX_PAYLOAD_APP` becomes a private compatibility detail (could rename the constant to `WIRE_APP_DISCRIMINATOR` to make this explicit).
-
-**Execution checklist (after team approves):**
-- [ ] **Decide on-wire policy** — keep `"phoenix-persona"` discriminator (recommended) or migrate (requires v2 envelope + dual-read fallback for any V1 personas already in the wild)
-- [ ] **Anaïse signs off** on the brand swap and demo language change
-- [ ] Find/replace `Phoenix` → `Feniksi` in user-visible strings only:
-  - [ ] `package.json` (`name`, `description`)
-  - [ ] `index.html`
-  - [ ] `README.md`
-  - [ ] All `useSeoMeta({ title: ... })` calls
-  - [ ] All toast / error / dialog copy
-  - [ ] `PhoenixHeader.tsx` brand wordmark + file rename
-  - [ ] `nip49Storage.ts` storage key (`phoenix:user:ncryptsec` → `feniksi:user:ncryptsec`) — **breaks any existing on-device unlock state; OK pre-launch but needs a migration shim if any users have signed up first**
-  - [ ] PWA manifest (Phase 3 task — coordinate)
-  - [ ] Favicon, OG image, og:title metadata
-- [ ] Update docs: `dev/PROJECT.md`, `AGENTS.md`, `tasks/todo.md`, `tasks/derek-plan.md`, `docs/*.md`
-- [ ] Add a paragraph in `dev/PROJECT.md` §13 (Glossary) explaining the bilingual brand: "Feniksi (Kinyarwanda for phoenix). The protocol-level identifier `phoenix-persona` is retained for compatibility."
-- [ ] Update demo opening: "Feniksi gives an activist a voice that can outlive them." (or whatever Anaïse lands on)
-- [ ] One round of grep-and-fix for any straggler "phoenix" strings that should be "Feniksi"
-
-**Coordination note.** This crosses every owner's lane (UI → Derek, on-wire → Derek + Topher, docs/demo → Anaïse, prompts → Jim). Don't execute solo — surface at next sync, pick a window when no one is mid-feature, and do it as a single atomic commit so we don't ship a half-rebranded build.
-
-### PWA
-- [ ] `vite-plugin-pwa` — manifest with Imigongo-themed 192/512/maskable icons
+### PWA — current branch (`derek/phase-3-polish`)
+- [ ] `vite-plugin-pwa` manifest with Imigongo-themed 192 / 512 / maskable icons (config exists; icons need real artwork beyond the favicon)
 - [ ] Service worker: cache app shell, last-fetched feed, profile assets. Offline shell falls back to "you're offline; recent posts shown below."
-- [ ] Install prompt fires after first successful post (not on first load — too aggressive)
+- [ ] Install prompt — fires after first successful sign-in (not on first load — too aggressive)
+- [ ] App shortcuts manifest entry for "New persona" / "My personas"
 
-### Mobile QA
-- [ ] iPhone Safari + Android Chrome at 360px / 414px / 768px
+### Mobile QA — current branch (`derek/phase-3-polish`)
+- [ ] iPhone Safari + Android Chrome at 360 / 414 / 768 px
 - [ ] Wizard flow works one-handed
-- [ ] Donate-button QR is scannable from across a stage (this is demo-critical)
+- [ ] Donate-button QR scannable from across a stage (demo-critical) — Topher's surface
 
 ---
 
 ## Phase 5 — Demo prep (my pieces, Hours 30–34)
 
-- [ ] **Kill-and-resurrect staging.** Pre-test on a second device: log in with the user nsec, watch persona list re-hydrate, publish a post from Device B while Device A is offline.
-- [ ] Persona nsec backups exported to multiple devices in case of laptop death (NIP-49 ncryptsec flow exercised)
+- [ ] **Kill-and-resurrect staging.** Pre-test on a second device: log in with the user nsec, watch persona list re-hydrate, publish a post from Device B while Device A is offline. Both halves shipped (download backup + NIP-49 import); needs rehearsal.
+- [ ] Persona nsec backups exported to multiple devices (exercises export/import round-trip)
 - [ ] Pre-load demo browser tabs, sign-ins tested on demo laptop
 - [ ] PWA install demonstrated on Anaïse's phone
 
@@ -339,15 +442,15 @@ layers with very different blast radii:
 
 ## Definition of Done — Derek's slice
 
-- [ ] Wizard end-to-end runs on a fresh device, generates persona, publishes kind 30078 + kind 0
-- [ ] Dashboard composer publishes kind 1 with attribution tags + persona signature; appears on PersonaFeed within seconds
-- [ ] PersonaFeed renders real events including images and zap receipts
-- [ ] MyPersonas lists every persona for the user; switching swaps the active persona's signer in the composer
-- [ ] Verify page passes for a freshly-created persona
-- [ ] Settings page persists model overrides into kind 30078; dashboard picks them up
-- [ ] Download-backup produces a valid NIP-49 ncryptsec; import recovers
-- [ ] PWA installs on Android; service worker survives a kill-and-relaunch
-- [ ] Kill-and-resurrect demo path works without intervention
+- [x] Wizard end-to-end runs on a fresh device, generates persona, publishes kind 30078 + kind 0
+- [x] Dashboard composer publishes kind 1 with attribution tags + persona signature; appears on PersonaFeed within seconds
+- [⚠️] PersonaFeed renders real events; **images via NIP-92 imeta still TODO**; **zap receipts pending Topher**
+- [x] MyPersonas lists every persona for the user; switching navigates to that persona's dashboard
+- [x] Verify page passes for a freshly-created persona — real client-side signature checks (PR #3)
+- [⚠️] Settings persists model overrides — **Jim's surface**; Settings page itself shipped
+- [x] Download-backup produces a valid NIP-49 ncryptsec; import recovers via AuthDialog
+- [ ] PWA installs on Android; service worker survives a kill-and-relaunch — current branch
+- [ ] Kill-and-resurrect demo path works without intervention — needs rehearsal
 
 ---
 

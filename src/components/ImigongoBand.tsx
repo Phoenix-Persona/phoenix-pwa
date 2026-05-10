@@ -6,8 +6,9 @@
  * `ImigongoSeal` — a single Imigongo tile rendered inline; useful as a
  *                  decorative seal next to headings or beside a verification
  *                  block.
- * `FlagStripe`   — Rwandan-flag three-color band (clay + gold + green).
- *                  Used as a confident architectural divider.
+ * `FlagStripe`   — Rwandan-flag three-color band (sky + gold + green).
+ *                  Matches the modern (2001+) Rwandan flag. Used as a
+ *                  confident architectural divider.
  */
 
 import { cn } from "@/lib/utils";
@@ -79,8 +80,9 @@ interface FlagStripeProps {
 }
 
 /**
- * Rwandan-flag three-band divider — clay (red/earth) + gold + green.
- * Confident architectural rule that doubles as a brand mark.
+ * Rwandan-flag three-band divider — sky-blue + sun-gold + hills-green.
+ * Matches the modern (2001+) Rwandan flag. Confident architectural
+ * rule that doubles as a brand mark.
  */
 export function FlagStripe({ className, height = 6 }: FlagStripeProps) {
   return (
@@ -89,7 +91,7 @@ export function FlagStripe({ className, height = 6 }: FlagStripeProps) {
       style={{ height }}
       aria-hidden="true"
     >
-      <div className="flex-1 bg-imigongo-clay" />
+      <div className="flex-1 bg-rw-sky" />
       <div className="flex-1 bg-rw-gold" />
       <div className="flex-1 bg-rw-green" />
     </div>

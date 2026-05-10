@@ -18,8 +18,14 @@ export default defineConfig(() => ({
     port: 8080,
     // The Breez Spark SDK ships as WASM with threading; the dev server needs
     // these cross-origin headers so SharedArrayBuffer is available to it.
+    //
+    // `credentialless` (instead of `require-corp`) keeps SharedArrayBuffer
+    // working but lets cross-origin images load without the third-party
+    // server having to opt in via Cross-Origin-Resource-Policy. We need
+    // this because Blossom servers serving persona pictures don't ship
+    // CORP headers, and require-corp blocks them outright.
     headers: {
-      "Cross-Origin-Embedder-Policy": "require-corp",
+      "Cross-Origin-Embedder-Policy": "credentialless",
       "Cross-Origin-Opener-Policy": "same-origin",
     },
   },
@@ -47,7 +53,7 @@ export default defineConfig(() => ({
             urlPattern: ({ url }) => url.origin === self.location.origin,
             handler: "StaleWhileRevalidate",
             options: {
-              cacheName: "phoenix-shell",
+              cacheName: "zuka-shell",
               expiration: { maxEntries: 64, maxAgeSeconds: 60 * 60 * 24 * 7 },
             },
           },
@@ -56,8 +62,8 @@ export default defineConfig(() => ({
         navigateFallbackDenylist: [/^\/api\//],
       },
       manifest: {
-        name: "Phoenix — Uncensorable Voices",
-        short_name: "Phoenix",
+        name: "Zuka — Uncensorable Voices",
+        short_name: "Zuka",
         description:
           "AI personas on Nostr. Voices that can be amplified but not silenced.",
         theme_color: "#a8431b",

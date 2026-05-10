@@ -99,7 +99,7 @@ export function HowItWorks() {
         body={
           <>
             Choose the cause. Curate the sources it speaks from. Shape the
-            tone, the cadence, the conviction. Phoenix mints the persona&rsquo;s
+            tone, the cadence, the conviction. Zuka mints the persona&rsquo;s
             own keypair on creation — a fresh identity, cryptographically
             separate from yours.
           </>
@@ -119,23 +119,24 @@ export function HowItWorks() {
         eyebrow="Speak"
         headline={
           <>
-            Your thought. Their voice.{" "}
-            <span className="italic text-rw-green-deep">Cited and signed.</span>
+            Your brief. Their voice.{" "}
+            <span className="italic text-rw-green-deep">Everywhere at once.</span>
           </>
         }
         body={
           <>
-            Type the rawest version of what you mean. Phoenix styles it in the
-            persona&rsquo;s voice, attaches the citation, and publishes it —
-            signed by the persona&rsquo;s key, not yours. You stay invisible.
-            The persona stays consistent.
+            Drop in your idea, your sources, a few style hints. Zuka
+            generates the video in the persona&rsquo;s likeness and voice,
+            posts it to Nostr signed by the persona&rsquo;s key, and
+            cross-posts it to X, Facebook, and Instagram in the same
+            click. You stay invisible. The persona reaches everywhere.
           </>
         }
         pills={[
-          "AI styling",
+          "Video generation",
           "Auto-cited",
           "Signed by persona",
-          "Operator never appears on-relay",
+          "Cross-posted to X / Facebook / Instagram",
         ]}
         visual={<SpeakVisual />}
       />

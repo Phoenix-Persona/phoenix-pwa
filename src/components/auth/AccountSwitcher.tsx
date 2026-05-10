@@ -1,4 +1,5 @@
-import { ChevronDown, LogOut, UserIcon, UserPlus } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ChevronDown, LogOut, Settings, UserIcon, UserPlus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,7 +29,11 @@ export function AccountSwitcher({ onAddAccountClick }: AccountSwitcherProps) {
       <DropdownMenuTrigger asChild>
         <button className='flex items-center gap-2 h-10 p-1 pr-2.5 rounded-full hover:bg-accent transition-all text-foreground'>
           <Avatar className='w-8 h-8'>
-            <AvatarImage src={currentUser.metadata.picture} alt={getDisplayName(currentUser)} />
+            <AvatarImage
+              src={currentUser.metadata.picture}
+              alt={getDisplayName(currentUser)}
+              crossOrigin="anonymous"
+            />
             <AvatarFallback>{getDisplayName(currentUser).charAt(0)}</AvatarFallback>
           </Avatar>
           <ChevronDown className='w-4 h-4 text-muted-foreground' />
@@ -43,7 +48,11 @@ export function AccountSwitcher({ onAddAccountClick }: AccountSwitcherProps) {
             className='flex items-center gap-2 cursor-pointer p-2 rounded-md'
           >
             <Avatar className='w-8 h-8'>
-              <AvatarImage src={user.metadata.picture} alt={getDisplayName(user)} />
+              <AvatarImage
+                src={user.metadata.picture}
+                alt={getDisplayName(user)}
+                crossOrigin="anonymous"
+              />
               <AvatarFallback>{getDisplayName(user)?.charAt(0) || <UserIcon />}</AvatarFallback>
             </Avatar>
             <div className='flex-1 truncate'>
@@ -53,6 +62,15 @@ export function AccountSwitcher({ onAddAccountClick }: AccountSwitcherProps) {
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link
+            to="/settings"
+            className='flex items-center gap-2 cursor-pointer p-2 rounded-md'
+          >
+            <Settings className='w-4 h-4' />
+            <span>Settings</span>
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem
           onClick={onAddAccountClick}
           className='flex items-center gap-2 cursor-pointer p-2 rounded-md'

@@ -26,7 +26,7 @@
 import { encrypt as nip49Encrypt, decrypt as nip49Decrypt } from "nostr-tools/nip49";
 
 /** Where the encrypted user nsec is parked. */
-const STORAGE_KEY = "phoenix:user:ncryptsec";
+const STORAGE_KEY = "zuka:user:ncryptsec";
 
 /** scrypt difficulty — Derek's locked default. */
 export const DEFAULT_LOG_N = 18;

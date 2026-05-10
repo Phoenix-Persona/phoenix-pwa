@@ -1,19 +1,19 @@
 /**
  * Dashboard — the active persona's composer + recent feed.
  *
- * Phase 1 status: the composer publishes raw text directly. PPQ
- * styling, image generation, wallet badge, and cost estimates land
- * in Phase 2 (tasks/derek-plan.md). Anything depending on Jim's PPQ
- * hooks is stubbed with a TODO comment.
+ * The composer publishes raw text directly. AI styling (PPQ), image
+ * generation, and the wallet/cost layer are Jim's surface area and
+ * land separately on this page when they're ready.
  */
 
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
-import { Loader2, Send, Sparkles, ExternalLink } from "lucide-react";
+import { FileText, Film, Loader2, Sparkles } from "lucide-react";
 
-import { PhoenixHeader } from "@/components/PhoenixHeader";
+import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
+import { PersonaActionsMenu } from "@/components/PersonaActionsMenu";
 import { PostCard } from "@/components/PostCard";
 import { PostListSkeleton } from "@/components/Skeletons";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/useToast";
 import { useAuthor } from "@/hooks/useAuthor";
+import { useCrossPost } from "@/hooks/useCrossPost";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePersona, usePersonaPosts } from "@/hooks/usePersona";
 import { usePersonaPublish } from "@/hooks/usePersonaPublish";
@@ -40,13 +41,23 @@ function npubToHex(npub: string): string | null {
 
 const Dashboard = () => {
   const { npub = "" } = useParams();
-  useSeoMeta({ title: "Dashboard — Phoenix" });
+  useSeoMeta({ title: "Dashboard — Zuka" });
 
   const { user } = useCurrentUser();
   const { toast } = useToast();
   const persona = usePersona(npub);
   const posts = usePersonaPosts(npub, 20);
   const publish = usePersonaPublish();
+  const crossPost = useCrossPost();
+
+  // Composer fields. `raw` is the idea/draft body (legacy name kept
+  // for git-blame continuity); the new V1.5 composer also collects
+  // sources and style hints to ground the eventual AI styling +
+  // video gen — both are wired into the post template now (sources
+  // emit `r` tags) so the kind 1 carries them even before the AI
+  // pipeline is live.
+  const [sourcesInput, setSourcesInput] = useState("");
+  const [hintsInput, setHintsInput] = useState("");
 
   const personaHex = useMemo(() => npubToHex(npub), [npub]);
   const author = useAuthor(personaHex ?? undefined);
@@ -61,18 +72,55 @@ const Dashboard = () => {
   async function onPost() {
     if (!personaConfig || !user || !raw.trim()) return;
     try {
-      // Phase 1: no styling step yet — publish the raw text directly.
-      // Phase 2 wires `pi-ai` (Jim's hook) between raw and template.
+      // No AI styling yet — publish the raw text directly. The
+      // hints field is captured for the future styling pipeline
+      // but not surfaced in the published event (style is shape,
+      // not content). Sources DO go on the event as `r` tags so
+      // attribution rides the post immediately.
+      const sources = sourcesInput
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
       const template = buildPersonaPostTemplate({
         text: raw,
         tags: personaConfig.tags,
+        sources,
       });
-      await publish.mutateAsync({
+      const signed = await publish.mutateAsync({
         personaNsec: personaConfig.nsec,
         template,
       });
-      toast({ title: "Published", description: "Post is live on relays." });
+
+      // Successful Nostr publish — try the cross-post webhook if
+      // configured. Failures are non-fatal: the post is already live
+      // on relays, so we surface a non-blocking warning toast.
+      if (personaConfig.cross_post?.webhook_url) {
+        try {
+          await crossPost.mutateAsync({
+            persona: personaConfig,
+            event: signed,
+          });
+          toast({
+            title: "Published",
+            description: "Live on relays and dispatched to your cross-post webhook.",
+          });
+        } catch (e) {
+          toast({
+            title: "Cross-post failed",
+            description:
+              e instanceof Error
+                ? `Posted to relays, but the webhook returned: ${e.message}`
+                : "Posted to relays, but the cross-post webhook didn't accept the event.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({ title: "Published", description: "Post is live on relays." });
+      }
+
       setRaw("");
+      setSourcesInput("");
+      setHintsInput("");
       posts.refetch();
     } catch (e) {
       toast({
@@ -85,7 +133,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <PhoenixHeader />
+      <AppHeader />
 
       <main id="main-content" className="flex-1">
         {/* Persona cover header — charcoal mat with avatar + tags */}
@@ -136,6 +184,7 @@ const Dashboard = () => {
                         alt=""
                         className="w-full h-full object-cover"
                         loading="eager"
+                        crossOrigin="anonymous"
                       />
                     ) : (
                       <ImigongoSeal size={56} colorClass="text-rw-gold/80" />
@@ -156,28 +205,29 @@ const Dashboard = () => {
                       {publicBio}
                     </p>
                   )}
-                  <div className="flex flex-wrap gap-2 pt-1 items-center">
-                    {personaConfig.tags.slice(0, 4).map((t) => (
-                      <Badge
-                        key={t}
-                        variant="secondary"
-                        className="text-[10px] bg-imigongo-cream/15 text-imigongo-cream border-0"
-                      >
-                        {t}
-                      </Badge>
-                    ))}
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full border-imigongo-cream/30 text-imigongo-cream bg-transparent hover:bg-imigongo-cream/10 hover:text-imigongo-cream"
-                    >
-                      <Link to={`/p/${npub}`}>
-                        <ExternalLink className="mr-2 size-3.5" />
-                        Public feed
-                      </Link>
-                    </Button>
-                  </div>
+                  {personaConfig.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1 items-center">
+                      {personaConfig.tags.slice(0, 4).map((t) => (
+                        <Badge
+                          key={t}
+                          variant="secondary"
+                          className="text-[10px] bg-imigongo-cream/15 text-imigongo-cream border-0"
+                        >
+                          {t}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <PersonaActionsMenu
+                    npub={npub}
+                    backupEvent={persona.data!.event}
+                    personaPubkey={personaConfig.pubkey}
+                    personaName={personaConfig.name}
+                    variant="inline"
+                    publicFeedNpub={npub}
+                    inverse
+                    className="pt-2"
+                  />
                 </div>
               </div>
             </div>
@@ -214,22 +264,28 @@ const Dashboard = () => {
         <div className="container py-10 max-w-4xl space-y-8">
           {personaConfig && (
             <Card className="border-imigongo-clay/20 bg-gradient-to-br from-card via-card to-rw-gold-soft/10 overflow-hidden">
-              <div className="bg-gradient-to-r from-imigongo-clay/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="size-5 text-imigongo-clay" aria-hidden="true" />
+              <div className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center gap-2">
+                <Film className="size-5 text-imigongo-clay" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
                   <h2 className="font-display text-2xl font-medium tracking-tight">
-                    Compose
+                    Compose a video
                   </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Idea + sources + hints feed the AI prompt that
+                    generates the persona's video. Text-only posting
+                    is available as a fallback.
+                  </p>
                 </div>
-                <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
-                  Phase 1 · Raw publish
-                </span>
               </div>
               <CardContent className="space-y-5 pt-5">
+                {/* Idea — drives both the video script and the text fallback */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label htmlFor="composer-raw" className="text-sm font-medium">
-                      Post body
+                    <label
+                      htmlFor="composer-raw"
+                      className="text-sm font-medium"
+                    >
+                      Idea
                     </label>
                     <span className="text-xs text-muted-foreground tabular-nums">
                       {raw.length} chars
@@ -240,7 +296,7 @@ const Dashboard = () => {
                     rows={5}
                     value={raw}
                     onChange={(e) => setRaw(e.target.value)}
-                    placeholder="Phase 1: publishes as-is. Phase 2: AI styling will run before publish."
+                    placeholder="What does the persona need to say? Drop the rawest version of your brief — Zuka turns it into a video script in the persona's voice."
                     onKeyDown={(e) => {
                       if (
                         (e.metaKey || e.ctrlKey) &&
@@ -254,42 +310,157 @@ const Dashboard = () => {
                     }}
                     className="resize-y min-h-[8rem] bg-background/60"
                   />
-                  <p className="text-[11px] text-muted-foreground">
-                    Press{" "}
-                    <kbd className="font-mono px-1 py-0.5 rounded bg-muted border border-border text-[10px]">
-                      ⌘ Enter
-                    </kbd>{" "}
-                    to publish.
-                  </p>
                 </div>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setRaw("")}
-                    disabled={publish.isPending}
-                  >
-                    Discard
-                  </Button>
-                  <Button
-                    onClick={onPost}
-                    disabled={publish.isPending || !raw.trim()}
-                    className="shadow-lg shadow-primary/20"
-                  >
-                    {publish.isPending ? (
+
+                {/* Sources + style hints — feed the AI prompt */}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="composer-sources"
+                      className="text-sm font-medium"
+                    >
+                      Sources{" "}
+                      <span className="text-xs font-normal text-muted-foreground">
+                        (optional)
+                      </span>
+                    </label>
+                    <Textarea
+                      id="composer-sources"
+                      rows={2}
+                      value={sourcesInput}
+                      onChange={(e) => setSourcesInput(e.target.value)}
+                      placeholder="https://hrw.org/..., https://cpj.org/..."
+                      className="text-sm bg-background/60 resize-none"
+                    />
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Comma-separated URLs. Grounds the video script
+                      and rides the published post as{" "}
+                      <code className="font-mono">r</code> tags for
+                      attribution.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="composer-hints"
+                      className="text-sm font-medium"
+                    >
+                      Style hints{" "}
+                      <span className="text-xs font-normal text-muted-foreground">
+                        (optional)
+                      </span>
+                    </label>
+                    <Textarea
+                      id="composer-hints"
+                      rows={2}
+                      value={hintsInput}
+                      onChange={(e) => setHintsInput(e.target.value)}
+                      placeholder="measured, first-person, vertical 9:16"
+                      className="text-sm bg-background/60 resize-none"
+                    />
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Tone, framing, length. Steers the AI prompt for
+                      both video script and visual direction.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Cross-post indicator (read-only) */}
+                {personaConfig.cross_post?.webhook_url && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-rw-sky/25 bg-rw-sky/5 px-4 py-2.5 text-xs">
+                    <span className="font-medium text-foreground">
+                      Cross-post:
+                    </span>
+                    <span className="text-muted-foreground">
+                      Will dispatch to your webhook
+                    </span>
+                    {(personaConfig.cross_post.webhook_platforms ?? [])
+                      .length > 0 && (
                       <>
-                        <Loader2
-                          className="mr-2 size-4 animate-spin"
-                          aria-hidden="true"
-                        />
-                        Publishing…
-                      </>
-                    ) : (
-                      <>
-                        <Send className="mr-2 size-4" aria-hidden="true" />
-                        Publish to relays
+                        <span className="text-muted-foreground">·</span>
+                        <div className="flex flex-wrap gap-1">
+                          {(
+                            personaConfig.cross_post.webhook_platforms ?? []
+                          ).map((p) => (
+                            <Badge
+                              key={p}
+                              variant="secondary"
+                              className="text-[10px] bg-rw-sky/10 text-rw-sky border border-rw-sky/20"
+                            >
+                              {p}
+                            </Badge>
+                          ))}
+                        </div>
                       </>
                     )}
-                  </Button>
+                  </div>
+                )}
+
+                {/* Action row — primary 'Generate video' (disabled until
+                    Jim's PPQ video → Blossom seam lands), secondary
+                    'Publish text-only' fallback that ships the kind 1
+                    immediately. */}
+                <div className="space-y-3 pt-1">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setRaw("");
+                        setSourcesInput("");
+                        setHintsInput("");
+                      }}
+                      disabled={publish.isPending || crossPost.isPending}
+                    >
+                      Discard
+                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={onPost}
+                        disabled={
+                          publish.isPending ||
+                          crossPost.isPending ||
+                          !raw.trim()
+                        }
+                        title="Publish a text-only kind 1 note (no video)"
+                      >
+                        {publish.isPending || crossPost.isPending ? (
+                          <>
+                            <Loader2
+                              className="mr-2 size-4 animate-spin"
+                              aria-hidden="true"
+                            />
+                            Publishing…
+                          </>
+                        ) : (
+                          <>
+                            <FileText
+                              className="mr-2 size-4"
+                              aria-hidden="true"
+                            />
+                            Publish text-only
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        disabled
+                        className="shadow-lg shadow-primary/20"
+                        title="Video generation lands once the PPQ video pipeline + Blossom upload seam ships"
+                      >
+                        <Sparkles
+                          className="mr-2 size-4"
+                          aria-hidden="true"
+                        />
+                        Generate video
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground text-right">
+                    <span className="opacity-80">
+                      Video generation arrives in the next build —
+                      until then, the text-only fallback publishes
+                      a clean kind 1 note grounded by your sources.
+                    </span>
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -311,7 +482,7 @@ const Dashboard = () => {
               <ul className="space-y-3">
                 {posts.data.map((p) => (
                   <li key={p.id}>
-                    <PostCard event={p} showOperatorBadge />
+                    <PostCard event={p} />
                   </li>
                 ))}
               </ul>
