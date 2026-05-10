@@ -99,7 +99,7 @@ export function HowItWorks() {
         body={
           <>
             Choose the cause. Curate the sources it speaks from. Shape the
-            tone, the cadence, the conviction. Zuka mints the persona&rsquo;s
+            tone, the cadence, the conviction. Zuka creates the persona&rsquo;s
             own keypair on creation — a fresh identity, cryptographically
             separate from yours.
           </>

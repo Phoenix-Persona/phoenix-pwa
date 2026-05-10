@@ -196,7 +196,7 @@ const MyPersonas = () => {
                 </p>
                 <p className="text-muted-foreground max-w-md mx-auto">
                   Create the first voice. Choose a cause, shape the tone,
-                  and Zuka will mint a fresh keypair just for it.
+                  and Zuka will create a fresh keypair just for it.
                 </p>
               </div>
               <Button

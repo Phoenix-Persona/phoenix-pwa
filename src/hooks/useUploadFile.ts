@@ -1,10 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
-import { BlossomUploader } from "@nostrify/nostrify/uploaders";
 import type { NostrSigner } from "@nostrify/types";
 
 import { useCurrentUser } from "./useCurrentUser";
 import { useAppContext } from "./useAppContext";
 import { APP_BLOSSOM_SERVERS, getEffectiveBlossomServers } from "@/lib/appBlossom";
+import { uploadFileToBlossom } from "@/lib/blossomUpload";
 
 export interface UseUploadFileOptions {
   /**
@@ -68,13 +68,11 @@ export function useUploadFile(options: UseUploadFileOptions = {}) {
         throw new Error("No Blossom servers configured");
       }
 
-      const uploader = new BlossomUploader({
-        servers,
+      return uploadFileToBlossom({
+        file,
         signer,
+        blossomServers: servers,
       });
-
-      const tags = await uploader.upload(file);
-      return tags;
     },
   });
 }

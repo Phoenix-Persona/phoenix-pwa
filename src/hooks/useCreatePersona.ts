@@ -31,9 +31,11 @@ import {
 } from "@/lib/wallet/client";
 import { DEFAULT_AUTO_TOPUP_CONFIG } from "@/lib/wallet/types";
 import {
+  LightningUsernameTakenError,
   isValidLightningUsername,
   registerLightningAddressWithRetry,
   slugifyForUsername,
+  SPARK_LN_DOMAIN,
 } from "@/lib/wallet/lightningAddress";
 
 import { useCurrentUser } from "./useCurrentUser";
@@ -41,6 +43,7 @@ import { useCurrentUser } from "./useCurrentUser";
 export interface CreatePersonaInput {
   name: string;
   username: string;
+  lightningUsername: string;
   bio: string;
   systemPrompt: string;
   pictureUrl?: string;
@@ -48,10 +51,8 @@ export interface CreatePersonaInput {
    * Optional pre-generated persona keypair. When provided, the hook
    * uses it instead of generating a fresh one.
    *
-   * Onboard generates the keypair upfront so the picture-upload step
-   * (which runs BEFORE this mutation) can sign Blossom BUD-01 auth
-   * events with the persona's nsec for privacy. By the time we publish,
-   * the keypair already exists — pass it through.
+   * Onboard generates this at Create time so any staged picture upload
+   * and the public profile publish use the same persona identity.
    */
   keypair?: PersonaKeypair;
 }
@@ -82,31 +83,38 @@ export function useCreatePersona() {
       const kp = input.keypair ?? generatePersonaKeypair();
       const dTag = generatePersonaDTag();
       const trimmedName = input.name.trim() || "Untitled";
-      const baseUsername = (
+      const personaUsername = (
         input.username || slugifyForUsername(trimmedName)
+      ).trim();
+      const baseLightningUsername = (
+        input.lightningUsername || slugifyForUsername(trimmedName)
       ).trim();
 
       const mnemonic = await generateMnemonic();
 
       let lightningAddress: string | undefined;
       let lnurl: string | undefined;
-      let resolvedUsername: string | undefined;
       let warning: string | undefined;
       try {
         const handle = await connectWallet({ mnemonic });
         try {
           const ln = await registerLightningAddressWithRetry(handle, {
-            baseUsername,
+            baseUsername: baseLightningUsername,
             description: `Donations to ${trimmedName}`,
             fallbackBase: "persona",
           });
           lightningAddress = ln.lightningAddress;
           lnurl = ln.lnurl;
-          resolvedUsername = ln.username;
         } finally {
           await disconnectWallet(handle).catch(() => undefined);
         }
       } catch (err) {
+        if (err instanceof LightningUsernameTakenError) {
+          throw new Error(
+            `${err.username}@${SPARK_LN_DOMAIN} is already taken. Pick a different Lightning address before creating the persona.`,
+            { cause: err },
+          );
+        }
         warning =
           err instanceof Error
             ? err.message
@@ -114,8 +122,7 @@ export function useCreatePersona() {
       }
 
       const finalUsername =
-        resolvedUsername ??
-        (isValidLightningUsername(baseUsername) ? baseUsername : undefined);
+        isValidLightningUsername(personaUsername) ? personaUsername : undefined;
 
       const persona: Persona = {
         pubkey: kp.hex.pk,

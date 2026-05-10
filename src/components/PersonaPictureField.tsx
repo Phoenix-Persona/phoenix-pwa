@@ -57,7 +57,7 @@ interface PersonaPictureFieldProps {
    * party with access to those events. Every consumer of this component
    * MUST pass a persona-keypair signer when uploading a persona's picture.
    */
-  signer?: NostrSigner;
+  signer: NostrSigner;
   /**
    * Optional Blossom server override for persona uploads. Used verbatim;
    * the operator's NIP-65-aware list is bypassed. When unset and `signer`
