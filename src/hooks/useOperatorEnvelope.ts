@@ -55,15 +55,30 @@ interface OperatorEnvelopeState {
   envelope: OperatorEnvelope;
 }
 
+function eventDTag(event: NostrEvent | undefined): string | undefined {
+  return event?.tags.find(([name]) => name === "d")?.[1];
+}
+
 async function findOperatorEnvelope(
   events: NostrEvent[],
   userPubkey: string,
   signer: Nip44Signer,
 ): Promise<OperatorEnvelopeState | null> {
-  // Newest-first; first valid match wins.
-  const sorted = [...events].sort((a, b) => b.created_at - a.created_at);
-  for (const ev of sorted) {
+  const latestPerD = new Map<string, NostrEvent>();
+  for (const ev of events) {
     if (!isCandidateOperatorEvent(ev)) continue;
+    const d = eventDTag(ev);
+    if (!d) continue;
+    const existing = latestPerD.get(d);
+    if (!existing || existing.created_at < ev.created_at) {
+      latestPerD.set(d, ev);
+    }
+  }
+
+  const sorted = [...latestPerD.values()].sort(
+    (a, b) => b.created_at - a.created_at,
+  );
+  for (const ev of sorted) {
     const env = await tryDecryptOperatorEnvelope(ev.content, userPubkey, signer);
     if (env) return { event: ev, envelope: env };
   }
@@ -113,9 +128,21 @@ export function useOperatorEnvelope() {
   async function publish(input: OperatorEnvelopeInput): Promise<OperatorEnvelopeState> {
     if (!user) throw new Error("Not logged in");
     const signer = user.signer as unknown as Nip44Signer;
-    const ciphertext = await encryptOperatorEnvelope(input, user.pubkey, signer);
+    const current = qc.getQueryData<OperatorEnvelopeState | null>(
+      OPERATOR_QK(user?.pubkey),
+    );
+    const dTag =
+      input.dTag ??
+      current?.envelope.dTag ??
+      eventDTag(current?.event) ??
+      generateOperatorDTag();
+    const ciphertext = await encryptOperatorEnvelope(
+      { ...input, dTag },
+      user.pubkey,
+      signer,
+    );
     const template = buildOperatorEventTemplate({
-      dTag: generateOperatorDTag(),
+      dTag,
       encryptedContent: ciphertext,
     });
     const signed = await user.signer.signEvent(template);
@@ -124,6 +151,7 @@ export function useOperatorEnvelope() {
     const envelope: OperatorEnvelope = {
       app: PHOENIX_OPERATOR_APP,
       version: PHOENIX_OPERATOR_VERSION,
+      dTag,
       wallet: input.wallet,
       ppq: input.ppq,
       created_at: signed.created_at,
