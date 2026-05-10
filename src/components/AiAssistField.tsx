@@ -39,7 +39,6 @@ export function AiAssistButton({
   fieldPurpose,
   currentValue,
   surroundingContext,
-  defaultInstruction,
   onReplace,
   className,
   disabled,
@@ -47,7 +46,7 @@ export function AiAssistButton({
 }: AiAssistButtonProps) {
   const inference = usePpqInference();
   const [open, setOpen] = useState(false);
-  const [instruction, setInstruction] = useState(defaultInstruction ?? "");
+  const [instruction, setInstruction] = useState("");
   const [preview, setPreview] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -58,7 +57,7 @@ export function AiAssistButton({
   function closeDialog(nextOpen: boolean) {
     setOpen(nextOpen);
     if (!nextOpen) {
-      setInstruction(defaultInstruction ?? "");
+      setInstruction("");
       setPreview("");
       setError("");
     }
@@ -177,14 +176,6 @@ export function AiAssistButton({
           </div>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => closeDialog(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
             <Button
               type="button"
               variant="outline"

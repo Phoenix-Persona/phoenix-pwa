@@ -56,6 +56,23 @@ describe("AiAssistButton", () => {
     mocks.inferenceMutateAsync.mockReset();
   });
 
+  it("opens with an empty instructions field", () => {
+    renderAiAssist();
+
+    fireEvent.click(screen.getByRole("button", { name: /ai assist/i }));
+
+    expect(screen.getByLabelText(/instructions/i)).toHaveValue("");
+  });
+
+  it("does not render a redundant cancel button", () => {
+    renderAiAssist();
+
+    fireEvent.click(screen.getByRole("button", { name: /ai assist/i }));
+
+    expect(screen.queryByRole("button", { name: /cancel/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /close/i })).toBeInTheDocument();
+  });
+
   it("sends field context and previews the generated replacement before applying it", async () => {
     mocks.inferenceMutateAsync.mockResolvedValue(
       ppqResponse("Generated public bio"),
@@ -118,11 +135,14 @@ describe("AiAssistButton", () => {
     const { onReplace } = renderAiAssist();
 
     fireEvent.click(screen.getByRole("button", { name: /ai assist/i }));
+    fireEvent.change(screen.getByLabelText(/instructions/i), {
+      target: { value: "Draft a concise public bio." },
+    });
     fireEvent.click(screen.getByRole("button", { name: /generate/i }));
 
     expect(await screen.findByText("Generated public bio")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    fireEvent.click(screen.getByRole("button", { name: /close/i }));
 
     expect(onReplace).not.toHaveBeenCalled();
 
@@ -136,6 +156,9 @@ describe("AiAssistButton", () => {
     renderAiAssist();
 
     fireEvent.click(screen.getByRole("button", { name: /ai assist/i }));
+    fireEvent.change(screen.getByLabelText(/instructions/i), {
+      target: { value: "Draft a concise public bio." },
+    });
     fireEvent.click(screen.getByRole("button", { name: /generate/i }));
 
     expect(
