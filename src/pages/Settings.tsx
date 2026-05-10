@@ -83,19 +83,20 @@ const Settings = () => {
       : null;
 
   function handleLockNow() {
-    // Clear the Nostrify session AND the per-tab session flag — next
-    // page load will hit the pre-render hook in main.tsx, see no flag,
-    // clear nostr:login, and the unlock gate fires. Without clearing
-    // the flag, an immediate F5 would skip the prompt because the
-    // tab is still considered "unlocked".
+    // Clear the Nostrify session AND the per-tab session flag. The
+    // <UnlockGate> reactively computes its `needsUnlock` state from
+    // `logins.length` so removing the login here causes the modal
+    // to render IMMEDIATELY over whatever route the user is on —
+    // no route change, no remount, no lost scroll/form state. They
+    // re-enter the passphrase and the modal hides without disturbing
+    // the page underneath.
     const current = logins[0];
     if (current) removeLogin(current.id);
     clearSessionUnlocked();
     toast({
       title: "Locked",
-      description: "Re-enter your passphrase to continue.",
+      description: "Enter your passphrase to unlock.",
     });
-    navigate("/");
   }
 
   function handleForgetDevice() {

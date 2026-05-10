@@ -53,14 +53,17 @@ export function UnlockGate({ children }: UnlockGateProps) {
   const { logins } = useNostrLogin();
   const login = useLoginActions();
 
-  // Snapshot at mount: do we have a Phoenix-managed key parked here?
-  // We don't reactively re-read `phoenix:user:ncryptsec` after mount —
-  // the only writers are AuthDialog signup (creates) and Settings
-  // "Forget device" (clears), both of which trigger a route change
-  // anyway.
-  const [needsUnlock, setNeedsUnlock] = useState<boolean>(() => {
-    return hasUserNcryptsec() && logins.length === 0;
-  });
+  // Reactive — recomputed every render from current logins state.
+  // When Settings → Lock now removes the login, this flips true on
+  // the next render and the modal appears OVER whatever route is
+  // mounted (children stay rendered underneath, see below). When
+  // the user unlocks, login.nsec(...) repopulates logins → flips
+  // back to false → modal hides without remounting children.
+  //
+  // hasUserNcryptsec() is a localStorage read; cheap, but we still
+  // only re-render this component when `logins` changes (it has no
+  // other reactive dependencies), so this isn't a hot path.
+  const needsUnlock = hasUserNcryptsec() && logins.length === 0;
 
   const [passphrase, setPassphrase] = useState("");
   const [unlocking, setUnlocking] = useState(false);
@@ -80,7 +83,7 @@ export function UnlockGate({ children }: UnlockGateProps) {
       const ncryptsec = loadUserNcryptsec();
       if (!ncryptsec) {
         // Edge case: storage was cleared between mount and submit.
-        setNeedsUnlock(false);
+        // The reactive needsUnlock will pick that up automatically.
         return;
       }
       const skBytes = decryptNcryptsec(ncryptsec, passphrase);
@@ -90,7 +93,7 @@ export function UnlockGate({ children }: UnlockGateProps) {
       // tab don't re-prompt. New tabs get no flag and re-prompt.
       markSessionUnlocked();
       setPassphrase("");
-      setNeedsUnlock(false);
+      setError(null);
     } catch {
       setError("Incorrect passphrase. Try again.");
     } finally {
@@ -105,77 +108,88 @@ export function UnlockGate({ children }: UnlockGateProps) {
     if (!ok) return;
     clearUserNcryptsec();
     clearSessionUnlocked();
-    setNeedsUnlock(false);
-  }
-
-  if (!needsUnlock) {
-    return <>{children}</>;
+    // hasUserNcryptsec() now returns false → needsUnlock flips on
+    // the next render. No explicit state to clear here.
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-7 shadow-xl space-y-5">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Lock className="size-5 text-primary" aria-hidden="true" />
-            <h2 className="font-display text-2xl font-medium tracking-tight">
-              Unlock Zuka
-            </h2>
+    <>
+      {children}
+      {needsUnlock && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm p-4"
+          // Block scroll on the underlying page while the modal is up.
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="unlock-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-7 shadow-xl space-y-5">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Lock className="size-5 text-primary" aria-hidden="true" />
+                <h2
+                  id="unlock-title"
+                  className="font-display text-2xl font-medium tracking-tight"
+                >
+                  Unlock Zuka
+                </h2>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Enter the passphrase you set when you created this user
+                account. It decrypts your Nostr key for this browser session.
+              </p>
+            </div>
+
+            <form onSubmit={handleUnlock} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="unlock-passphrase">Passphrase</Label>
+                <Input
+                  id="unlock-passphrase"
+                  type="password"
+                  autoFocus
+                  value={passphrase}
+                  onChange={(e) => setPassphrase(e.target.value)}
+                  autoComplete="current-password"
+                  disabled={unlocking}
+                />
+              </div>
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button
+                type="submit"
+                disabled={!passphrase || unlocking}
+                className="w-full"
+              >
+                {unlocking ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Unlocking…
+                  </>
+                ) : (
+                  "Unlock"
+                )}
+              </Button>
+            </form>
+
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={handleForgetDevice}
+                disabled={unlocking}
+                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4"
+              >
+                Forget this device
+              </button>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Enter the passphrase you set when you created this user
-            account. It decrypts your Nostr key for this browser session.
-          </p>
         </div>
-
-        <form onSubmit={handleUnlock} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="unlock-passphrase">Passphrase</Label>
-            <Input
-              id="unlock-passphrase"
-              type="password"
-              autoFocus
-              value={passphrase}
-              onChange={(e) => setPassphrase(e.target.value)}
-              autoComplete="current-password"
-              disabled={unlocking}
-            />
-          </div>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <Button
-            type="submit"
-            disabled={!passphrase || unlocking}
-            className="w-full"
-          >
-            {unlocking ? (
-              <>
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                Unlocking…
-              </>
-            ) : (
-              "Unlock"
-            )}
-          </Button>
-        </form>
-
-        <div className="pt-2 text-center">
-          <button
-            type="button"
-            onClick={handleForgetDevice}
-            disabled={unlocking}
-            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4"
-          >
-            Forget this device
-          </button>
-        </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }
 
