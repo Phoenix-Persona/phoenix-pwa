@@ -99,6 +99,9 @@ export function VideoComposerDialog(props: VideoComposerDialogProps) {
   // whether to resume before kicking off a fresh preview.
   const [resumable, setResumable] = useState<ChainSummary | null>(null);
   const [resumeChecked, setResumeChecked] = useState(false);
+  // True iff the user picked Resume (we suppress auto-preview); false
+  // for Start-fresh / no-resumable-found (we DO auto-fire preview).
+  const [resumeDispatched, setResumeDispatched] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -112,22 +115,23 @@ export function VideoComposerDialog(props: VideoComposerDialogProps) {
       cancelled = true;
       setResumeChecked(false);
       setResumable(null);
+      setResumeDispatched(false);
     };
   }, [open, persona.pubkey]);
 
   // Auto-fire preview generation only AFTER we've checked for resumes
-  // and there isn't one (or the user dismissed it). The resume step
-  // sets `resumable` to null when dismissed/started.
+  // and there isn't a pending one. If the user clicked Resume, suppress
+  // — `runFromRecord` is owning the phase transitions.
   useEffect(() => {
     if (!open) return;
     if (!resumeChecked) return;
     if (resumable) return;
+    if (resumeDispatched) return;
     if (phase.type !== "idle") return;
     if (!idea.trim()) return;
     void pipeline.generatePreview();
-    // We deliberately depend only on the gating signals.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, resumeChecked, resumable]);
+  }, [open, resumeChecked, resumable, resumeDispatched]);
 
   const handleClose = (next: boolean) => {
     if (!next) {
@@ -167,6 +171,7 @@ export function VideoComposerDialog(props: VideoComposerDialogProps) {
               summary={resumable}
               onResume={() => {
                 const id = resumable.chainId;
+                setResumeDispatched(true);
                 setResumable(null);
                 void pipeline.resume(id);
               }}

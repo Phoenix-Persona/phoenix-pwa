@@ -20,19 +20,31 @@
  * Phoenix's singleton-model pipeline, copy is correct.
  */
 
-import { fetchFile } from "@ffmpeg/util";
+import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import type { FFmpeg } from "@ffmpeg/ffmpeg";
+
+/**
+ * Same-origin paths for the ffmpeg.wasm core. The files are copied
+ * from `@ffmpeg/core/dist/umd/` into `public/ffmpeg/` by the
+ * `postinstall` script, so they're served verbatim from our origin
+ * at /ffmpeg/.
+ *
+ * We don't import these via Vite — `public/` assets are deliberately
+ * outside the module graph. Instead we let `@ffmpeg/util.toBlobURL()`
+ * fetch them at runtime and hand the worker a same-origin `blob:` URL
+ * for `importScripts`. This is the pattern documented by the @ffmpeg
+ * team and avoids:
+ *   - Vite's "should not be imported from source code" error for
+ *     `public/` paths
+ *   - cross-origin CSP `script-src` allowances
+ *   - COEP-credentialless interactions with unpkg
+ *   - bundler-specific worker resolution edge cases
+ */
+const FFMPEG_CORE_JS = "/ffmpeg/ffmpeg-core.js";
+const FFMPEG_CORE_WASM = "/ffmpeg/ffmpeg-core.wasm";
 
 let ffmpegSingleton: FFmpeg | null = null;
 let ffmpegLoadPromise: Promise<FFmpeg> | null = null;
-
-/**
- * Public ffmpeg.wasm core hosted by the @ffmpeg team — loading from
- * CDN keeps the app's initial bundle small. The browser caches it
- * after the first download.
- */
-const FFMPEG_CORE_BASE_URL =
-  "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
 
 export interface StitchProgress {
   /** "loading" while ffmpeg.wasm is initializing; "stitching" while running. */
@@ -62,10 +74,15 @@ async function loadFFmpeg(
     // for users who actually generate video.
     const { FFmpeg } = await import("@ffmpeg/ffmpeg");
     const ffmpeg = new FFmpeg();
-    await ffmpeg.load({
-      coreURL: `${FFMPEG_CORE_BASE_URL}/ffmpeg-core.js`,
-      wasmURL: `${FFMPEG_CORE_BASE_URL}/ffmpeg-core.wasm`,
-    });
+    // Fetch the same-origin core files and convert to blob: URLs. The
+    // worker imports the blob URL via `importScripts`, which works
+    // reliably under our CSP (`script-src` includes `blob:`) and
+    // doesn't go through Vite's import pipeline.
+    const [coreURL, wasmURL] = await Promise.all([
+      toBlobURL(FFMPEG_CORE_JS, "text/javascript"),
+      toBlobURL(FFMPEG_CORE_WASM, "application/wasm"),
+    ]);
+    await ffmpeg.load({ coreURL, wasmURL });
     onProgress?.({ phase: "loading", ratio: 1 });
     ffmpegSingleton = ffmpeg;
     return ffmpeg;

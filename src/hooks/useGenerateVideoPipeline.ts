@@ -643,6 +643,13 @@ export function useGenerateVideoPipeline(
       const { signal } = abortRef.current;
 
       vlog("pipeline", "resume requested", { chainId });
+      // Move out of "idle" synchronously so the dialog's auto-preview
+      // effect doesn't fire on the same tick we're starting to resume.
+      setPhase({
+        type: "scripting",
+        previewUrl: "",
+        seedImageUrl: "",
+      });
       try {
         const record = await loadChain(chainId);
         if (!record) {
