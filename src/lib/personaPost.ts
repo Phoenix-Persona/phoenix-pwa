@@ -83,78 +83,130 @@ export function extractSourceDomains(tags: string[][]): string[] {
   );
 }
 
-export interface ImetaImage {
+export interface ImetaMedia {
   url: string;
   mime?: string;
   alt?: string;
   blurhash?: string;
   dim?: { w: number; h: number };
+  /**
+   * Optional poster URL for video imeta — some clients emit
+   * `image url` inside the same imeta tag pointing at a thumbnail.
+   */
+  poster?: string;
+}
+
+export type ImetaImage = ImetaMedia;
+export type ImetaVideo = ImetaMedia;
+
+/**
+ * Parse a single `imeta` tag into a key→value map. NIP-92 puts
+ * space-separated key/value pairs into each tag element; some
+ * clients forget and put each kv pair as its own tag element. We
+ * accept either shape.
+ */
+function parseImetaFields(tag: string[]): Record<string, string> {
+  const fields: Record<string, string> = {};
+  for (const part of tag.slice(1)) {
+    if (typeof part !== "string") continue;
+    const idx = part.indexOf(" ");
+    if (idx < 1) continue;
+    const key = part.slice(0, idx);
+    const value = part.slice(idx + 1).trim();
+    if (key && value && !(key in fields)) {
+      fields[key] = value;
+    }
+  }
+  return fields;
+}
+
+/** Sanitise to http(s)-only URLs. Rejects data:/javascript:/etc. */
+function sanitizeMediaUrl(raw: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol === "http:" || u.protocol === "https:") {
+      return u.toString();
+    }
+  } catch {
+    /* fall through */
+  }
+  return null;
+}
+
+/** Pull dimensions from a NIP-92 `dim WxH` field if present. */
+function parseDim(
+  raw: string | undefined
+): { w: number; h: number } | undefined {
+  const m = raw?.match(/^(\d+)x(\d+)$/);
+  return m ? { w: Number(m[1]), h: Number(m[2]) } : undefined;
 }
 
 /**
  * Parse NIP-92 `imeta` tags into renderable image descriptors.
  *
- * NIP-92 stuffs space-separated key/value pairs into the imeta tag's
- * remaining elements (e.g.
- * `["imeta", "url https://...", "m image/png", "alt ...", "dim 1024x768"]`).
- * Some clients use the alternative form where each kv pair is a
- * separate tag element — we accept either shape.
- *
- * Only entries with a sanitisable http(s) URL and an image MIME (or a
- * URL that ends in a recognised image extension) are returned.
+ * Accepts MIME-tagged images (`m image/...`) or URLs with a
+ * recognised image extension. Video imeta entries are skipped — use
+ * `extractImetaVideos` for those.
  */
 export function extractImetaImages(tags: string[][]): ImetaImage[] {
   const images: ImetaImage[] = [];
 
   for (const tag of tags) {
     if (tag[0] !== "imeta") continue;
-
-    const fields: Record<string, string> = {};
-    for (const part of tag.slice(1)) {
-      if (typeof part !== "string") continue;
-      const idx = part.indexOf(" ");
-      if (idx < 1) continue;
-      const key = part.slice(0, idx);
-      const value = part.slice(idx + 1).trim();
-      if (key && value && !(key in fields)) {
-        fields[key] = value;
-      }
-    }
-
-    const url = fields.url;
-    if (!url) continue;
-
-    // Reject anything but http(s) — never let data: / javascript: through.
-    let safeUrl: string | null = null;
-    try {
-      const u = new URL(url);
-      if (u.protocol === "http:" || u.protocol === "https:") {
-        safeUrl = u.toString();
-      }
-    } catch {
-      continue;
-    }
+    const fields = parseImetaFields(tag);
+    const safeUrl = sanitizeMediaUrl(fields.url);
     if (!safeUrl) continue;
 
     const mime = fields.m;
     const isImage =
       (mime && mime.startsWith("image/")) ||
-      /\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i.test(safeUrl);
+      (!mime && /\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i.test(safeUrl));
     if (!isImage) continue;
-
-    const dimMatch = fields.dim?.match(/^(\d+)x(\d+)$/);
-    const dim = dimMatch
-      ? { w: Number(dimMatch[1]), h: Number(dimMatch[2]) }
-      : undefined;
 
     images.push({
       url: safeUrl,
       mime,
       alt: fields.alt,
       blurhash: fields.blurhash,
-      dim,
+      dim: parseDim(fields.dim),
     });
   }
 
   return images;
+}
+
+/**
+ * Parse NIP-92 `imeta` tags into renderable video descriptors.
+ *
+ * Accepts MIME-tagged videos (`m video/...`) or URLs with a
+ * recognised video extension. Optional `image` field is treated as
+ * a poster URL.
+ */
+export function extractImetaVideos(tags: string[][]): ImetaVideo[] {
+  const videos: ImetaVideo[] = [];
+
+  for (const tag of tags) {
+    if (tag[0] !== "imeta") continue;
+    const fields = parseImetaFields(tag);
+    const safeUrl = sanitizeMediaUrl(fields.url);
+    if (!safeUrl) continue;
+
+    const mime = fields.m;
+    const isVideo =
+      (mime && mime.startsWith("video/")) ||
+      (!mime && /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(safeUrl));
+    if (!isVideo) continue;
+
+    videos.push({
+      url: safeUrl,
+      mime,
+      alt: fields.alt,
+      blurhash: fields.blurhash,
+      dim: parseDim(fields.dim),
+      poster: sanitizeMediaUrl(fields.image) ?? undefined,
+    });
+  }
+
+  return videos;
 }
