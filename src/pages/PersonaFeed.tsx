@@ -4,7 +4,8 @@ import { useSeoMeta } from "@unhead/react";
 import { ShieldCheck } from "lucide-react";
 
 import { AppHeader } from "@/components/AppHeader";
-import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
+import { ImigongoSeal } from "@/components/ImigongoBand";
+import { PersonaHero } from "@/components/persona/PersonaHero";
 import { PostCard } from "@/components/PostCard";
 import { PostListSkeleton } from "@/components/Skeletons";
 import { Card, CardContent } from "@/components/ui/card";
@@ -51,76 +52,34 @@ const PersonaFeed = () => {
             </div>
           </section>
         ) : (
-          <section className="relative overflow-hidden hero-mat text-imigongo-cream">
-            <div
-              className="absolute inset-0 imigongo-pattern-bold text-imigongo-cream opacity-[0.05] pointer-events-none"
-              aria-hidden="true"
-            />
-            <div
-              className="absolute -top-40 -right-32 w-[36rem] h-[36rem] rounded-full bg-rw-gold/10 blur-3xl pointer-events-none"
-              aria-hidden="true"
-            />
-
-            <div className="container relative py-12 md:py-16 max-w-4xl">
-              <div className="flex items-start gap-6 flex-wrap md:flex-nowrap">
-                {/* Avatar disc — uses the persona's picture if available */}
-                <div className="relative flex-shrink-0">
-                  <div
-                    className="absolute -inset-2 rounded-full bg-gradient-to-br from-rw-gold/40 via-imigongo-ochre/40 to-imigongo-clay/40 blur-2xl"
-                    aria-hidden="true"
-                  />
-                  <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden ring-2 ring-rw-gold/40 shadow-2xl shadow-black/40 bg-imigongo-charcoal flex items-center justify-center">
-                    {picture ? (
-                      <img
-                        src={picture}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        loading="eager"
-                        crossOrigin="anonymous"
-                      />
-                    ) : (
-                      <ImigongoSeal size={72} colorClass="text-rw-gold/80" />
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex-1 min-w-0 space-y-3">
-                  <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
-                    <span className="h-px w-6 bg-rw-gold" />
-                    Public persona
-                  </p>
-                  <h1 className="font-display text-3xl md:text-5xl font-medium tracking-tight leading-tight">
-                    {displayName}
-                  </h1>
-                  {bio && (
-                    <p className="text-imigongo-cream/85 max-w-2xl leading-relaxed">
-                      {bio}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-2 pt-1 items-center">
-                    <Badge
-                      variant="secondary"
-                      className="font-mono text-[10px] bg-imigongo-cream/15 text-imigongo-cream border-0"
-                    >
-                      {npub.slice(0, 16)}…
-                    </Badge>
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full border-imigongo-cream/30 text-imigongo-cream bg-transparent hover:bg-imigongo-cream/10 hover:text-imigongo-cream"
-                    >
-                      <Link to={`/verify/${npub}`}>
-                        <ShieldCheck className="mr-2 size-4" />
-                        Verify
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
+          <PersonaHero
+            eyebrow="Public persona"
+            name={displayName}
+            bio={bio || undefined}
+            pictureUrl={picture ?? null}
+            avatarSize="public"
+            badges={
+              <div className="flex flex-wrap gap-2 pt-1 items-center">
+                <Badge
+                  variant="secondary"
+                  className="font-mono text-[10px] bg-imigongo-cream/15 text-imigongo-cream border-0"
+                >
+                  {npub.slice(0, 16)}…
+                </Badge>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-imigongo-cream/30 text-imigongo-cream bg-transparent hover:bg-imigongo-cream/10 hover:text-imigongo-cream"
+                >
+                  <Link to={`/verify/${npub}`}>
+                    <ShieldCheck className="mr-2 size-4" />
+                    Verify
+                  </Link>
+                </Button>
               </div>
-            </div>
-            <FlagStripe height={4} />
-          </section>
+            }
+          />
         )}
 
         {/* Feed */}
