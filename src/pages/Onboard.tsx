@@ -396,6 +396,12 @@ const Onboard = () => {
                     value={pictureUrl}
                     onChange={setPictureUrl}
                     promptHint={promptHint}
+                    // Onboarding users haven't funded a wallet yet — let
+                    // the field fall back to the free Pollinations
+                    // endpoint when PPQ returns 402 so they can still
+                    // ship a portrait. EditPersona keeps PPQ-only
+                    // (post-onboarding the user has the paid path).
+                    allowFreeFallback
                   />
 
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">

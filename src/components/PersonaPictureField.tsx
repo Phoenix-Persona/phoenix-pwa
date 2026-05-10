@@ -27,6 +27,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useUploadFile } from "@/hooks/useUploadFile";
 import { usePpqImage } from "@/hooks/usePpqImage";
 import { useToast } from "@/hooks/useToast";
+import { generatePollinationsImage } from "@/lib/pollinations/client";
 import { PpqError } from "@/lib/ppq/types";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +38,14 @@ interface PersonaPictureFieldProps {
   onChange: (url: string) => void;
   /** Suggested generation prompt (typically derived from persona name + bio). */
   promptHint?: string;
+  /**
+   * When true, fall back to the free Pollinations endpoint if PPQ
+   * returns 402 (out of credits). Used during onboarding so brand-new
+   * users — who by definition haven't funded a wallet yet — can still
+   * generate a portrait. PPQ stays the preferred path; Pollinations
+   * only fires when PPQ is unavailable.
+   */
+  allowFreeFallback?: boolean;
   className?: string;
 }
 
@@ -67,6 +76,7 @@ export function PersonaPictureField({
   value,
   onChange,
   promptHint,
+  allowFreeFallback = false,
   className,
 }: PersonaPictureFieldProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -95,52 +105,86 @@ export function PersonaPictureField({
     }
   }
 
+  /**
+   * Upload an image Blob to Blossom and return the canonical URL.
+   * Shared by the PPQ + Pollinations paths so the rest of the app
+   * sees a single, stable URL shape regardless of how the picture
+   * was produced.
+   */
+  async function uploadToBlossom(blob: Blob, sourceUrl?: string): Promise<string> {
+    const mime = blob.type || (sourceUrl ? guessImageMime(sourceUrl) : "image/png");
+    const ext = mime.split("/")[1] ?? "png";
+    const file = new File([blob], `persona-portrait.${ext}`, { type: mime });
+    const tags = await upload.mutateAsync(file);
+    const blossomUrl = urlFromUploadTags(tags);
+    if (!blossomUrl) {
+      throw new Error("Upload succeeded but no URL was returned.");
+    }
+    return blossomUrl;
+  }
+
+  async function generateViaPollinations(prompt: string): Promise<string> {
+    const blob = await generatePollinationsImage({
+      prompt,
+      width: 1024,
+      height: 1024,
+      model: "flux",
+      nologo: true,
+    });
+    return uploadToBlossom(blob);
+  }
+
+  async function generateViaPpq(prompt: string): Promise<string> {
+    const result = await generate.mutateAsync({
+      model: DEFAULT_IMAGE_MODEL,
+      prompt,
+      size: "1:1",
+      n: 1,
+    });
+    const ppqUrl = result.data[0]?.url;
+    if (!ppqUrl) {
+      throw new Error("PPQ returned no image. Try a different prompt.");
+    }
+    const res = await fetch(ppqUrl);
+    if (!res.ok) {
+      throw new Error(`Could not fetch generated image (HTTP ${res.status}).`);
+    }
+    const blob = await res.blob();
+    return uploadToBlossom(blob, ppqUrl);
+  }
+
   async function handleGenerate() {
-    if (!prompt.trim()) {
+    const trimmed = prompt.trim();
+    if (!trimmed) {
       setGenError("Describe the picture you want.");
       return;
     }
     setGenError(null);
     setGenerating(true);
     try {
-      // 1. Generate via PPQ.
-      const result = await generate.mutateAsync({
-        model: DEFAULT_IMAGE_MODEL,
-        prompt: prompt.trim(),
-        size: "1:1",
-        n: 1,
-      });
-      const ppqUrl = result.data[0]?.url;
-      if (!ppqUrl) {
-        throw new Error("PPQ returned no image. Try a different prompt.");
-      }
-
-      // 2. Fetch and re-upload to Blossom so the persona's picture
-      //    isn't tied to PPQ's hosting.
-      const res = await fetch(ppqUrl);
-      if (!res.ok) {
-        throw new Error(`Could not fetch generated image (HTTP ${res.status}).`);
-      }
-      const blob = await res.blob();
-      const ext = guessImageMime(ppqUrl).split("/")[1] ?? "png";
-      const file = new File([blob], `persona-portrait.${ext}`, {
-        type: blob.type || guessImageMime(ppqUrl),
-      });
-
-      const tags = await upload.mutateAsync(file);
-      const blossomUrl = urlFromUploadTags(tags);
-      if (!blossomUrl) {
-        throw new Error("Upload succeeded but no URL was returned.");
+      let blossomUrl: string;
+      let usedFreeTier = false;
+      try {
+        blossomUrl = await generateViaPpq(trimmed);
+      } catch (e) {
+        // PPQ 402 = out of credits. During onboarding we transparently
+        // fall back to the free Pollinations endpoint so the user
+        // isn't blocked by an empty wallet they haven't funded yet.
+        if (allowFreeFallback && e instanceof PpqError && e.status === 402) {
+          blossomUrl = await generateViaPollinations(trimmed);
+          usedFreeTier = true;
+        } else {
+          throw e;
+        }
       }
       onChange(blossomUrl);
       toast({
         title: "Picture generated",
-        description: "Saved to your media server.",
+        description: usedFreeTier
+          ? "Made with the free generator — top up your wallet later for higher-quality runs."
+          : "Saved to your media server.",
       });
     } catch (e) {
-      // PPQ returns 402 when the persona's credit account has no
-      // funds. Surface that as a clear, actionable message instead of
-      // the raw status text.
       if (e instanceof PpqError && e.status === 402) {
         setGenError(
           "Out of credits — top up the persona's wallet to generate images."
