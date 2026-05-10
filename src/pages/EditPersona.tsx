@@ -45,6 +45,7 @@ import { type PhoenixEnvelope } from "@/lib/persona";
 import {
   isValidLightningUsername,
   slugifyForUsername,
+  SPARK_LN_DOMAIN,
 } from "@/lib/wallet/lightningAddress";
 import { parseCommaList } from "@/lib/text";
 
@@ -356,7 +357,7 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
               spellCheck={false}
             />
             <span className="text-sm text-muted-foreground whitespace-nowrap">
-              @spark.money
+              @{SPARK_LN_DOMAIN}
             </span>
           </div>
           <UsernameAvailabilityHint
@@ -537,20 +538,20 @@ function UsernameAvailabilityHint({
     case "checking":
       return (
         <p className="text-xs text-muted-foreground">
-          Checking <code className="font-mono">{state.username}@spark.money</code>…
+          Checking <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code>…
         </p>
       );
     case "available":
       return (
         <p className="text-xs text-emerald-600 dark:text-emerald-500">
-          <code className="font-mono">{state.username}@spark.money</code> is
+          <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code> is
           available.
         </p>
       );
     case "taken":
       return (
         <p className="text-xs text-amber-600 dark:text-amber-500">
-          <code className="font-mono">{state.username}@spark.money</code> is
+          <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code> is
           taken — pick a different name. Save will append a random suffix
           rather than fail.
         </p>

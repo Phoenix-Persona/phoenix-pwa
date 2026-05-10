@@ -3,11 +3,12 @@
  * Lightning wallet. Shows the QR + raw invoice. While the invoice is
  * displayed the dialog subscribes to the SDK's event stream and
  * dismisses itself once the matching `paymentSucceeded` event lands —
- * the user gets a brief "received" confirmation, then the modal closes.
+ * the user gets a transient toast as confirmation while the dialog
+ * closes immediately so the moment of receipt feels responsive.
  */
 
 import { useEffect, useState } from "react";
-import { Check, Copy, Loader2 } from "lucide-react";
+import { Copy, Loader2 } from "lucide-react";
 
 import {
   Dialog,
@@ -29,14 +30,11 @@ interface ReceiveDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const RECEIVED_AUTO_CLOSE_MS = 1800;
-
 export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps) {
   const { toast } = useToast();
   const [amountStr, setAmountStr] = useState("5000");
   const [memo, setMemo] = useState("Phoenix top-up");
   const [invoice, setInvoice] = useState<string | null>(null);
-  const [received, setReceived] = useState(false);
 
   async function generate() {
     const amount = Number(amountStr);
@@ -51,7 +49,6 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
     try {
       const res = await wallet.receive({ amountSats: amount, description: memo });
       setInvoice(res.paymentRequest);
-      setReceived(false);
     } catch (e) {
       toast({
         title: "Could not generate invoice",
@@ -69,20 +66,18 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
 
   function reset() {
     setInvoice(null);
-    setReceived(false);
   }
 
   // Subscribe to SDK events while an invoice is on screen. When a
   // `paymentSucceeded` event fires for the BOLT11 string we generated,
-  // refresh balances, flip to a success state, and auto-dismiss the
-  // dialog after a short delay so the user sees the confirmation.
+  // refresh balances, dismiss the dialog immediately, and surface a
+  // toast so the user knows the payment landed.
   const handle = wallet.handle;
   useEffect(() => {
     if (!handle || !invoice || !open) return;
 
     let listenerId: string | undefined;
     let cancelled = false;
-    let closeTimer: ReturnType<typeof setTimeout> | undefined;
 
     void handle
       .addEventListener({
@@ -97,14 +92,17 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
             p.details?.type === "lightning" && p.details.invoice === invoice;
           if (!matched) return;
 
-          setReceived(true);
           wallet.refreshInfo();
           wallet.refreshPayments();
-          closeTimer = setTimeout(() => {
-            if (cancelled) return;
-            onOpenChange(false);
-            reset();
-          }, RECEIVED_AUTO_CLOSE_MS);
+          const sats = Number(p.amount);
+          toast({
+            title: "Payment received",
+            description: Number.isFinite(sats)
+              ? `+${sats.toLocaleString()} sats`
+              : "Balance updated.",
+          });
+          onOpenChange(false);
+          reset();
         },
       })
       .then((id) => {
@@ -118,12 +116,11 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
 
     return () => {
       cancelled = true;
-      if (closeTimer) clearTimeout(closeTimer);
       if (listenerId) {
         void handle.removeEventListener(listenerId).catch(() => undefined);
       }
     };
-  }, [handle, invoice, open, onOpenChange, wallet]);
+  }, [handle, invoice, open, onOpenChange, toast, wallet]);
 
   return (
     <Dialog
@@ -176,16 +173,6 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
                 "Generate invoice"
               )}
             </Button>
-          </div>
-        ) : received ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 ring-2 ring-emerald-500/30">
-              <Check className="h-8 w-8" aria-hidden="true" />
-            </div>
-            <p className="text-lg font-semibold">Payment received</p>
-            <p className="text-sm text-muted-foreground">
-              Balance updated. Closing…
-            </p>
           </div>
         ) : (
           <div className="space-y-4">

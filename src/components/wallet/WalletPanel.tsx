@@ -5,54 +5,46 @@
  *
  * Sections:
  *   - Balance (sats + USD where available)
- *   - Lightning Address (copy)
+ *   - Lightning Address (copy + LNURL/QR toggle)
  *   - Receive / Send buttons (open child dialogs)
  *   - PPQ credits + auto-topup state
  *   - Recent payments
+ *
+ * Lightning Address registration lives on the EditPersona page —
+ * changing it requires re-publishing kind 0 and the encrypted backup,
+ * so the wallet panel only renders the read-only address (or a hint
+ * pointing at the edit page when missing).
  */
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ArrowDownLeft,
   ArrowUpRight,
   ChevronDown,
   ChevronUp,
   Copy,
-  Loader2,
   QrCode,
   Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { QRCodeCanvas } from "@/components/ui/qrcode";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/useToast";
-import {
-  isValidLightningUsername,
-  slugifyForUsername,
-} from "@/lib/wallet/lightningAddress";
 import type { UseWalletResult } from "@/hooks/useWallet";
 import { ReceiveDialog } from "./ReceiveDialog";
 import { SendDialog } from "./SendDialog";
 
-export interface WalletPanelRegisterProps {
-  /** Callback invoked when the user submits a username to register. */
-  onSubmit: (baseUsername: string) => void;
-  /** Truthy while the registration mutation is in flight. */
-  isPending: boolean;
-  /** Default value seeded into the username input. */
-  suggestedUsername?: string;
-}
-
 interface WalletPanelProps {
   wallet: UseWalletResult;
   /**
-   * When provided, render an inline "Register Lightning Address" form
-   * in place of the "Not registered yet" message. Used by Dashboard
-   * for backfilling pre-existing personas.
+   * When provided AND the wallet has no Lightning Address registered,
+   * the missing-address state renders a hint linking here so the user
+   * can claim a username from the persona profile editor. Omitted in
+   * the dev harness (no persona context).
    */
-  registerLightningAddress?: WalletPanelRegisterProps;
+  editPersonaHref?: string;
 }
 
 function fmtSats(n: number | undefined): string {
@@ -71,7 +63,7 @@ function fmtTime(ts: number | undefined): string {
   return d.toLocaleString();
 }
 
-export function WalletPanel({ wallet, registerLightningAddress }: WalletPanelProps) {
+export function WalletPanel({ wallet, editPersonaHref }: WalletPanelProps) {
   const { toast } = useToast();
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
@@ -197,8 +189,17 @@ export function WalletPanel({ wallet, registerLightningAddress }: WalletPanelPro
               </>
             ) : null}
           </>
-        ) : registerLightningAddress ? (
-          <RegisterAddressForm {...registerLightningAddress} />
+        ) : editPersonaHref ? (
+          <p className="text-sm text-muted-foreground">
+            No Lightning Address yet. Set a username on the{" "}
+            <Link
+              to={editPersonaHref}
+              className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+            >
+              Edit persona
+            </Link>{" "}
+            page to register one.
+          </p>
         ) : (
           <p className="text-sm text-muted-foreground">
             Not registered yet. Use Receive to generate an invoice instead.
@@ -300,75 +301,6 @@ export function WalletPanel({ wallet, registerLightningAddress }: WalletPanelPro
         onOpenChange={setReceiveOpen}
       />
       <SendDialog wallet={wallet} open={sendOpen} onOpenChange={setSendOpen} />
-    </div>
-  );
-}
-
-function RegisterAddressForm({
-  onSubmit,
-  isPending,
-  suggestedUsername,
-}: WalletPanelRegisterProps) {
-  const [username, setUsername] = useState(
-    suggestedUsername ? slugifyForUsername(suggestedUsername) : "",
-  );
-
-  function onChange(next: string) {
-    setUsername(next.toLowerCase().replace(/[^a-z0-9-]/g, ""));
-  }
-
-  function submit() {
-    if (!isValidLightningUsername(username)) return;
-    onSubmit(username);
-  }
-
-  const valid = isValidLightningUsername(username);
-
-  return (
-    <div className="space-y-2 rounded-md border border-dashed border-imigongo-clay/30 bg-muted/30 p-3">
-      <p className="text-xs text-muted-foreground leading-relaxed">
-        This persona doesn't have a Lightning Address yet. Pick a username and
-        register one on <code className="font-mono">spark.money</code>.
-      </p>
-      <div className="flex items-center gap-1.5 min-w-0">
-        <Input
-          value={username}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="username"
-          className="font-mono text-sm flex-1 min-w-0"
-          autoComplete="off"
-          spellCheck={false}
-          disabled={isPending}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && valid && !isPending) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-        />
-        <span className="text-sm text-muted-foreground whitespace-nowrap">
-          @spark.money
-        </span>
-      </div>
-      <Button
-        onClick={submit}
-        disabled={!valid || isPending}
-        size="sm"
-        className="w-full"
-      >
-        {isPending ? (
-          <>
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
-            Registering…
-          </>
-        ) : (
-          "Register Lightning Address"
-        )}
-      </Button>
-      <p className="text-[11px] text-muted-foreground">
-        If the username is taken, we'll add a 4-character suffix. The persona's
-        Nostr profile is updated automatically.
-      </p>
     </div>
   );
 }

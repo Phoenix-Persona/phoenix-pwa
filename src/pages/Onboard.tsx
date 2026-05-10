@@ -47,6 +47,7 @@ import { parseCommaList } from "@/lib/text";
 import {
   slugifyForUsername,
   isValidLightningUsername,
+  SPARK_LN_DOMAIN,
 } from "@/lib/wallet/lightningAddress";
 
 type WizardStep = "details" | "picture";
@@ -62,7 +63,7 @@ const Onboard = () => {
 
   // Details
   const [name, setName] = useState("Voice of Rwanda");
-  // Username drives the spark.money LN address. Auto-derives from
+  // Username drives the breez.tips LN address. Auto-derives from
   // `name` while untouched; once the user edits it, we stop syncing
   // (tracked by `usernameDirty`).
   const [username, setUsername] = useState(slugifyForUsername("Voice of Rwanda"));
@@ -304,7 +305,7 @@ const Onboard = () => {
                         spellCheck={false}
                       />
                       <span className="text-sm text-muted-foreground whitespace-nowrap">
-                        @spark.money
+                        @{SPARK_LN_DOMAIN}
                       </span>
                     </div>
                     <UsernameAvailabilityHint state={availability} />
@@ -463,7 +464,7 @@ function UsernameAvailabilityHint({
       return (
         <p className="text-xs text-muted-foreground">
           URL-friendly handle. Becomes the persona's Lightning Address — donors
-          zap <code className="font-mono">username@spark.money</code>.
+          zap <code className="font-mono">username@{SPARK_LN_DOMAIN}</code>.
         </p>
       );
     case "invalid":
@@ -476,20 +477,20 @@ function UsernameAvailabilityHint({
     case "checking":
       return (
         <p className="text-xs text-muted-foreground">
-          Checking <code className="font-mono">{state.username}@spark.money</code>…
+          Checking <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code>…
         </p>
       );
     case "available":
       return (
         <p className="text-xs text-emerald-600 dark:text-emerald-500">
-          <code className="font-mono">{state.username}@spark.money</code> is
+          <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code> is
           available.
         </p>
       );
     case "taken":
       return (
         <p className="text-xs text-amber-600 dark:text-amber-500">
-          <code className="font-mono">{state.username}@spark.money</code> is
+          <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code> is
           taken — we'll append a short random suffix on mint.
         </p>
       );

@@ -1,7 +1,7 @@
 /**
  * Helpers for registering a Spark Lightning Address with collision handling.
  *
- * The default Breez LNURL host (`spark.money`) is a globally shared
+ * The default Breez LNURL host (`breez.tips`) is a globally shared
  * namespace — first-come-first-served across every Spark wallet on the
  * planet. We slugify the user's chosen username, probe availability, and
  * fall back to `<base>-<4chars>` on collision so persona creation never
@@ -11,6 +11,16 @@
  * registration); `registerLightningAddress` is the actual claim. Both
  * are scoped to the connected wallet's Spark identity.
  */
+
+/**
+ * Default Spark hosted LN address domain. The SDK reports
+ * `<username>@breez.tips` from `getLightningAddress()`. We surface the
+ * same string in form previews so what the user sees matches what
+ * Spark actually issues.
+ *
+ * Single source of truth — UI labels import this rather than hardcoding.
+ */
+export const SPARK_LN_DOMAIN = "breez.tips";
 
 import type { WalletHandle } from "@/lib/wallet/types";
 
@@ -32,13 +42,13 @@ export function isValidLightningUsername(s: string): boolean {
 }
 
 /**
- * Public LUD-16 endpoint that powers `<user>@spark.money`. Hitting it
+ * Public LUD-16 endpoint that powers `<user>@breez.tips`. Hitting it
  * lets us probe availability without connecting an SDK instance — a
  * 200 means the slot is taken (the JSON LNURL-pay descriptor is
  * served), a 404 means it's free. Anything else is a transient
  * network error.
  */
-const SPARK_LUD16_HOST = "https://spark.money";
+const SPARK_LUD16_HOST = `https://${SPARK_LN_DOMAIN}`;
 
 export type AvailabilityStatus = "available" | "taken" | "error";
 
@@ -93,7 +103,7 @@ export interface RegisterLightningAddressOptions {
 export interface ResolvedLightningAddress {
   /** Final username we successfully registered (`base` or `base-xxxx`). */
   username: string;
-  /** Full address, e.g. `imani-7k2p@spark.money`. */
+  /** Full address, e.g. `imani-7k2p@breez.tips`. */
   lightningAddress: string;
   /** Static LNURL-pay bech32 string, if the SDK populated it. */
   lnurl?: string;
