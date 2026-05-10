@@ -62,3 +62,5 @@ SCRATCH.md
 android/keystore.properties
 android/*.jks
 android/*.keystore
+
+.tmp/

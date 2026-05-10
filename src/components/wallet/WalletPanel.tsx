@@ -99,7 +99,7 @@ export function WalletPanel({ wallet, editPersonaHref }: WalletPanelProps) {
             Wallet failed to connect: {wallet.connectError.message}
           </p>
         ) : (
-          <p>No wallet seed available. Mint a new persona to get a wallet.</p>
+          <p>No wallet seed available. Create a new persona to get a wallet.</p>
         )}
       </div>
     );

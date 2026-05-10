@@ -249,7 +249,7 @@ const Dashboard = () => {
             <Card className="border-dashed border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20">
               <CardContent className="py-4 px-6 text-sm text-amber-900 dark:text-amber-200">
                 This persona was created before wallets were wired. AI styling
-                and image generation are disabled. Mint a new persona from the
+                and image generation are disabled. Create a new persona from the
                 onboard wizard to enable them.
               </CardContent>
             </Card>

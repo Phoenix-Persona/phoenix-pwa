@@ -1,0 +1,146 @@
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import Onboard from "./Onboard";
+
+const mocks = vi.hoisted(() => ({
+  navigate: vi.fn(),
+  toast: vi.fn(),
+  mutateAsync: vi.fn(),
+  generatePersonaKeypair: vi.fn(),
+  createPersonaSigner: vi.fn(),
+  uploadFileToBlossom: vi.fn(),
+  availability: { status: "idle" } as { status: "idle" } | { status: "taken"; username: string },
+}));
+
+vi.mock("@unhead/react", () => ({
+  useSeoMeta: vi.fn(),
+}));
+
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => mocks.navigate,
+}));
+
+vi.mock("@/components/AppHeader", () => ({
+  AppHeader: () => <header />,
+}));
+
+vi.mock("@/components/ImigongoBand", () => ({
+  FlagStripe: () => <div />,
+  ImigongoSeal: () => <div />,
+}));
+
+vi.mock("@/components/PersonaPictureStager", () => ({
+  PersonaPictureStager: () => <div data-testid="picture-stager" />,
+}));
+
+vi.mock("@/hooks/useToast", () => ({
+  useToast: () => ({ toast: mocks.toast }),
+}));
+
+vi.mock("@/hooks/useCurrentUser", () => ({
+  useCurrentUser: () => ({
+    user: {
+      pubkey: "operator-pubkey",
+      signer: { signEvent: vi.fn() },
+    },
+  }),
+}));
+
+vi.mock("@/hooks/useCreatePersona", () => ({
+  useCreatePersona: () => ({
+    isPending: false,
+    mutateAsync: mocks.mutateAsync,
+  }),
+}));
+
+vi.mock("@/hooks/useUsernameAvailability", () => ({
+  useUsernameAvailability: () => mocks.availability,
+}));
+
+vi.mock("@/lib/personaKey", () => ({
+  generatePersonaKeypair: mocks.generatePersonaKeypair,
+}));
+
+vi.mock("@/lib/personaSigner", () => ({
+  createPersonaSigner: mocks.createPersonaSigner,
+}));
+
+vi.mock("@/lib/blossomUpload", () => ({
+  uploadFileToBlossom: mocks.uploadFileToBlossom,
+  urlFromUploadTags: vi.fn(),
+}));
+
+describe("Onboard", () => {
+  beforeEach(() => {
+    mocks.navigate.mockReset();
+    mocks.toast.mockReset();
+    mocks.generatePersonaKeypair.mockReset().mockReturnValue({
+      nsec: "nsec1persona",
+      npub: "npub1persona",
+      hex: {
+        pk: "a".repeat(64),
+        sk: "b".repeat(64),
+      },
+    });
+    mocks.createPersonaSigner.mockReset();
+    mocks.uploadFileToBlossom.mockReset();
+    mocks.availability = { status: "idle" };
+    mocks.mutateAsync.mockReset().mockResolvedValue({
+      npub: "npub1persona",
+      envelope: {
+        persona: {
+          name: "Voice of Rwanda",
+        },
+      },
+    });
+  });
+
+  it("does not generate the persona keypair until Create is clicked", async () => {
+    render(<Onboard />);
+
+    expect(mocks.generatePersonaKeypair).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /next: profile picture/i }));
+
+    expect(mocks.generatePersonaKeypair).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /create persona/i }));
+    });
+
+    expect(mocks.generatePersonaKeypair).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(mocks.mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          keypair: expect.objectContaining({ nsec: "nsec1persona" }),
+          username: "voice-of-rwanda",
+          lightningUsername: "voice-of-rwanda",
+          pictureUrl: undefined,
+        }),
+      ),
+    );
+  });
+
+  it("shows direct copy when the Lightning address is taken", () => {
+    mocks.availability = {
+      status: "taken",
+      username: "voice-of-rwanda",
+    };
+
+    render(<Onboard />);
+
+    expect(screen.getByText("voice-of-rwanda@breez.tips")).toBeInTheDocument();
+    expect(screen.getByText(/already taken\. Try another handle\./i)).toBeInTheDocument();
+    expect(screen.queryByText(/before creating the persona/i)).not.toBeInTheDocument();
+  });
+
+  it("does not show a separate skip button on the picture step", () => {
+    render(<Onboard />);
+
+    fireEvent.click(screen.getByRole("button", { name: /next: profile picture/i }));
+
+    expect(screen.getByRole("button", { name: /create persona/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /skip/i })).not.toBeInTheDocument();
+  });
+});

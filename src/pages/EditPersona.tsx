@@ -24,15 +24,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import type { NostrEvent } from "@nostrify/nostrify";
-import { NSecSigner } from "@nostrify/nostrify";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe } from "@/components/ImigongoBand";
 import { EditPersonaCrossPostFields } from "@/components/persona/EditPersonaCrossPostFields";
 import { EditPersonaIdentityFields } from "@/components/persona/EditPersonaIdentityFields";
 import { EditPersonaPublicProfileFields } from "@/components/persona/EditPersonaPublicProfileFields";
-import { decodePersonaNsec } from "@/lib/personaKey";
-import { hexToBytes } from "@noble/hashes/utils.js";
+import { createPersonaSigner } from "@/lib/personaSigner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -129,6 +127,10 @@ interface EditPersonaFormProps {
   envelope: PhoenixEnvelope;
 }
 
+function lightningUsernameFromAddress(address: string | undefined): string | undefined {
+  return address?.split("@")[0];
+}
+
 function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) {
   const navigate = useNavigate();
   const { user } = useCurrentUser();
@@ -148,8 +150,7 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   // Memoised by persona pubkey: the parent re-mounts on persona change, but
   // we still memoise to be explicit about the dependency.
   const personaSigner = useMemo(() => {
-    const kp = decodePersonaNsec(original.nsec);
-    return new NSecSigner(hexToBytes(kp.hex.sk));
+    return createPersonaSigner(original.nsec);
   }, [original.nsec]);
 
   // Initialize directly from props — the parent passes a `key` of the
@@ -162,6 +163,13 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
     original.username ?? slugifyForUsername(original.display_name ?? original.name);
   const [username, setUsername] = useState(initialUsername);
   const [usernameDirty, setUsernameDirty] = useState(false);
+  const initialLightningUsername =
+    lightningUsernameFromAddress(envelope.wallet?.lightning_address) ??
+    initialUsername;
+  const [lightningUsername, setLightningUsername] = useState(
+    initialLightningUsername,
+  );
+  const [lightningUsernameDirty, setLightningUsernameDirty] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState(original.system_prompt);
   // The picture initial seed comes from the encrypted backup's
   // reference_image_url; the public kind-0 picture is loaded below
@@ -186,16 +194,20 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   );
   const saving = updatePersona.isPending;
 
-  // Live availability check for the username field. Skip while the
-  // value still matches the original (no-op rename).
+  // Live availability check for the Lightning address field. Skip while
+  // the value still matches the original (no-op rename).
   const availability = useUsernameAvailability(
-    username !== initialUsername ? username : "",
+    lightningUsername !== initialLightningUsername ? lightningUsername : "",
   );
 
   function onNameChange(next: string) {
     setName(next);
+    const slug = slugifyForUsername(next);
     if (!usernameDirty) {
-      setUsername(slugifyForUsername(next));
+      setUsername(slug);
+    }
+    if (!lightningUsernameDirty) {
+      setLightningUsername(slug);
     }
   }
 
@@ -203,6 +215,12 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
     const cleaned = next.toLowerCase().replace(/[^a-z0-9-]/g, "");
     setUsername(cleaned);
     setUsernameDirty(true);
+  }
+
+  function onLightningUsernameChange(next: string) {
+    const cleaned = next.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    setLightningUsername(cleaned);
+    setLightningUsernameDirty(true);
   }
 
   // Bio + picture come from the persona's public kind 0 — fetched
@@ -247,15 +265,25 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
       return;
     }
 
-    // Username gate: if the user edited the username, it must be a
-    // valid LN-address handle before we commit. The mint path's SDK
-    // call would also reject, but we'd rather fail before connecting.
     const trimmedUsername = username.trim();
     if (trimmedUsername && !isValidLightningUsername(trimmedUsername)) {
       toast({
         title: "Invalid username",
         description:
           "Usernames must start with a letter or digit and contain only lowercase letters, digits, and hyphens.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const trimmedLightningUsername = lightningUsername.trim();
+    if (
+      trimmedLightningUsername &&
+      !isValidLightningUsername(trimmedLightningUsername)
+    ) {
+      toast({
+        title: "Invalid Lightning address",
+        description:
+          "Lightning addresses must start with a letter or digit and contain only lowercase letters, digits, and hyphens.",
         variant: "destructive",
       });
       return;
@@ -284,6 +312,7 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
         npub,
         name,
         username: trimmedUsername,
+        lightningUsername: trimmedLightningUsername,
         systemPrompt,
         bio,
         originalBio,
@@ -319,10 +348,12 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
         <EditPersonaIdentityFields
           name={name}
           username={username}
-          initialUsername={initialUsername}
+          lightningUsername={lightningUsername}
+          initialLightningUsername={initialLightningUsername}
           availability={availability}
           onNameChange={onNameChange}
           onUsernameChange={onUsernameChange}
+          onLightningUsernameChange={onLightningUsernameChange}
         />
 
         <EditPersonaPublicProfileFields

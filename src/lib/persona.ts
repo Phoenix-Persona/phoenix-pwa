@@ -96,10 +96,11 @@ const personaSchema = z.object({
   dTag: z.string().min(1).max(128).optional(),
   name: z.string().min(1).max(120),
   /**
-   * URL-friendly handle. Drives the Spark Lightning Address registration
-   * (`<username>@breez.tips`) and the kind 0 `name` field. Optional for
-   * back-compat with personas authored before this field landed; new
-   * personas always write it. Lowercase letters, digits, and hyphens.
+   * URL-friendly persona handle used for the kind 0 `name` field.
+   * Lightning Address registration is tracked separately in the wallet
+   * payload. Optional for back-compat with personas authored before this
+   * field landed; new personas always write it. Lowercase letters,
+   * digits, and hyphens.
    */
   username: z
     .string()

@@ -23,7 +23,7 @@ export interface EditPersonaPublicProfileFieldsProps {
    * Required for privacy — without it, the operator's pubkey appears
    * on every upload and correlates operator ↔ persona.
    */
-  pictureSigner?: NostrSigner;
+  pictureSigner: NostrSigner;
   /** Optional persona-specific Blossom server override. */
   pictureBlossomServers?: string[];
 }

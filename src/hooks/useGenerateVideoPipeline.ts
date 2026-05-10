@@ -36,6 +36,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { generateImage } from "@/lib/ppq/client";
 import type { Persona } from "@/lib/persona";
 import { buildPersonaPostTemplate } from "@/lib/personaPost";
+import { createPersonaSigner } from "@/lib/personaSigner";
 
 import {
   deleteChain,
@@ -186,7 +187,11 @@ export function useGenerateVideoPipeline(
   const { persona, idea, sources, hints, personaAvatarUrl } = args;
 
   const { account, ensureAccount } = usePpqAccount();
-  const upload = useUploadFile();
+  const personaSigner = useMemo(
+    () => createPersonaSigner(persona.nsec),
+    [persona.nsec],
+  );
+  const upload = useUploadFile({ signer: personaSigner });
   const personaPublish = usePersonaPublish();
   const { user } = useCurrentUser();
   const { toast } = useToast();
@@ -540,7 +545,7 @@ export function useGenerateVideoPipeline(
       const previewUrl = current.previewUrl;
 
       if (!user) {
-        await fail(new Error("Sign in before generating video — Blossom uploads need your signer."));
+        await fail(new Error("Sign in before generating video."));
         return;
       }
 

@@ -31,9 +31,12 @@ export function extractUrlFromTags(tags: string[][]): string | undefined {
 }
 
 /**
- * Hook returning `uploadBlob(blob, filename?)` — uploads to Blossom via
- * the user's signer and resolves to the single URL string. Throws if
- * the upload mutation rejects or the returned tags don't carry a URL.
+ * Hook returning `uploadBlob(blob, filename?)` — uploads to Blossom via the
+ * configured `useUploadFile` signer and resolves to the single URL string.
+ * Throws if the upload mutation rejects or the returned tags don't carry a URL.
+ *
+ * Persona media callers must lift `useUploadFile({ signer: personaSigner })`
+ * themselves instead of using this helper's operator-signer default.
  *
  * Use this from React components / hooks. For a non-React caller, lift
  * the underlying `useUploadFile` mutation up and pass `extractUrlFromTags`

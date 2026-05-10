@@ -5,6 +5,7 @@ import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { queryKeys } from "@/lib/queryKeys";
+import { LightningUsernameTakenError } from "@/lib/wallet/lightningAddress";
 import { useCreatePersona } from "./useCreatePersona";
 
 const mocks = vi.hoisted(() => {
@@ -131,7 +132,8 @@ describe("useCreatePersona", () => {
     await act(async () => {
       const created = await result.current.mutateAsync({
         name: "Voice",
-        username: "voice",
+        username: "public-voice",
+        lightningUsername: "donate-voice",
         bio: "Bio",
         systemPrompt: "System",
         pictureUrl: "https://example.com/pic.png",
@@ -139,6 +141,7 @@ describe("useCreatePersona", () => {
 
       expect(created.npub).toBe("npub1persona");
       expect(created.envelope.persona.dTag).toBeTruthy();
+      expect(created.envelope.persona.username).toBe("public-voice");
       expect(created.envelope.wallet?.lightning_address).toBe(
         "voice@breez.tips",
       );
@@ -149,6 +152,12 @@ describe("useCreatePersona", () => {
       expect.objectContaining({
         kind: 30078,
         content: "ciphertext",
+      }),
+    );
+    expect(mocks.registerLightningAddressWithRetry).toHaveBeenCalledWith(
+      { id: "wallet" },
+      expect.objectContaining({
+        baseUsername: "donate-voice",
       }),
     );
     expect(
@@ -169,24 +178,47 @@ describe("useCreatePersona", () => {
     });
   });
 
-  it("continues persona creation when Lightning Address registration fails", async () => {
+  it("continues persona creation when Lightning Address registration has a transient failure", async () => {
     mocks.registerLightningAddressWithRetry.mockRejectedValue(
-      new Error("address taken"),
+      new Error("network unavailable"),
     );
     const { result } = renderHook(() => useCreatePersona(), { wrapper });
 
     await act(async () => {
       const created = await result.current.mutateAsync({
         name: "Voice",
-        username: "voice",
+        username: "public-voice",
+        lightningUsername: "donate-voice",
         bio: "Bio",
         systemPrompt: "System",
       });
 
       expect(created.envelope.wallet?.lightning_address).toBeUndefined();
-      expect(created.warning).toBe("address taken");
+      expect(created.envelope.persona.username).toBe("public-voice");
+      expect(created.warning).toBe("network unavailable");
     });
 
     expect(mocks.nostrEvent).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails persona creation when the requested Lightning Address is taken", async () => {
+    mocks.registerLightningAddressWithRetry.mockRejectedValue(
+      new LightningUsernameTakenError("donate-voice"),
+    );
+    const { result } = renderHook(() => useCreatePersona(), { wrapper });
+
+    await expect(
+      act(async () => {
+        await result.current.mutateAsync({
+          name: "Voice",
+          username: "public-voice",
+          lightningUsername: "donate-voice",
+          bio: "Bio",
+          systemPrompt: "System",
+        });
+      }),
+    ).rejects.toThrow("donate-voice@breez.tips is already taken");
+
+    expect(mocks.nostrEvent).not.toHaveBeenCalled();
   });
 });
