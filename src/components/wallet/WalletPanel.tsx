@@ -24,6 +24,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  RotateCw,
   Zap,
 } from "lucide-react";
 
@@ -43,6 +44,7 @@ import { SendDialog } from "./SendDialog";
 interface WalletPanelProps {
   wallet: UseWalletResult;
   walletScope?: "persona" | "operator";
+  operatorDiagnostics?: OperatorWalletDiagnostics;
   /**
    * When provided AND the wallet has no Lightning Address registered,
    * the missing-address state renders a hint linking here so the user
@@ -51,6 +53,12 @@ interface WalletPanelProps {
    */
   editPersonaHref?: string;
   onAutoTopupSave?: (config: AutoTopupConfig) => void | Promise<void>;
+}
+
+export interface OperatorWalletDiagnostics {
+  hasEnvelopeEvent: boolean;
+  hasWalletBackup: boolean;
+  hasPpqBackup: boolean;
 }
 
 function fmtSats(n: number | undefined): string {
@@ -83,6 +91,7 @@ function fmtHistoryTime(ts: string | undefined): string {
 export function WalletPanel({
   wallet,
   walletScope = "persona",
+  operatorDiagnostics,
   editPersonaHref,
   onAutoTopupSave,
 }: WalletPanelProps) {
@@ -108,6 +117,7 @@ export function WalletPanel({
   );
   const [autoTopupError, setAutoTopupError] = useState<string | null>(null);
   const [manualTopupError, setManualTopupError] = useState<string | null>(null);
+  const [rotatePpqError, setRotatePpqError] = useState<string | null>(null);
   const [isSavingAutoTopup, setIsSavingAutoTopup] = useState(false);
 
   const balanceSats = wallet.info?.balanceSats;
@@ -177,6 +187,25 @@ export function WalletPanel({
       setManualTopupError(message);
       toast({
         title: "PPQ top-up failed",
+        description: message,
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function rotatePpqCredentials() {
+    setRotatePpqError(null);
+    try {
+      await wallet.rotatePpqAccount();
+      setShowPpqApiKey(false);
+      setShowPpqChargeId(false);
+      toast({ title: "PPQ credentials rotated" });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not rotate PPQ credentials.";
+      setRotatePpqError(message);
+      toast({
+        title: "PPQ rotation failed",
         description: message,
         variant: "destructive",
       });
@@ -416,9 +445,33 @@ export function WalletPanel({
           </section>
 
           <section className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              Active PPQ credentials
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                Active PPQ credentials
+              </p>
+              {walletScope === "operator" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={rotatePpqCredentials}
+                  disabled={wallet.isPpqRotating}
+                  aria-label="Rotate PPQ credentials"
+                  className="h-8"
+                >
+                  <RotateCw
+                    className={`mr-2 size-3.5 ${wallet.isPpqRotating ? "animate-spin" : ""}`}
+                    aria-hidden="true"
+                  />
+                  {wallet.isPpqRotating ? "Rotating..." : "Rotate"}
+                </Button>
+              ) : null}
+            </div>
+            {walletScope === "operator" && (rotatePpqError || wallet.ppqRotateError) ? (
+              <p className="text-xs text-destructive">
+                {rotatePpqError ?? wallet.ppqRotateError?.message}
+              </p>
+            ) : null}
             <SecretRow
               label="PPQ charge id"
               value={wallet.ppqAccount?.credit_id}
@@ -433,6 +486,10 @@ export function WalletPanel({
               revealLabel="PPQ API key"
             />
           </section>
+
+          {walletScope === "operator" && operatorDiagnostics ? (
+            <OperatorBackupStatus diagnostics={operatorDiagnostics} />
+          ) : null}
 
           <PpqUsageActivity
             items={wallet.ppqQueryHistory}
@@ -449,6 +506,57 @@ export function WalletPanel({
       />
       <SendDialog wallet={wallet} open={sendOpen} onOpenChange={setSendOpen} />
     </div>
+  );
+}
+
+function OperatorBackupStatus({
+  diagnostics,
+}: {
+  diagnostics: OperatorWalletDiagnostics;
+}) {
+  const rows = [
+    {
+      label: diagnostics.hasEnvelopeEvent
+        ? "Backup event found"
+        : "Backup event missing",
+      ok: diagnostics.hasEnvelopeEvent,
+    },
+    {
+      label: diagnostics.hasWalletBackup
+        ? "Wallet seed backed up"
+        : "Wallet seed not backed up",
+      ok: diagnostics.hasWalletBackup,
+    },
+    {
+      label: diagnostics.hasPpqBackup
+        ? "AI credentials backed up"
+        : "AI credentials not backed up",
+      ok: diagnostics.hasPpqBackup,
+    },
+  ];
+
+  return (
+    <section className="space-y-2 rounded-md border bg-muted/20 p-3">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+        Operator backup status
+      </p>
+      <ul className="space-y-1.5 text-sm">
+        {rows.map((row) => (
+          <li key={row.label} className="flex items-center justify-between gap-2">
+            <span>{row.label}</span>
+            <span
+              className={
+                row.ok
+                  ? "text-xs font-medium text-emerald-700 dark:text-emerald-400"
+                  : "text-xs font-medium text-amber-700 dark:text-amber-400"
+              }
+            >
+              {row.ok ? "OK" : "Check"}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

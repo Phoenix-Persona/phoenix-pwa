@@ -7,7 +7,6 @@ import type { PpqAccount } from "@/lib/ppq/types";
 import { usePpqAccount } from "./usePpqAccount";
 
 const mocks = vi.hoisted(() => {
-  let stored: PpqAccount | null = null;
   const operator = {
     envelope: undefined as { ppq?: PpqAccount } | undefined,
     event: undefined as unknown,
@@ -21,16 +20,6 @@ const mocks = vi.hoisted(() => {
     getBalance: vi.fn(),
     readEnv: vi.fn(),
     operator,
-    load: vi.fn(() => stored),
-    save: vi.fn((account: PpqAccount) => {
-      stored = account;
-    }),
-    clear: vi.fn(() => {
-      stored = null;
-    }),
-    setStored(account: PpqAccount | null) {
-      stored = account;
-    },
     currentUser: {
       user: { pubkey: "operator-pubkey" } as { pubkey: string } | undefined,
     },
@@ -40,14 +29,6 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/lib/ppq/client", () => ({
   createAccount: mocks.createAccount,
   getBalance: mocks.getBalance,
-}));
-
-vi.mock("@/lib/ppq/storage", () => ({
-  ppqAccountStore: {
-    load: mocks.load,
-    save: mocks.save,
-    clear: mocks.clear,
-  },
 }));
 
 vi.mock("@/lib/env", () => ({
@@ -71,7 +52,7 @@ function wrapper({ children }: PropsWithChildren) {
 
 describe("usePpqAccount", () => {
   beforeEach(() => {
-    mocks.setStored(null);
+    window.localStorage.clear();
     mocks.currentUser.user = { pubkey: "operator-pubkey" };
     mocks.operator.envelope = undefined;
     mocks.operator.event = undefined;
@@ -81,9 +62,6 @@ describe("usePpqAccount", () => {
     mocks.createAccount.mockReset();
     mocks.getBalance.mockReset().mockResolvedValue({ balance_usd: 0, raw: {} });
     mocks.readEnv.mockReset().mockReturnValue(undefined);
-    mocks.load.mockClear();
-    mocks.save.mockClear();
-    mocks.clear.mockClear();
   });
 
   it("returns a freshly created account immediately after ensureAccount resolves", async () => {
@@ -97,10 +75,10 @@ describe("usePpqAccount", () => {
     });
 
     await waitFor(() => expect(result.current.account).toEqual(fresh));
-    expect(mocks.save).toHaveBeenCalledWith(fresh);
+    expect(mocks.operator.ensureWithPpq).toHaveBeenCalledWith(fresh);
   });
 
-  it("clears local PPQ storage without deleting the operator envelope account", async () => {
+  it("clears in-memory PPQ state without deleting the operator envelope account", async () => {
     const operatorAccount = {
       api_key: "api-operator",
       credit_id: "credit-operator",
@@ -116,15 +94,16 @@ describe("usePpqAccount", () => {
     });
 
     await waitFor(() => expect(result.current.account).toEqual(operatorAccount));
-    expect(mocks.clear).toHaveBeenCalled();
   });
 
-  it("does not attach a cached account to a different operator", async () => {
-    const cached = { api_key: "api-cached", credit_id: "credit-cached" };
+  it("does not attach a legacy cached account to a different operator", async () => {
     const fresh = { api_key: "api-new", credit_id: "credit-new" };
-    mocks.setStored(cached);
     mocks.operator.event = { id: "operator-event" };
     mocks.createAccount.mockResolvedValue(fresh);
+    window.localStorage.setItem(
+      "phoenix:ppq:account",
+      JSON.stringify({ api_key: "api-cached", credit_id: "credit-cached" }),
+    );
 
     const { result } = renderHook(() => usePpqAccount(), { wrapper });
 
@@ -135,7 +114,10 @@ describe("usePpqAccount", () => {
     });
 
     expect(mocks.operator.ensureWithPpq).toHaveBeenCalledWith(fresh);
-    expect(mocks.operator.ensureWithPpq).not.toHaveBeenCalledWith(cached);
+    expect(mocks.operator.ensureWithPpq).not.toHaveBeenCalledWith({
+      api_key: "api-cached",
+      credit_id: "credit-cached",
+    });
   });
 
   it("waits for the operator envelope before minting a PPQ account", async () => {
@@ -155,5 +137,29 @@ describe("usePpqAccount", () => {
     });
 
     expect(mocks.createAccount).not.toHaveBeenCalled();
+  });
+
+  it("rotates to a freshly minted PPQ account for the current operator", async () => {
+    const oldAccount = {
+      api_key: "api-old",
+      credit_id: "credit-old",
+    };
+    const fresh = {
+      api_key: "api-new",
+      credit_id: "credit-new",
+    };
+    mocks.operator.envelope = { ppq: oldAccount };
+    mocks.createAccount.mockResolvedValue(fresh);
+
+    const { result } = renderHook(() => usePpqAccount(), { wrapper });
+
+    await waitFor(() => expect(result.current.account).toEqual(oldAccount));
+
+    await act(async () => {
+      await expect(result.current.rotateAccount()).resolves.toEqual(fresh);
+    });
+
+    expect(mocks.operator.ensureWithPpq).toHaveBeenCalledWith(fresh);
+    await waitFor(() => expect(result.current.account).toEqual(fresh));
   });
 });

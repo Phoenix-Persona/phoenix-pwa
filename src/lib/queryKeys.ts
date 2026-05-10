@@ -25,15 +25,19 @@ export const queryKeys = {
     allPublicProfiles: () => ["persona-public-profile"] as const,
   },
   wallet: {
+    allDetails: () => ["wallet"] as const,
     detail: (walletId: string | undefined) => ["wallet", walletId ?? ""] as const,
+    allPayments: () => ["wallet-payments"] as const,
     payments: (walletId: string | undefined) =>
       ["wallet-payments", walletId ?? ""] as const,
   },
   operator: {
+    all: () => ["phoenix-operator"] as const,
     envelope: (pubkey: string | undefined) =>
-      ["phoenix-operator-envelope", pubkey] as const,
+      ["phoenix-operator", pubkey ?? ""] as const,
   },
   ppq: {
+    all: () => ["ppq"] as const,
     account: (operatorPubkey: string | undefined) =>
       ["ppq", "account", operatorPubkey ?? ""] as const,
     allAccounts: () => ["ppq", "account"] as const,
@@ -41,6 +45,7 @@ export const queryKeys = {
     allBalances: () => ["ppq", "balance"] as const,
     queryHistory: (creditId: string | undefined) =>
       ["ppq", "query-history", creditId ?? ""] as const,
+    allQueryHistory: () => ["ppq", "query-history"] as const,
     topup: (
       creditId: string | undefined,
       invoiceId: string | null | undefined,

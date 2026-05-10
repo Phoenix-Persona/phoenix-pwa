@@ -114,6 +114,9 @@ export interface UseWalletResult {
   /* ----- ppq.ai credit ----- */
   ppqBalanceUsd: number | undefined;
   ppqAccount: PpqAccount | null;
+  rotatePpqAccount: () => Promise<PpqAccount>;
+  isPpqRotating: boolean;
+  ppqRotateError: Error | undefined;
   isPpqBalanceLoading: boolean;
   refreshPpqBalance: () => void;
   ppqQueryHistory: PpqQueryHistoryItem[] | undefined;
@@ -512,6 +515,9 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
       sendError: sendMutation.error ?? undefined,
       ppqBalanceUsd: ppq.balance?.balance_usd,
       ppqAccount: ppq.account,
+      rotatePpqAccount: ppq.rotateAccount,
+      isPpqRotating: ppq.isRotating,
+      ppqRotateError: ppq.rotateError ?? undefined,
       isPpqBalanceLoading: ppq.isBalanceLoading,
       refreshPpqBalance: ppq.refreshBalance,
       ppqQueryHistory: ppqQueryHistoryQuery.data?.data,
@@ -543,6 +549,9 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
       sendMutation,
       ppq.balance?.balance_usd,
       ppq.account,
+      ppq.rotateAccount,
+      ppq.isRotating,
+      ppq.rotateError,
       ppq.isBalanceLoading,
       ppq.refreshBalance,
       ppqQueryHistoryQuery.data,

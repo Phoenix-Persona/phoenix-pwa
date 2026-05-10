@@ -39,6 +39,7 @@ import {
 } from "@/lib/operator";
 import type { Nip44Signer } from "@/lib/personaCrypto";
 import { publishWithTimeout } from "@/lib/nostrPublish";
+import { queryKeys } from "@/lib/queryKeys";
 import { generateMnemonic } from "@/lib/wallet/client";
 import {
   DEFAULT_AUTO_TOPUP_CONFIG,
@@ -48,9 +49,6 @@ import {
 import type { PersonaWallet } from "@/lib/persona";
 
 import { useCurrentUser } from "./useCurrentUser";
-
-const OPERATOR_QK = (userPubkey: string | undefined) =>
-  ["phoenix-operator", userPubkey] as const;
 
 interface OperatorEnvelopeState {
   event: NostrEvent;
@@ -104,7 +102,7 @@ export function useOperatorEnvelope() {
   const qc = useQueryClient();
 
   const query = useQuery({
-    queryKey: OPERATOR_QK(user?.pubkey),
+    queryKey: queryKeys.operator.envelope(user?.pubkey),
     enabled: Boolean(user),
     queryFn: async (c): Promise<OperatorEnvelopeState | null> => {
       if (!user) return null;
@@ -127,7 +125,7 @@ export function useOperatorEnvelope() {
     if (!user) throw new Error("Not logged in");
     const signer = user.signer as unknown as Nip44Signer;
     const current = qc.getQueryData<OperatorEnvelopeState | null>(
-      OPERATOR_QK(user?.pubkey),
+      queryKeys.operator.envelope(user?.pubkey),
     );
     const dTag =
       input.dTag ??
@@ -164,7 +162,7 @@ export function useOperatorEnvelope() {
   >({
     mutationFn: async (overrides) => {
       const current = qc.getQueryData<OperatorEnvelopeState | null>(
-        OPERATOR_QK(user?.pubkey),
+        queryKeys.operator.envelope(user?.pubkey),
       );
       const wallet =
         overrides?.wallet ??
@@ -174,7 +172,7 @@ export function useOperatorEnvelope() {
       return publish({ wallet, ppq });
     },
     onSuccess: (state) => {
-      qc.setQueryData(OPERATOR_QK(user?.pubkey), state);
+      qc.setQueryData(queryKeys.operator.envelope(user?.pubkey), state);
     },
   });
 
@@ -185,7 +183,7 @@ export function useOperatorEnvelope() {
   >({
     mutationFn: async (next) => publish(next),
     onSuccess: (state) => {
-      qc.setQueryData(OPERATOR_QK(user?.pubkey), state);
+      qc.setQueryData(queryKeys.operator.envelope(user?.pubkey), state);
     },
   });
 
@@ -198,7 +196,7 @@ export function useOperatorEnvelope() {
   const ensureWithPpq = useCallback(
     async (ppq: OperatorPpqAccount): Promise<OperatorEnvelope> => {
       const current = qc.getQueryData<OperatorEnvelopeState | null>(
-        OPERATOR_QK(user?.pubkey),
+        queryKeys.operator.envelope(user?.pubkey),
       );
       if (current?.envelope.ppq?.api_key === ppq.api_key) {
         return current.envelope;

@@ -213,6 +213,11 @@ export function AppHeader() {
           open={walletOpen}
           onOpenChange={setWalletOpen}
           personaName="Operator"
+          operatorDiagnostics={{
+            hasEnvelopeEvent: Boolean(operator.event),
+            hasWalletBackup: Boolean(operator.envelope?.wallet?.seed),
+            hasPpqBackup: Boolean(operator.envelope?.ppq),
+          }}
         />
       ) : null}
     </header>

@@ -64,6 +64,12 @@ function makeWallet(
       credit_id: "credit_active_123",
       api_key: "ppq_live_secret_key",
     },
+    rotatePpqAccount: vi.fn().mockResolvedValue({
+      credit_id: "credit_rotated_456",
+      api_key: "ppq_live_rotated_key",
+    }),
+    isPpqRotating: false,
+    ppqRotateError: undefined,
     ppqBalanceUsd: 4.25,
     isPpqBalanceLoading: false,
     refreshPpqBalance: vi.fn(),
@@ -290,6 +296,43 @@ describe("WalletPanel", () => {
     expect(screen.queryByText("Lightning Address")).not.toBeInTheDocument();
     expect(screen.queryByText("voice@breez.tips")).not.toBeInTheDocument();
     expect(screen.queryByTestId("qr-code")).not.toBeInTheDocument();
+  });
+
+  it("shows operator envelope diagnostics only for the operator wallet", () => {
+    const { unmount } = render(
+      <MemoryRouter>
+        <WalletPanel
+          wallet={makeWallet()}
+          walletScope="operator"
+          operatorDiagnostics={{
+            hasEnvelopeEvent: true,
+            hasWalletBackup: true,
+            hasPpqBackup: true,
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    activateTab(/ai credits/i);
+
+    expect(screen.getByText("Operator backup status")).toBeInTheDocument();
+    expect(screen.getByText("Backup event found")).toBeInTheDocument();
+    expect(screen.getByText("Wallet seed backed up")).toBeInTheDocument();
+    expect(screen.getByText("AI credentials backed up")).toBeInTheDocument();
+
+    unmount();
+    renderWallet(makeWallet(), { walletScope: "persona" });
+    expect(screen.queryByText("Operator backup status")).not.toBeInTheDocument();
+  });
+
+  it("rotates PPQ credentials from the operator wallet", async () => {
+    const wallet = makeWallet();
+    renderWallet(wallet, { walletScope: "operator" });
+
+    activateTab(/ai credits/i);
+    fireEvent.click(screen.getByRole("button", { name: /rotate ppq credentials/i }));
+
+    await waitFor(() => expect(wallet.rotatePpqAccount).toHaveBeenCalledOnce());
   });
 });
 

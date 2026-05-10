@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import type { UseWalletResult } from "@/hooks/useWallet";
 import type { AutoTopupConfig } from "@/lib/wallet/types";
-import { WalletPanel } from "./WalletPanel";
+import { WalletPanel, type OperatorWalletDiagnostics } from "./WalletPanel";
 
 interface WalletDialogProps {
   wallet: UseWalletResult;
@@ -22,6 +22,7 @@ interface WalletDialogProps {
   personaName?: string;
   /** Forwarded to WalletPanel — see its prop docs. */
   editPersonaHref?: string;
+  operatorDiagnostics?: OperatorWalletDiagnostics;
   onAutoTopupSave?: (config: AutoTopupConfig) => void | Promise<void>;
 }
 
@@ -32,6 +33,7 @@ export function WalletDialog({
   walletScope = "persona",
   personaName,
   editPersonaHref,
+  operatorDiagnostics,
   onAutoTopupSave,
 }: WalletDialogProps) {
   const description =
@@ -56,6 +58,7 @@ export function WalletDialog({
             wallet={wallet}
             walletScope={walletScope}
             editPersonaHref={editPersonaHref}
+            operatorDiagnostics={operatorDiagnostics}
             onAutoTopupSave={onAutoTopupSave}
           />
         </div>

@@ -21,7 +21,12 @@ describe("queryKeys", () => {
 
   it("centralizes partial keys for invalidation", () => {
     expect(queryKeys.nostr.authors()).toEqual(["nostr", "author"]);
+    expect(queryKeys.wallet.allDetails()).toEqual(["wallet"]);
+    expect(queryKeys.wallet.allPayments()).toEqual(["wallet-payments"]);
+    expect(queryKeys.operator.all()).toEqual(["phoenix-operator"]);
+    expect(queryKeys.ppq.all()).toEqual(["ppq"]);
     expect(queryKeys.ppq.allBalances()).toEqual(["ppq", "balance"]);
+    expect(queryKeys.ppq.allQueryHistory()).toEqual(["ppq", "query-history"]);
   });
 
   it("scopes PPQ account cache entries by operator", () => {

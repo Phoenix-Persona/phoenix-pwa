@@ -17,6 +17,7 @@ import { UnlockGate } from '@/components/UnlockGate';
 import { InstallBanner } from '@/components/InstallBanner';
 import { DevAutoLogin } from '@/components/DevAutoLogin';
 import { OperatorWalletInit } from '@/components/OperatorWalletInit';
+import { OperatorScopedStateCleanup } from '@/components/OperatorScopedStateCleanup';
 import AppRouter from './AppRouter';
 const head = createHead({
   plugins: [
@@ -56,6 +57,7 @@ export function App() {
           <NostrLoginProvider storageKey='nostr:login'>
             <NostrProvider>
               <DevAutoLogin />
+              <OperatorScopedStateCleanup />
               <OperatorWalletInit />
               <NostrSync />
               <TooltipProvider>

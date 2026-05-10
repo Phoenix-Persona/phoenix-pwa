@@ -10,11 +10,9 @@
  *   2. **Operator envelope** (`useOperatorEnvelope`): the encrypted
  *      kind-30078 backup carrying the operator's persistent PPQ
  *      credentials. Source of truth for production.
- *   3. **localStorage cache** (`ppqAccountStore`): legacy compatibility.
- *      Kept only as a write-through cache after a
- *      current-operator account is created. It is NOT used to resolve
- *      credentials for a different operator because the cache is not
- *      scoped by pubkey.
+ *   3. Missing account: mint a fresh ppq.ai account and publish it into
+ *      the current operator envelope. The legacy global localStorage PPQ
+ *      cache is deliberately not read or written.
  *
  *   const { account, ensureAccount, balance, refreshBalance, signOut } =
  *     usePpqAccount();
@@ -25,8 +23,7 @@
  * `ensureAccount()` is the *only* mutation that creates a new ppq.ai
  * account, and after creating one it *also* writes the resulting
  * credentials into the operator envelope (publishing a kind-30078
- * update) so the operator carries them across devices. The localStorage
- * cache is updated alongside for fast subsequent loads.
+ * update) so the operator carries them across devices.
  */
 
 import { useCallback, useEffect, useMemo } from "react";
@@ -34,7 +31,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { readEnv } from "@/lib/env";
 import { createAccount, getBalance } from "@/lib/ppq/client";
-import { ppqAccountStore } from "@/lib/ppq/storage";
 import type { PpqAccount } from "@/lib/ppq/types";
 import { queryKeys } from "@/lib/queryKeys";
 
@@ -109,20 +105,35 @@ export function usePpqAccount() {
         }
       }
 
-      // Mint a brand-new ppq.ai account, write to both stores.
+      // Mint a brand-new ppq.ai account and write it to the operator envelope.
       const fresh = await createAccount();
-      ppqAccountStore.save(fresh);
+      await operator.ensureWithPpq(fresh);
       qc.setQueryData(accountKey, fresh);
-      await operator.ensureWithPpq(fresh).catch((err) => {
-        // The freshly minted account still unblocks the current request;
-        // log the persistence failure and let a later call retry via the
-        // operator envelope path.
-        console.warn("[usePpqAccount] failed to persist to operator envelope:", err);
-      });
       return fresh;
     },
     onSuccess: (acct) => {
       qc.setQueryData(accountKey, acct);
+      qc.invalidateQueries({ queryKey: queryKeys.ppq.balance(acct.credit_id) });
+    },
+  });
+
+  const rotateAccount = useMutation<PpqAccount, Error, void>({
+    mutationKey: [...accountKey, "rotate"],
+    mutationFn: async () => {
+      const fromEnv = envAccount();
+      if (fromEnv) {
+        throw new Error("PPQ credentials are pinned by environment variables.");
+      }
+
+      const fresh = await createAccount();
+      await operator.ensureWithPpq(fresh);
+      qc.setQueryData(accountKey, fresh);
+      return fresh;
+    },
+    onSuccess: (acct) => {
+      qc.setQueryData(accountKey, acct);
+      qc.removeQueries({ queryKey: queryKeys.ppq.allBalances() });
+      qc.removeQueries({ queryKey: queryKeys.ppq.allQueryHistory() });
       qc.invalidateQueries({ queryKey: queryKeys.ppq.balance(acct.credit_id) });
     },
   });
@@ -144,18 +155,15 @@ export function usePpqAccount() {
   }, [account, qc]);
 
   /**
-   * Forget the local credential cache. The remote ppq.ai account still
-   * exists and the operator envelope copy is untouched; this just
-   * clears localStorage. Use to force a re-load from the operator
-   * envelope, or before signing out of the operator entirely.
+   * Forget in-memory PPQ query state. The remote ppq.ai account still
+   * exists and the operator envelope copy is untouched.
    */
   const signOut = useCallback(() => {
-    ppqAccountStore.clear();
+    qc.removeQueries({ queryKey: queryKeys.ppq.all() });
     qc.setQueryData(
       accountKey,
       envAccount() ?? operator.envelope?.ppq ?? null,
     );
-    qc.removeQueries({ queryKey: queryKeys.ppq.allBalances() });
   }, [accountKey, operator.envelope?.ppq, qc]);
 
   return {
@@ -163,6 +171,9 @@ export function usePpqAccount() {
     ensureAccount: ensureAccount.mutateAsync,
     isEnsuring: ensureAccount.isPending,
     ensureError: ensureAccount.error,
+    rotateAccount: rotateAccount.mutateAsync,
+    isRotating: rotateAccount.isPending,
+    rotateError: rotateAccount.error,
     balance: balance.data,
     isBalanceLoading: balance.isLoading,
     balanceError: balance.error,
@@ -172,9 +183,9 @@ export function usePpqAccount() {
 }
 
 /**
- * Legacy pure helper for code that cannot use React hooks. Prefer
- * `usePpqAccount()` so credentials remain scoped to the current operator.
+ * Pure helper for code that cannot use React hooks. Only env-pinned
+ * credentials are safe to resolve outside the current operator context.
  */
 export function getStoredPpqAccount(): PpqAccount | null {
-  return envAccount() ?? ppqAccountStore.load();
+  return envAccount();
 }
