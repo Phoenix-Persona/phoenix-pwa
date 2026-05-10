@@ -20,8 +20,11 @@
  *     if an envelope is in flight).
  *   - Won't mint if an existing envelope was found.
  *   - Won't mint if env override is already complete.
- *   - Runs once per session; failures clear the guard so subsequent
- *     events (login state change) get a retry.
+ *   - Runs at most once per session per user. On failure we don't
+ *     auto-retry; the user recovers via the manual "Set up wallet"
+ *     CTA in `<AppHeader>`, which calls `mint()` directly and
+ *     bypasses this component's `ran` guard. Login state changes
+ *     reset the guard so a new user (or re-login) gets a fresh shot.
  */
 
 import { useEffect, useRef } from "react";
@@ -39,6 +42,7 @@ function envOverrideComplete(): boolean {
 export function OperatorWalletInit() {
   const { user } = useCurrentUser();
   const operator = useOperatorEnvelope();
+  const { envelope, isLoading, isMinting, mint } = operator;
   const ran = useRef(false);
 
   useEffect(() => {
@@ -46,24 +50,28 @@ export function OperatorWalletInit() {
       ran.current = false;
       return;
     }
-    if (operator.isLoading) return;
-    if (operator.envelope) return;
-    if (operator.isMinting) return;
+    if (isLoading) return;
+    if (envelope) return;
+    if (isMinting) return;
     if (ran.current) return;
     if (envOverrideComplete()) return;
 
     ran.current = true;
-    operator.mint(undefined).catch((err) => {
+    mint(undefined).catch((err) => {
+      // Auto-mint runs at most once per session per user. The error is
+      // surfaced through `useOperatorEnvelope().mintError`; the AppHeader
+      // renders a destructive "Wallet setup failed — retry" CTA the user
+      // can click to invoke `mint()` directly. Resetting `ran.current`
+      // here would hot-loop the effect (deps include `isMinting`, which
+      // flips back to false on rejection).
       console.warn("[OperatorWalletInit] mint failed:", err);
-      // Allow another attempt on next state change (e.g. retry).
-      ran.current = false;
     });
   }, [
     user,
-    operator.isLoading,
-    operator.envelope,
-    operator.isMinting,
-    operator.mint,
+    isLoading,
+    envelope,
+    isMinting,
+    mint,
   ]);
 
   return null;

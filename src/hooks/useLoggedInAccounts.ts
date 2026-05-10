@@ -2,6 +2,7 @@ import { useNostr } from '@nostrify/react';
 import { useNostrLogin } from '@nostrify/react/login';
 import { useQuery } from '@tanstack/react-query';
 import { NSchema as n, NostrEvent, NostrMetadata } from '@nostrify/nostrify';
+import { queryKeys } from '@/lib/queryKeys';
 
 export interface Account {
   id: string;
@@ -15,7 +16,7 @@ export function useLoggedInAccounts() {
   const { logins, setLogin, removeLogin } = useNostrLogin();
 
   const { data: authors = [] } = useQuery({
-    queryKey: ['nostr', 'logins', logins.map((l) => l.id).join(';')],
+    queryKey: queryKeys.nostr.logins(logins.map((l) => l.id).join(';')),
     queryFn: async () => {
       const events = await nostr.query(
         [{ kinds: [0], authors: logins.map((l) => l.pubkey) }],

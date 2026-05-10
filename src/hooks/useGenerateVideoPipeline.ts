@@ -708,13 +708,11 @@ export function useGenerateVideoPipeline(
         vlog("pipeline", "phase → publishing", {
           captionLen: editedCaption.length,
           stitchedUrl,
-          numTags: persona.tags.length,
           numSources: sources?.length ?? 0,
         });
         setPhase({ type: "publishing", stitchedUrl });
         const template = buildPersonaPostTemplate({
           text: editedCaption,
-          tags: persona.tags,
           sources,
           media: { url: stitchedUrl, mimeType: "video/mp4" },
         });

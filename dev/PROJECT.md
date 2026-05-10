@@ -37,10 +37,9 @@ Same product. Two stories.
 ```
 1. Open Zuka → "Create a new persona"
 2. Character-creator wizard, guided by an embedded AI agent:
-   - Interview (values, voice, region, languages, what this persona stands for)
+   - Interview (values, region, what this persona stands for)
    - Generate name + bio + system prompt
    - Generate profile picture (canonical reference image)
-   - Generate voice sample
    - Mint Nostr keypair + Breez Spark Lightning wallet
    - Publish encrypted backup event
 3. Persona dashboard:
@@ -226,7 +225,7 @@ generic Nostr clients without breaking them.
   "display_name": "Imani Uwase",
   "about": "Voice of Rwanda. Press freedom, civil society, the long memory.",
   "picture": "https://blossom.example/<sha256>.png",
-  "lud16": "imani@spark.money",
+  "lud16": "imani@breez.tips",
   "lud06": "lnurl1...",
   "nip05": "imani@example.com",
   "phoenix": {
@@ -280,17 +279,13 @@ Plaintext payload:
     "dTag": "<opaque random uuid; generated once at creation, reused on every update>",
     "name": "Imani Uwase",
     "system_prompt": "...full persona system prompt...",
-    "voice_id": "thalia",
-    "voice_sample_url": "https://blossom.example/<sha256>.mp3",
     "reference_image_url": "https://blossom.example/<sha256>.png",
-    "languages": ["en", "rw"],
-    "tags": ["rwanda", "press-freedom"],
     "created_at": 1715212800
   },
   "wallet": {
     "kind": "spark",
     "seed": "<bip39 mnemonic>",
-    "lightning_address": "imani@spark.money",
+    "lightning_address": "imani@breez.tips",
     "lnurl": "lnurl1..."
   },
   "model_prefs": {
@@ -403,7 +398,7 @@ for how `pi-ai` is configured against it.
 | Persona text styling    | claude-sonnet-4.5 | Raw thought → polished post in persona's voice             |
 | Profile picture         | upload OR `gpt-image-1` | User uploads an image OR generates one during the wizard. The chosen image is saved to Blossom and referenced as the canonical likeness for subsequent post-image generation. |
 | Post images             | gpt-image-1      | Always pass the reference image as input for likeness. ~29 sats per 1024×1024 image at current PPQ pricing. |
-| Voice sample            | (deferred to V2) | TTS deferred — no L402-compatible TTS provider identified, and we don't want to grow the credits surface for voice features V1 isn't shipping. The persona schema fields (`voice_id`, `voice_sample_url`, `model_prefs.tts`) remain optional/null. |
+| Voice sample            | (deferred to V2) | TTS deferred — no L402-compatible TTS provider identified, and we don't want to grow the credits surface for voice features V1 isn't shipping. `model_prefs.tts` remains optional/null. |
 | Post audio              | (deferred to V2) | Same. |
 | Video (V2 stretch)      | TBD              | PPQ exposes `/v1/videos`; model TBD. Pricing decision will revisit L402 vs. credits at that time. |
 
@@ -420,19 +415,17 @@ are persisted in the persona's encrypted kind 30078 event under
 PPQ's `/v1/models` endpoint at runtime so we don't have to hard-code it.
 
 **Agent harness — deferred to V2.** V1 ships a **form-based**
-character-creator wizard. The operator fills in name, region, cause,
-languages, system prompt, and source URLs through ordinary form
-inputs; Zuka calls `pi-ai` for sample-post styling and image
-generation, plus `/v1/audio/speech` directly for the one-shot voice
-sample — but does not run an LLM-driven interview.
+character-creator wizard. The operator fills in name, system prompt,
+and bio through ordinary form inputs; Zuka calls `pi-ai` for
+sample-post styling and image generation but does not run an
+LLM-driven interview.
 
 The agent harness below is the V2 design: `pi-agent-core` would run
 the wizard with a small tool set (`propose_name(name, rationale)`,
 `propose_bio(bio)`, `propose_system_prompt(prompt)`,
-`generate_profile_image(prompt)`, `generate_voice_sample(text, voice_id)`,
-`finalize_persona()`), with `pi-web-ui` rendering the conversation
-surface. See `./docs/pi-mono.md` for the integration shape when
-we revisit.
+`generate_profile_image(prompt)`, `finalize_persona()`), with
+`pi-web-ui` rendering the conversation surface. See `./docs/pi-mono.md`
+for the integration shape when we revisit.
 
 ---
 
@@ -453,7 +446,7 @@ persona's wallet is reconstituted by passing its seed to the SDK's
 
 Each persona surfaces:
 
-- A **Lightning Address** (e.g. `imani@spark.money`) — provided
+- A **Lightning Address** (e.g. `imani@breez.tips`) — provided
   natively by the Spark SDK via Breez's hosted LNURL server. **No
   self-hosted LNURL endpoint required.** Zuka calls
   `sdk.registerLightningAddress({ username, description })` at persona
@@ -584,7 +577,7 @@ constructive, not just resilient.
 
 - *Wallet SDK*: locked to **`@breeztech/breez-sdk-spark`** (Breez SDK
   Spark / Nodeless variant). Lightning Addresses are SDK-native via
-  Breez's hosted `spark.money` LNURL server — no Zuka-hosted
+  Breez's hosted `breez.tips` LNURL server — no Zuka-hosted
   endpoint required.
 - *PPQ payment*: **credits + NWC auto-topup**, uniform across all PPQ
   endpoints. Per-persona `credit_id` funded by NIP-47 NWC auto-topup
@@ -609,9 +602,10 @@ constructive, not just resilient.
 - *Voice generation*: PPQ supports TTS via `/v1/audio/speech` (DeepGram
   Aura 2, ElevenLabs) but only via the credits + bearer flow — there is
   no L402-compatible TTS provider Zuka has identified. **TTS is
-  deferred from V1.** The persona schema retains `voice_id`,
-  `voice_sample_url`, and `model_prefs.tts` as optional/null fields so
-  V2 can populate them without a schema migration.
+  deferred from V1.** `model_prefs.tts` remains optional/null so V2 can
+  populate it without a schema migration. The earlier `voice_id` /
+  `voice_sample_url` persona fields were removed in V1 — V2 can
+  reintroduce them additively when there's a viable provider.
 
 | # | Question                              | Why it matters                                                                      |
 | - | ------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -727,7 +721,7 @@ wallet/agent/Nostr/image-gen seams are where bugs will live.
   reserved for the V2 agent-driven wizard.
 - **Spark / Breez Spark SDK** — `@breeztech/breez-sdk-spark`,
   Breez's wrapping of Lightspark's Spark protocol. Provides per-persona
-  Lightning wallets with a hosted Lightning Address at `spark.money`
+  Lightning wallets with a hosted Lightning Address at `breez.tips`
   (no self-hosted LNURL endpoint).
 - **NIP-44** — Nostr encrypted-payload spec. Used for the persona's
   encrypted backup event.

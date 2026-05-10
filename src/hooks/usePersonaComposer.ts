@@ -78,7 +78,6 @@ export function usePersonaComposer({
 
       const template = buildPersonaPostTemplate({
         text: trimmed,
-        tags: persona.tags,
         sources: parseCommaList(sourcesInput, []),
       });
       const event = await publish.mutateAsync({

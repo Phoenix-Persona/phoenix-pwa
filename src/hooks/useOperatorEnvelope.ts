@@ -38,6 +38,7 @@ import {
   type OperatorPpqAccount,
 } from "@/lib/operator";
 import type { Nip44Signer } from "@/lib/personaCrypto";
+import { publishWithTimeout } from "@/lib/nostrPublish";
 import { generateMnemonic } from "@/lib/wallet/client";
 import {
   DEFAULT_AUTO_TOPUP_CONFIG,
@@ -146,7 +147,7 @@ export function useOperatorEnvelope() {
       encryptedContent: ciphertext,
     });
     const signed = await user.signer.signEvent(template);
-    await nostr.event(signed, { signal: AbortSignal.timeout(8000) });
+    await publishWithTimeout(nostr, signed);
 
     const envelope: OperatorEnvelope = {
       app: PHOENIX_OPERATOR_APP,
@@ -218,6 +219,12 @@ export function useOperatorEnvelope() {
     refetch: query.refetch,
     mint: mintMutation.mutateAsync,
     isMinting: mintMutation.isPending,
+    /**
+     * Last error from a mint attempt (auto or manual). Stays set until
+     * a fresh `mint()` call clears it. Surfaced by `<AppHeader>` so
+     * the user can see when an auto-mint silently failed.
+     */
+    mintError: mintMutation.error ?? undefined,
     update: updateMutation.mutateAsync,
     isUpdating: updateMutation.isPending,
     ensureWithPpq,

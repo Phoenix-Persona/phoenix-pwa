@@ -62,9 +62,6 @@ function makePersona(overrides: Partial<Persona> = {}): Persona {
     display_name: "Voice",
     username: "voice",
     system_prompt: "Speak plainly.",
-    voice_id: "alloy",
-    languages: ["en"],
-    tags: ["rwanda", "press-freedom"],
     created_at: 1,
     ...overrides,
   };
@@ -122,7 +119,7 @@ describe("usePersonaComposer", () => {
     expect(wallet.refreshInfo).toHaveBeenCalledOnce();
   });
 
-  it("publishes text-only posts with topic and source tags", async () => {
+  it("publishes text-only posts with source attribution tags", async () => {
     const onPublished = vi.fn();
     const { result } = renderHook(
       () =>
@@ -147,8 +144,6 @@ describe("usePersonaComposer", () => {
         kind: 1,
         content: "Publish this",
         tags: [
-          ["t", "rwanda"],
-          ["t", "press-freedom"],
           ["r", "https://example.com/a"],
           ["r", "https://example.com/b"],
         ],

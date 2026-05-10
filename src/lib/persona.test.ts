@@ -23,9 +23,6 @@ function makeValidEnvelope(overrides: Partial<PhoenixEnvelope> = {}): PhoenixEnv
       nsec,
       name: "Voice of Test",
       system_prompt: "You are a test persona.",
-      voice_id: "alloy",
-      languages: ["en"],
-      tags: ["press-freedom"],
       created_at: Math.floor(Date.now() / 1000),
     },
   };
@@ -120,15 +117,6 @@ describe("parsePhoenixEnvelope", () => {
       persona: { ...env.persona, nsec: "definitely-not-an-nsec" },
     };
     expect(parsePhoenixEnvelope(JSON.stringify(tampered))).toBeNull();
-  });
-
-  it("rejects an envelope with an empty languages array", () => {
-    const env = makeValidEnvelope();
-    const empty = {
-      ...env,
-      persona: { ...env.persona, languages: [] },
-    };
-    expect(parsePhoenixEnvelope(JSON.stringify(empty))).toBeNull();
   });
 
   it("accepts an envelope with persona.dTag (stable per-persona d-tag)", () => {

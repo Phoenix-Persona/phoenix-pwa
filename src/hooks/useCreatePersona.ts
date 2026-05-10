@@ -21,6 +21,8 @@ import {
   signWithPersona,
 } from "@/lib/personaKey";
 import { buildPersonaProfileMetadata } from "@/lib/personaProfile";
+import { publishWithTimeout } from "@/lib/nostrPublish";
+import { queryKeys } from "@/lib/queryKeys";
 import {
   connectWallet,
   disconnectWallet,
@@ -40,9 +42,6 @@ export interface CreatePersonaInput {
   username: string;
   bio: string;
   systemPrompt: string;
-  tags: string[];
-  languages: string[];
-  voiceId: string;
   pictureUrl?: string;
 }
 
@@ -115,9 +114,6 @@ export function useCreatePersona() {
         username: finalUsername,
         display_name: trimmedName,
         system_prompt: input.systemPrompt,
-        voice_id: input.voiceId,
-        languages: input.languages.length > 0 ? input.languages : ["en"],
-        tags: input.tags,
         reference_image_url: input.pictureUrl || undefined,
         created_at: Math.floor(Date.now() / 1000),
       };
@@ -150,7 +146,7 @@ export function useCreatePersona() {
         encryptedContent: ciphertext,
       });
       const backupEvent = await user.signer.signEvent(personaTemplate);
-      await nostr.event(backupEvent, { signal: AbortSignal.timeout(8000) });
+      await publishWithTimeout(nostr, backupEvent);
 
       const metadata = buildPersonaProfileMetadata({
         name: persona.name,
@@ -169,7 +165,7 @@ export function useCreatePersona() {
         },
         kp,
       );
-      await nostr.event(profileEvent, { signal: AbortSignal.timeout(8000) });
+      await publishWithTimeout(nostr, profileEvent);
 
       const envelope: PhoenixEnvelope = {
         app: PHOENIX_PAYLOAD_APP,
@@ -185,7 +181,7 @@ export function useCreatePersona() {
         npub: kp.npub,
       };
       queryClient.setQueryData(
-        ["phoenix-my-personas", user.pubkey],
+        queryKeys.persona.mine(user.pubkey),
         (old: MyPersonaRecord[] | undefined) => {
           const existing = old ?? [];
           if (existing.some((r) => r.event.id === backupEvent.id)) {
@@ -194,7 +190,18 @@ export function useCreatePersona() {
           return [newRecord, ...existing];
         },
       );
-      queryClient.setQueryData(["nostr", "author", kp.hex.pk], {
+      // Prime the detail cache so an immediate navigate to /dashboard/<npub>
+      // renders without a relay round-trip.
+      queryClient.setQueryData(
+        queryKeys.persona.detail(kp.npub, user.pubkey),
+        { event: backupEvent, envelope, npub: kp.npub },
+      );
+      // Prime the public-profile cache (bio + picture come from kind 0).
+      queryClient.setQueryData(
+        queryKeys.persona.publicProfile(kp.hex.pk),
+        { bio: input.bio, pictureUrl: input.pictureUrl || null },
+      );
+      queryClient.setQueryData(queryKeys.nostr.author(kp.hex.pk), {
         event: profileEvent,
         metadata,
       });

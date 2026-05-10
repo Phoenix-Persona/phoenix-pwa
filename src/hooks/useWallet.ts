@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { runAutoTopupOnce } from "@/lib/wallet/autoTopup";
+import { queryKeys } from "@/lib/queryKeys";
 import {
   connectWallet,
   disconnectWallet,
@@ -44,11 +45,6 @@ import {
 } from "@/lib/wallet/types";
 
 import { usePpqAccount } from "./usePpqAccount";
-
-const WALLET_QK = (walletId: string | undefined) =>
-  ["wallet", "info", walletId ?? "none"] as const;
-const PAYMENTS_QK = (walletId: string | undefined) =>
-  ["wallet", "payments", walletId ?? "none"] as const;
 
 const WALLET_INFO_REFETCH_MS = 15_000;
 
@@ -82,6 +78,7 @@ export interface UseWalletResult {
   /* ----- Spark wallet ----- */
   info: WalletInfo | undefined;
   isInfoLoading: boolean;
+  infoError: Error | undefined;
   refreshInfo: () => void;
   payments: Payment[] | undefined;
   refreshPayments: () => void;
@@ -190,7 +187,7 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
   /* ---------- Wallet info / payments ---------- */
 
   const infoQuery = useQuery({
-    queryKey: WALLET_QK(walletId),
+    queryKey: queryKeys.wallet.detail(walletId),
     enabled: Boolean(handle),
     queryFn: async () => {
       if (!handle) throw new Error("Wallet not connected");
@@ -201,7 +198,7 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
   });
 
   const paymentsQuery = useQuery({
-    queryKey: PAYMENTS_QK(walletId),
+    queryKey: queryKeys.wallet.payments(walletId),
     enabled: Boolean(handle),
     queryFn: async () => {
       if (!handle) throw new Error("Wallet not connected");
@@ -211,10 +208,10 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
   });
 
   const refreshInfo = useCallback(() => {
-    qc.invalidateQueries({ queryKey: WALLET_QK(walletId) });
+    qc.invalidateQueries({ queryKey: queryKeys.wallet.detail(walletId) });
   }, [walletId, qc]);
   const refreshPayments = useCallback(() => {
-    qc.invalidateQueries({ queryKey: PAYMENTS_QK(walletId) });
+    qc.invalidateQueries({ queryKey: queryKeys.wallet.payments(walletId) });
   }, [walletId, qc]);
 
   /* ---------- Receive / send ---------- */
@@ -313,6 +310,7 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
       connectError,
       info: infoQuery.data,
       isInfoLoading: infoQuery.isLoading,
+      infoError: infoQuery.error ?? undefined,
       refreshInfo,
       payments: paymentsQuery.data,
       refreshPayments,
@@ -336,6 +334,7 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
       connectError,
       infoQuery.data,
       infoQuery.isLoading,
+      infoQuery.error,
       refreshInfo,
       paymentsQuery.data,
       refreshPayments,

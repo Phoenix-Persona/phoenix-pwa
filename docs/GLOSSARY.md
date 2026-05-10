@@ -36,7 +36,7 @@
 
 - **Spark / Breez Spark SDK** — `@breeztech/breez-sdk-spark`. Breez's
   wrapping of Lightspark's Spark protocol. Per-persona Lightning
-  wallets, with a hosted Lightning Address at `spark.money` (no
+  wallets, with a hosted Lightning Address at `breez.tips` (no
   self-hosted LNURL endpoint). BIP-39 seed recoverable from the
   encrypted kind 30078 backup. See `../dev/docs/breez-spark.md`.
 

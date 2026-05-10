@@ -1,6 +1,5 @@
 /**
- * Delete a persona — releases the persona's Lightning Address (so the
- * `username@spark.money` slot is freed up), publishes a NIP-09 deletion
+ * Delete a persona — releases the persona's Lightning Address, publishes a NIP-09 deletion
  * request, and overwrites the kind 30078 envelope with a "deleted"
  * sentinel.
  *
@@ -39,19 +38,41 @@ import type { NostrEvent } from "@nostrify/nostrify";
 
 import {
   buildEncryptedPersonaTemplate,
+  type PhoenixEnvelope,
   PHOENIX_PAYLOAD_APP,
   PHOENIX_PAYLOAD_VERSION,
 } from "@/lib/persona";
+import { publishWithTimeout } from "@/lib/nostrPublish";
 import { tryDecryptPhoenixEnvelope } from "@/lib/personaCrypto";
+import { queryKeys } from "@/lib/queryKeys";
 import { connectWallet, disconnectWallet } from "@/lib/wallet/client";
 import { useCurrentUser } from "./useCurrentUser";
 
-interface DeletePersonaArgs {
+export interface DeletePersonaArgs {
   /** The current kind 30078 backup event we're tombstoning. */
   backupEvent: NostrEvent;
   /** The persona's pubkey (hex). Used for the kind 0 deletion lookup. */
   personaPubkey: string;
+  /** Persona npub. Used for exact query-cache eviction. */
+  npub: string;
 }
+
+export type DeletePersonaWarning =
+  | "backup-decrypt"
+  | "lightning-address-release"
+  | "kind0-lookup";
+
+export interface DeletePersonaResult {
+  deletionId: string;
+  tombstoneId: string;
+  warnings: DeletePersonaWarning[];
+}
+
+type MyPersonaRecord = {
+  event: NostrEvent;
+  envelope: PhoenixEnvelope;
+  npub: string;
+};
 
 interface Nip44Signer {
   signEvent: (template: {
@@ -68,12 +89,12 @@ interface Nip44Signer {
 
 /**
  * Best-effort: connect with the persona's seed and release the
- * `username@spark.money` slot so it can be reclaimed by future
+ * Lightning Address slot so it can be reclaimed by future
  * personas (or by other Phoenix users). Swallow all errors — a
  * deletion that misses the LN release is still a successful
  * persona deletion from the operator's POV.
  */
-async function tryReleaseLightningAddress(seed: string): Promise<void> {
+async function tryReleaseLightningAddress(seed: string): Promise<boolean> {
   try {
     const handle = await connectWallet({ mnemonic: seed });
     try {
@@ -81,8 +102,10 @@ async function tryReleaseLightningAddress(seed: string): Promise<void> {
     } finally {
       await disconnectWallet(handle).catch(() => undefined);
     }
+    return true;
   } catch (err) {
     console.warn("[useDeletePersona] LN address release failed:", err);
+    return false;
   }
 }
 
@@ -91,10 +114,11 @@ export function useDeletePersona() {
   const { user } = useCurrentUser();
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async ({ backupEvent, personaPubkey }: DeletePersonaArgs) => {
+  return useMutation<DeletePersonaResult, Error, DeletePersonaArgs>({
+    mutationFn: async ({ backupEvent, personaPubkey, npub }) => {
       if (!user) throw new Error("Sign in required");
       const signer = user.signer as unknown as Nip44Signer;
+      const warnings: DeletePersonaWarning[] = [];
 
       // Find the d-tag we need to reuse so the addressable replacement
       // actually replaces (not appends).
@@ -117,9 +141,11 @@ export function useDeletePersona() {
         );
         const seed = envelope?.wallet?.seed;
         if (seed) {
-          await tryReleaseLightningAddress(seed);
+          const released = await tryReleaseLightningAddress(seed);
+          if (!released) warnings.push("lightning-address-release");
         }
       } catch (err) {
+        warnings.push("backup-decrypt");
         console.warn(
           "[useDeletePersona] could not decrypt backup to release LN address:",
           err,
@@ -138,6 +164,7 @@ export function useDeletePersona() {
         );
         kind0Id = profiles[0]?.id ?? null;
       } catch {
+        warnings.push("kind0-lookup");
         // Swallow — kind 0 deletion is best-effort.
       }
 
@@ -156,9 +183,7 @@ export function useDeletePersona() {
         content: "Persona deleted by operator",
       };
       const deletionSigned = await signer.signEvent(deletionTemplate);
-      await nostr.event(deletionSigned, {
-        signal: AbortSignal.timeout(8000),
-      });
+      await publishWithTimeout(nostr, deletionSigned);
 
       // 2. Tombstone the addressable kind 30078 — overwrite with a
       //    sentinel that fails the PhoenixEnvelope shape check, so
@@ -178,15 +203,29 @@ export function useDeletePersona() {
         now
       );
       const tombstoneSigned = await signer.signEvent(tombstoneTemplate);
-      await nostr.event(tombstoneSigned, {
-        signal: AbortSignal.timeout(8000),
-      });
+      await publishWithTimeout(nostr, tombstoneSigned);
 
-      return { deletionId: deletionSigned.id, tombstoneId: tombstoneSigned.id };
+      queryClient.setQueryData(
+        queryKeys.persona.mine(user.pubkey),
+        (old: MyPersonaRecord[] | undefined) =>
+          (old ?? []).filter(
+            (record) => record.envelope.persona.pubkey !== personaPubkey,
+          ),
+      );
+      queryClient.setQueryData(
+        queryKeys.persona.detail(npub, user.pubkey),
+        null,
+      );
+
+      return {
+        deletionId: deletionSigned.id,
+        tombstoneId: tombstoneSigned.id,
+        warnings,
+      };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["phoenix-my-personas"] });
-      queryClient.invalidateQueries({ queryKey: ["phoenix-persona"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.persona.allMine() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.persona.allDetails() });
     },
   });
 }

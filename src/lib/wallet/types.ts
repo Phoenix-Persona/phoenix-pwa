@@ -52,7 +52,7 @@ export interface WalletInfo {
   /** Spendable balance in satoshis. */
   balanceSats: number;
   /**
-   * The wallet's Lightning Address (e.g. `imani@spark.money`), if the SDK
+   * The wallet's Lightning Address (e.g. `imani@breez.tips`), if the SDK
    * has one assigned. Used as the persona's public donate destination.
    */
   lightningAddress?: string;

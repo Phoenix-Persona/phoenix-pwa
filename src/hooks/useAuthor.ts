@@ -1,12 +1,13 @@
 import { type NostrEvent, type NostrMetadata, NSchema as n } from '@nostrify/nostrify';
 import { useNostr } from '@nostrify/react';
 import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 
 export function useAuthor(pubkey: string | undefined) {
   const { nostr } = useNostr();
 
   return useQuery<{ event?: NostrEvent; metadata?: NostrMetadata }>({
-    queryKey: ['nostr', 'author', pubkey ?? ''],
+    queryKey: queryKeys.nostr.author(pubkey),
     queryFn: async () => {
       if (!pubkey) {
         return {};

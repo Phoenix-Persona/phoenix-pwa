@@ -52,10 +52,10 @@ shim, no LNURL infra to maintain.
 const username = pickPersonaUsername(); // e.g. "imani"
 const description = `Donations to ${persona.name}`;
 const addressInfo = await sdk.registerLightningAddress({ username, description });
-// addressInfo.lightning_address === "imani@spark.money"
+// addressInfo.lightning_address === "imani@breez.tips"
 ```
 
-The default domain is `spark.money` (Breez's hosted LNURL server).
+The default domain is `breez.tips` (Breez's hosted LNURL server).
 Custom domains are also supported but Zuka V1 uses the default.
 
 **Limitation:** *"Each user can have only one Lightning address per
@@ -112,7 +112,7 @@ From `src/lib/wallet/types.ts`:
 ```typescript
 interface WalletInfo {
   balanceSats: number;
-  lightningAddress?: string;  // e.g. "imani@spark.money"
+  lightningAddress?: string;  // e.g. "imani@breez.tips"
   lnurlPay?: string;          // static LNURL-pay string
   raw: GetInfoResponse;       // SDK-native payload preserved
 }

@@ -2,7 +2,7 @@
  * Live availability check for a Spark Lightning Address username.
  *
  * Debounces input changes, probes the LUD-16 endpoint at
- * `spark.money/.well-known/lnurlp/<user>` (200 = taken, 404 = free),
+ * `breez.tips/.well-known/lnurlp/<user>` (200 = taken, 404 = free),
  * and returns a status the form can render inline. SDK-free — this is
  * a UX hint; the authoritative check + claim happens during the actual
  * mint via the SDK's `checkLightningAddressAvailable` + register flow.

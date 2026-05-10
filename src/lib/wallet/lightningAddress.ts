@@ -52,6 +52,13 @@ const SPARK_LUD16_HOST = `https://${SPARK_LN_DOMAIN}`;
 
 export type AvailabilityStatus = "available" | "taken" | "error";
 
+export class LightningUsernameTakenError extends Error {
+  constructor(public readonly username: string) {
+    super(`Username \`${username}\` is taken — pick another.`);
+    this.name = "LightningUsernameTakenError";
+  }
+}
+
 /**
  * Probe a username via the LUD-16 well-known endpoint. Cheap and
  * SDK-free — used for live UX feedback in the username form input.
@@ -98,6 +105,8 @@ export interface RegisterLightningAddressOptions {
   maxRetries?: number;
   /** Fallback base username if `baseUsername` is empty/invalid. Defaults to "user". */
   fallbackBase?: string;
+  /** When true, do not suffix on collision; fail so deliberate renames are explicit. */
+  noSuffixOnCollision?: boolean;
 }
 
 export interface ResolvedLightningAddress {
@@ -142,6 +151,9 @@ export async function registerLightningAddressWithRetry(
     }
 
     if (!available) {
+      if (opts.noSuffixOnCollision) {
+        throw new LightningUsernameTakenError(candidate);
+      }
       candidate = `${base}-${randomUsernameSuffix()}`;
       continue;
     }
@@ -159,6 +171,9 @@ export async function registerLightningAddressWithRetry(
         lnurl: info.lnurl?.bech32,
       };
     } catch (err) {
+      if (opts.noSuffixOnCollision) {
+        throw new LightningUsernameTakenError(candidate);
+      }
       // Race condition: probe said available, register collided. Retry.
       lastError = err;
       candidate = `${base}-${randomUsernameSuffix()}`;

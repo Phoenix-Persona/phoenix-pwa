@@ -541,7 +541,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
         const metadata: Record<string, string> = {};
         if (profileData.name) metadata.name = profileData.name;
         if (profileData.about) metadata.about = profileData.about;
-        if (profileData.picture) metadata.picture = profileData.picture;
+        if (profileData.picture) metadata["picture"] = profileData.picture;
         await publishEvent({ kind: 0, content: JSON.stringify(metadata) });
       }
     } catch {

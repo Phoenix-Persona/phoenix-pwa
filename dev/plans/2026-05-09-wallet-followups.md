@@ -1,5 +1,30 @@
 # Wallet UI + Lightning Address — follow-up plan (2026-05-09)
 
+> **Status: SHIPPED on `fix/ui-polish`** (2026-05-10)
+>
+> All five tasks landed across the `fix/refactor` merge (commit `68d8cdc`)
+> and post-merge audit fixes (commit `bd6d542`):
+>
+> - **Task 1** — `useUpdatePersona` / `useCreatePersona` audited against
+>   the 8-item LN-flow checklist; both pass. Bonus fix: `useCreatePersona`
+>   was missing `setQueryData` for the `persona.detail` and
+>   `persona.publicProfile` caches so an immediate navigate to
+>   `/dashboard/<npub>` round-tripped the relay; both calls added.
+> - **Task 2** — `noSuffixOnCollision` flag + `LightningUsernameTakenError`
+>   class shipped via `fix/refactor`; `useUpdatePersona` passes
+>   `noSuffixOnCollision: true` on rename and re-throws the typed error
+>   as a user-friendly message; `EditPersona` taken-hint copy updated.
+> - **Task 3** — Dashboard nudge for missing donate handle shipped via
+>   `fix/refactor` (already integrated into the persona header flow).
+> - **Task 4** — `src/lib/wallet/lightningAddress.test.ts` (140 lines)
+>   shipped via `fix/refactor` with full coverage of `slugifyForUsername`,
+>   `isValidLightningUsername`, `randomUsernameSuffix`, and
+>   `probeLightningUsernameAvailability`.
+> - **Task 5** — Doc sweep complete; `grep -rln "spark\.money" docs/ dev/
+>   AGENTS.md README.md` returns zero hits.
+>
+> Verification: `npm test` green at 116/116 on the merged tree.
+
 Scope: hard-cut tasks left after the `fix/ui-polish` branch's wallet-UI
 polish + Lightning Address registration work landed (commit `3dc4287` plus
 the LN-domain fix and WalletPanel/EditPersona consolidation that followed).
@@ -192,7 +217,7 @@ hyphens, length truncation).
 
 **Why:** The source code now uses `SPARK_LN_DOMAIN = "breez.tips"`
 consistently, but `docs/guides/breez-spark.md` and other docs still
-reference the old `spark.money` domain. The docs are read by future
+reference the old `breez.tips` domain. The docs are read by future
 agents/contributors as design references — leaving the wrong domain
 will produce more code that probes the wrong endpoint.
 
@@ -211,7 +236,7 @@ Expected matches (as of the audit on this branch):
 
 **Replacements:**
 
-- `spark.money` → `breez.tips` in prose and example addresses.
+- `breez.tips` → `breez.tips` in prose and example addresses.
 - Add a parenthetical: "(default Breez LNURL host; the SDK's
   `getLightningAddress()` returns whatever Spark assigns)".
 - In `breez-spark.md`, add a note: "The default domain is configurable

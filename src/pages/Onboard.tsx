@@ -43,7 +43,6 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useCreatePersona } from "@/hooks/useCreatePersona";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 
-import { parseCommaList } from "@/lib/text";
 import {
   slugifyForUsername,
   isValidLightningUsername,
@@ -74,9 +73,6 @@ const Onboard = () => {
   const [systemPrompt, setSystemPrompt] = useState(
     "You are an AI-assisted activist voice. Write with precision. Avoid sensationalism. Ground every claim in cited sources. Speak truth without dehumanizing anyone."
   );
-  const [tagsInput, setTagsInput] = useState("rwanda, press-freedom");
-  const [languagesInput, setLanguagesInput] = useState("en, rw");
-  const [voiceId, setVoiceId] = useState("alloy");
 
   // Picture
   const [pictureUrl, setPictureUrl] = useState("");
@@ -141,9 +137,6 @@ const Onboard = () => {
         username,
         bio,
         systemPrompt,
-        voiceId,
-        languages: parseCommaList(languagesInput, ["en"]),
-        tags: parseCommaList(tagsInput, []),
         pictureUrl: pictureUrl || undefined,
       });
 
@@ -335,48 +328,6 @@ const Onboard = () => {
                       onChange={(e) => setSystemPrompt(e.target.value)}
                       className="bg-background/60"
                     />
-                  </div>
-
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="persona-tags">
-                        Topical tags (comma separated)
-                      </Label>
-                      <Input
-                        id="persona-tags"
-                        value={tagsInput}
-                        onChange={(e) => setTagsInput(e.target.value)}
-                        placeholder="rwanda, press-freedom"
-                        className="bg-background/60"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="persona-languages">
-                        Languages (comma separated)
-                      </Label>
-                      <Input
-                        id="persona-languages"
-                        value={languagesInput}
-                        onChange={(e) => setLanguagesInput(e.target.value)}
-                        placeholder="en, rw"
-                        className="bg-background/60"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="persona-voice">Voice</Label>
-                    <Input
-                      id="persona-voice"
-                      value={voiceId}
-                      onChange={(e) => setVoiceId(e.target.value)}
-                      placeholder="alloy"
-                      className="bg-background/60"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Voice id used when the persona generates audio. The
-                      default works fine if you're not sure.
-                    </p>
                   </div>
 
                   <div className="flex justify-end pt-2">

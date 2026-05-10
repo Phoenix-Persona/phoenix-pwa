@@ -7,22 +7,21 @@
  */
 
 import { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
-import { FileText, Film, Loader2, Sparkles, Wand2 } from "lucide-react";
+import { X } from "lucide-react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
 import { PersonaActionsMenu } from "@/components/PersonaActionsMenu";
+import { DashboardComposerCard } from "@/components/persona/DashboardComposerCard";
 import { PostCard } from "@/components/PostCard";
 import { PostListSkeleton } from "@/components/Skeletons";
 import { VideoComposerDialog } from "@/components/VideoComposerDialog";
 import { WalletBadge } from "@/components/wallet/WalletBadge";
 import { WalletDialog } from "@/components/wallet/WalletDialog";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { impactLight, notificationError, notificationSuccess } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
 import { useAuthor } from "@/hooks/useAuthor";
@@ -32,6 +31,7 @@ import { usePersona, usePersonaPosts } from "@/hooks/usePersona";
 import { useWallet } from "@/hooks/useWallet";
 import { featureFlags } from "@/lib/features";
 import { npubToHex } from "@/lib/nostrIds";
+import { sanitizeHttpUrl } from "@/lib/url";
 
 const Dashboard = () => {
   const { npub = "" } = useParams();
@@ -55,7 +55,7 @@ const Dashboard = () => {
   const personaHex = useMemo(() => npubToHex(npub), [npub]);
   const author = useAuthor(personaHex ?? undefined);
   const publicBio = author.data?.metadata?.about ?? "";
-  const picture = author.data?.metadata?.picture;
+  const picture = sanitizeHttpUrl(author.data?.metadata?.picture);
 
   const [raw, setRaw] = useState("");
   // Open state for the video composer modal. Mounted alongside the
@@ -63,6 +63,14 @@ const Dashboard = () => {
   // hints when launched.
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
+  const missingDonateDismissKey = `zuka:missing-ln-address:${npub}`;
+  const [dismissedDonateKeys, setDismissedDonateKeys] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const donateNudgeDismissed =
+    dismissedDonateKeys.has(missingDonateDismissKey) ||
+    (typeof window !== "undefined" &&
+      window.sessionStorage.getItem(missingDonateDismissKey) === "1");
 
   const envelope = persona.data?.envelope ?? null;
   const personaConfig = envelope?.persona ?? null;
@@ -78,6 +86,12 @@ const Dashboard = () => {
     walletId: personaConfig ? `persona:${personaConfig.pubkey}` : undefined,
     mnemonic: walletSeed,
   });
+  const showDonateHandleNudge =
+    Boolean(personaConfig && walletSeed) &&
+    !wallet.isInfoLoading &&
+    !wallet.info?.lightningAddress &&
+    !donateNudgeDismissed;
+
   const composer = usePersonaComposer({
     persona: personaConfig,
     stylingModel,
@@ -217,24 +231,12 @@ const Dashboard = () => {
                       {publicBio}
                     </p>
                   )}
-                  {personaConfig.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-1 items-center">
-                      {personaConfig.tags.slice(0, 4).map((t) => (
-                        <Badge
-                          key={t}
-                          variant="secondary"
-                          className="text-[10px] bg-imigongo-cream/15 text-imigongo-cream border-0"
-                        >
-                          {t}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
                   <div className="flex items-center gap-2 pt-2">
                     {walletSeed ? (
                       <WalletBadge
                         wallet={wallet}
                         onClick={() => setWalletOpen(true)}
+                        inverse
                       />
                     ) : null}
                     <PersonaActionsMenu
@@ -291,249 +293,67 @@ const Dashboard = () => {
             </Card>
           ) : null}
 
-          {personaConfig && (
-            <Card className="border-imigongo-clay/20 bg-gradient-to-br from-card via-card to-rw-gold-soft/10 overflow-hidden">
-              <div className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center gap-2">
-                <Film className="size-5 text-imigongo-clay" aria-hidden="true" />
-                <div className="flex-1 min-w-0">
-                  <h2 className="font-display text-2xl font-medium tracking-tight">
-                    Compose a video
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    Idea + sources + hints feed the AI prompt that
-                    generates the persona's video. Text-only posting
-                    is available as a fallback.
-                  </p>
-                </div>
-              </div>
-              <CardContent className="space-y-5 pt-5">
-                {/* Idea — drives both the video script and the text fallback */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label
-                      htmlFor="composer-raw"
-                      className="text-sm font-medium"
+          {showDonateHandleNudge ? (
+            <Card className="border-rw-sky/30 bg-rw-sky/5">
+              <CardContent className="py-4 px-6">
+                <div className="flex items-start justify-between gap-4">
+                  <p className="text-sm text-foreground">
+                    No public donate handle yet —{" "}
+                    <Link
+                      to={`/dashboard/${npub}/edit`}
+                      className="font-medium text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary"
                     >
-                      Idea
-                    </label>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {raw.length} chars
-                    </span>
-                  </div>
-                  <Textarea
-                    id="composer-raw"
-                    rows={5}
-                    value={raw}
-                    onChange={(e) => setRaw(e.target.value)}
-                    placeholder="What does the persona need to say? Drop the rawest version of your brief — Zuka turns it into a video script in the persona's voice."
-                    onKeyDown={(e) => {
-                      if (
-                        (e.metaKey || e.ctrlKey) &&
-                        e.key === "Enter" &&
-                        raw.trim() &&
-                        !composer.isPublishing
-                      ) {
-                        e.preventDefault();
-                        onPost();
-                      }
+                      claim a username on Edit persona
+                    </Link>{" "}
+                    to enable zaps.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="-my-2 -mr-2 size-8 shrink-0"
+                    aria-label="Dismiss donate handle notice"
+                    onClick={() => {
+                      window.sessionStorage.setItem(
+                        missingDonateDismissKey,
+                        "1",
+                      );
+                      setDismissedDonateKeys((prev) => {
+                        const next = new Set(prev);
+                        next.add(missingDonateDismissKey);
+                        return next;
+                      });
                     }}
-                    className="resize-y min-h-[8rem] bg-background/60"
-                  />
-                </div>
-
-                {/* Sources + style hints — feed the AI prompt */}
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="composer-sources"
-                      className="text-sm font-medium"
-                    >
-                      Sources{" "}
-                      <span className="text-xs font-normal text-muted-foreground">
-                        (optional)
-                      </span>
-                    </label>
-                    <Textarea
-                      id="composer-sources"
-                      rows={2}
-                      value={sourcesInput}
-                      onChange={(e) => setSourcesInput(e.target.value)}
-                      placeholder="https://hrw.org/..., https://cpj.org/..."
-                      className="text-sm bg-background/60 resize-none"
-                    />
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Comma-separated URLs. Grounds the video script
-                      and rides the published post as{" "}
-                      <code className="font-mono">r</code> tags for
-                      attribution.
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="composer-hints"
-                      className="text-sm font-medium"
-                    >
-                      Style hints{" "}
-                      <span className="text-xs font-normal text-muted-foreground">
-                        (optional)
-                      </span>
-                    </label>
-                    <Textarea
-                      id="composer-hints"
-                      rows={2}
-                      value={hintsInput}
-                      onChange={(e) => setHintsInput(e.target.value)}
-                      placeholder="measured, first-person, vertical 9:16"
-                      className="text-sm bg-background/60 resize-none"
-                    />
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Tone, framing, length. Steers the AI prompt for
-                      both video script and visual direction.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Cross-post indicator (read-only) */}
-                {crossPostEnabled && personaConfig.cross_post?.webhook_url && (
-                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-rw-sky/25 bg-rw-sky/5 px-4 py-2.5 text-xs">
-                    <span className="font-medium text-foreground">
-                      Cross-post:
-                    </span>
-                    <span className="text-muted-foreground">
-                      Will dispatch to your webhook
-                    </span>
-                    {(personaConfig.cross_post.webhook_platforms ?? [])
-                      .length > 0 && (
-                      <>
-                        <span className="text-muted-foreground">·</span>
-                        <div className="flex flex-wrap gap-1">
-                          {(
-                            personaConfig.cross_post.webhook_platforms ?? []
-                          ).map((p) => (
-                            <Badge
-                              key={p}
-                              variant="secondary"
-                              className="text-[10px] bg-rw-sky/10 text-rw-sky border border-rw-sky/20"
-                            >
-                              {p}
-                            </Badge>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {/* Action row — primary 'Generate video', secondary
-                    'Publish text-only' fallback that ships the kind 1
-                    immediately. "Style in voice" rewrites the idea text
-                    using the persona's system prompt before publish. */}
-                <div className="space-y-3 pt-1">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setRaw("");
-                        setSourcesInput("");
-                        setHintsInput("");
-                      }}
-                      disabled={
-                        composer.isPublishing || composer.isStyling
-                      }
-                    >
-                      Discard
-                    </Button>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={onStyle}
-                        disabled={
-                          composer.isStyling ||
-                          composer.isPublishing ||
-                          !raw.trim() ||
-                          !walletSeed
-                        }
-                        title={
-                          !walletSeed
-                            ? "Mint a new persona to enable AI styling"
-                            : "Rewrite the idea in the persona's voice (PPQ chat)"
-                        }
-                      >
-                        {composer.isStyling ? (
-                          <>
-                            <Loader2
-                              className="mr-2 size-4 animate-spin"
-                              aria-hidden="true"
-                            />
-                            Styling…
-                          </>
-                        ) : (
-                          <>
-                            <Wand2
-                              className="mr-2 size-4"
-                              aria-hidden="true"
-                            />
-                            Style in voice
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={onPost}
-                        disabled={
-                          composer.isPublishing ||
-                          composer.isStyling ||
-                          !raw.trim()
-                        }
-                        title="Publish a text-only kind 1 note (no video)"
-                      >
-                        {composer.isPublishing ? (
-                          <>
-                            <Loader2
-                              className="mr-2 size-4 animate-spin"
-                              aria-hidden="true"
-                            />
-                            Publishing…
-                          </>
-                        ) : (
-                          <>
-                            <FileText
-                              className="mr-2 size-4"
-                              aria-hidden="true"
-                            />
-                            Publish text-only
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        onClick={() => setVideoDialogOpen(true)}
-                        disabled={
-                          !raw.trim() ||
-                          composer.isPublishing ||
-                          composer.isStyling
-                        }
-                        className="shadow-lg shadow-primary/20"
-                        title="Open the video composer (Seedance i2v chain → stitched MP4 → kind 1)"
-                      >
-                        <Sparkles
-                          className="mr-2 size-4"
-                          aria-hidden="true"
-                        />
-                        Generate video
-                      </Button>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground text-right">
-                    <span className="opacity-80">
-                      Video runs four+ Seedance clips back-to-back,
-                      stitches them with ffmpeg.wasm, uploads the
-                      result to Blossom, and lets you edit the caption
-                      before posting.
-                    </span>
-                  </p>
+                  >
+                    <X className="size-4" aria-hidden="true" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
+          ) : null}
+
+          {personaConfig && (
+            <DashboardComposerCard
+              raw={raw}
+              sourcesInput={sourcesInput}
+              hintsInput={hintsInput}
+              crossPostEnabled={crossPostEnabled}
+              crossPost={personaConfig.cross_post}
+              walletSeed={walletSeed}
+              isPublishing={composer.isPublishing}
+              isStyling={composer.isStyling}
+              onRawChange={setRaw}
+              onSourcesInputChange={setSourcesInput}
+              onHintsInputChange={setHintsInput}
+              onDiscard={() => {
+                setRaw("");
+                setSourcesInput("");
+                setHintsInput("");
+              }}
+              onStyle={onStyle}
+              onPost={onPost}
+              onOpenVideo={() => setVideoDialogOpen(true)}
+            />
           )}
 
           {/* Recent posts */}
@@ -582,7 +402,7 @@ const Dashboard = () => {
           idea={raw}
           sourcesInput={sourcesInput}
           hintsInput={hintsInput}
-          personaAvatarUrl={picture}
+          personaAvatarUrl={picture ?? undefined}
           onPublished={() => {
             posts.refetch();
             setRaw("");

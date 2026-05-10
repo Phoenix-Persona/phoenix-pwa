@@ -14,9 +14,16 @@ import {
   encryptPhoenixEnvelope,
   type Nip44Signer,
 } from "@/lib/personaCrypto";
+import { publishWithTimeout, tryPublishWithTimeout } from "@/lib/nostrPublish";
 import { buildPersonaProfileMetadata } from "@/lib/personaProfile";
+import { safePersonaPictureUrl } from "@/lib/personaView";
+import { queryKeys } from "@/lib/queryKeys";
 import { connectWallet, disconnectWallet } from "@/lib/wallet/client";
-import { registerLightningAddressWithRetry } from "@/lib/wallet/lightningAddress";
+import {
+  LightningUsernameTakenError,
+  registerLightningAddressWithRetry,
+  SPARK_LN_DOMAIN,
+} from "@/lib/wallet/lightningAddress";
 
 import { useCurrentUser } from "./useCurrentUser";
 
@@ -27,9 +34,6 @@ export interface UpdatePersonaInput {
   name: string;
   username: string;
   systemPrompt: string;
-  voiceId: string;
-  languages: string[];
-  tags: string[];
   bio: string;
   originalBio: string;
   bioHydrated: boolean;
@@ -43,7 +47,14 @@ export interface UpdatePersonaResult {
   updated: Persona;
   backupEvent: NostrEvent;
   profileEvent?: NostrEvent;
+  profileWarning?: string;
 }
+
+type MyPersonaRecord = {
+  event: NostrEvent;
+  envelope: PhoenixEnvelope;
+  npub: string;
+};
 
 export function useUpdatePersona() {
   const { nostr } = useNostr();
@@ -69,14 +80,25 @@ export function useUpdatePersona() {
       if (usernameChanged && seed) {
         const handle = await connectWallet({ mnemonic: seed });
         try {
-          const ln = await registerLightningAddressWithRetry(handle, {
-            baseUsername: input.username,
-            description: `Donations to ${input.name.trim() || original.name}`,
-            fallbackBase: "persona",
-          });
-          registeredAddress = ln.lightningAddress;
-          registeredLnurl = ln.lnurl;
-          resolvedUsername = ln.username;
+          try {
+            const ln = await registerLightningAddressWithRetry(handle, {
+              baseUsername: input.username,
+              description: `Donations to ${input.name.trim() || original.name}`,
+              fallbackBase: "persona",
+              noSuffixOnCollision: true,
+            });
+            registeredAddress = ln.lightningAddress;
+            registeredLnurl = ln.lnurl;
+            resolvedUsername = ln.username;
+          } catch (err) {
+            if (err instanceof LightningUsernameTakenError) {
+              throw new Error(
+                `${input.username}@${SPARK_LN_DOMAIN} is already taken. Pick a different username before saving.`,
+                { cause: err },
+              );
+            }
+            throw err;
+          }
         } finally {
           await disconnectWallet(handle).catch(() => undefined);
         }
@@ -90,10 +112,6 @@ export function useUpdatePersona() {
         display_name: trimmedName,
         username: resolvedUsername,
         system_prompt: input.systemPrompt,
-        voice_id: input.voiceId.trim() || original.voice_id,
-        languages:
-          input.languages.length > 0 ? input.languages : original.languages,
-        tags: input.tags,
         reference_image_url: input.pictureUrl || undefined,
         cross_post: input.crossPost,
       };
@@ -111,13 +129,16 @@ export function useUpdatePersona() {
         : undefined;
 
       const signer = user.signer as unknown as Nip44Signer;
+      const nextEnvelope: PhoenixEnvelope = {
+        app: envelope.app,
+        version: envelope.version,
+        persona: updated,
+        wallet: updatedWallet,
+        model_prefs: envelope.model_prefs,
+        settings: envelope.settings,
+      };
       const ciphertext = await encryptPhoenixEnvelope(
-        {
-          persona: updated,
-          wallet: updatedWallet,
-          model_prefs: envelope.model_prefs,
-          settings: envelope.settings,
-        },
+        nextEnvelope,
         user.pubkey,
         signer,
       );
@@ -127,7 +148,7 @@ export function useUpdatePersona() {
         encryptedContent: ciphertext,
       });
       const signed = await user.signer.signEvent(template);
-      await nostr.event(signed, { signal: AbortSignal.timeout(8000) });
+      await publishWithTimeout(nostr, signed);
 
       const displayNameChanged = updated.name !== original.name;
       const bioChanged = input.bioHydrated && input.bio !== input.originalBio;
@@ -135,6 +156,7 @@ export function useUpdatePersona() {
         input.pictureHydrated && input.pictureUrl !== input.originalPicture;
       const lud16Changed = registeredAddress !== undefined;
       let profileEvent: NostrEvent | undefined;
+      let profileWarning: string | undefined;
       if (
         displayNameChanged ||
         bioChanged ||
@@ -164,25 +186,84 @@ export function useUpdatePersona() {
             },
             decoded.data,
           );
-          await nostr.event(profileEvent, {
-            signal: AbortSignal.timeout(8000),
-          });
+          const publishAttempt = await tryPublishWithTimeout(
+            nostr,
+            profileEvent,
+            "persona-profile-publish",
+          );
+          if (!publishAttempt.ok) {
+            profileWarning = publishAttempt.error.message;
+            console.warn(
+              "Failed to update persona profile:",
+              publishAttempt.error,
+            );
+          }
         } catch (error) {
           // The encrypted persona backup is the source of truth for this edit.
           // Keep public kind-0 refresh best-effort so a profile relay failure
           // does not make a successful backup save look like a failed edit.
+          profileWarning =
+            error instanceof Error
+              ? error.message
+              : "Unknown profile publish error";
           console.warn("Failed to update persona profile:", error);
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ["phoenix-persona"] });
-      queryClient.invalidateQueries({ queryKey: ["phoenix-my-personas"] });
-      queryClient.invalidateQueries({ queryKey: ["nostr", "author"] });
-      queryClient.invalidateQueries({
-        queryKey: ["persona-public-profile"],
-      });
+      const updatedRecord: MyPersonaRecord = {
+        event: signed,
+        envelope: nextEnvelope,
+        npub: input.npub,
+      };
+      queryClient.setQueryData(
+        queryKeys.persona.detail(input.npub, user.pubkey),
+        updatedRecord,
+      );
+      queryClient.setQueryData(
+        queryKeys.persona.mine(user.pubkey),
+        (old: MyPersonaRecord[] | undefined) =>
+          (old ?? []).map((record) =>
+            record.envelope.persona.pubkey === updated.pubkey
+              ? updatedRecord
+              : record,
+          ),
+      );
+      if (profileEvent && !profileWarning) {
+        const metadata = buildPersonaProfileMetadata({
+          name: updated.name,
+          username: updated.username,
+          displayName: updated.display_name ?? updated.name,
+          bio: input.bio,
+          pictureUrl: input.pictureUrl || undefined,
+          lightningAddress:
+            registeredAddress ?? updatedWallet?.lightning_address,
+        });
+        queryClient.setQueryData(queryKeys.nostr.author(updated.pubkey), {
+          event: profileEvent,
+          metadata,
+        });
+        queryClient.setQueryData(queryKeys.persona.publicProfile(updated.pubkey), {
+          bio: input.bio,
+          pictureUrl: safePersonaPictureUrl(input.pictureUrl),
+        });
+      } else if (
+        displayNameChanged ||
+        bioChanged ||
+        pictureChanged ||
+        usernameChanged ||
+        lud16Changed
+      ) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.nostr.author(updated.pubkey),
+        });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.persona.publicProfile(updated.pubkey),
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.persona.allDetails() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.persona.allMine() });
 
-      return { updated, backupEvent: signed, profileEvent };
+      return { updated, backupEvent: signed, profileEvent, profileWarning };
     },
   });
 }

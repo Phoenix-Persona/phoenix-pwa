@@ -5,6 +5,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useAppContext } from '@/hooks/useAppContext';
 import { APP_RELAYS } from '@/lib/appRelays';
 import { APP_BLOSSOM_SERVERS, parseBlossomServerList } from '@/lib/appBlossom';
+import { queryKeys } from '@/lib/queryKeys';
 
 /**
  * Drop every cache that depends on the user-pubkey filter or on which
@@ -14,10 +15,10 @@ import { APP_BLOSSOM_SERVERS, parseBlossomServerList } from '@/lib/appBlossom';
  * correct sources).
  */
 function invalidateUserDependentCaches(queryClient: QueryClient) {
-  queryClient.invalidateQueries({ queryKey: ['phoenix-my-personas'] });
-  queryClient.invalidateQueries({ queryKey: ['phoenix-persona'] });
-  queryClient.invalidateQueries({ queryKey: ['phoenix-persona-posts'] });
-  queryClient.invalidateQueries({ queryKey: ['nostr', 'author'] });
+  queryClient.invalidateQueries({ queryKey: queryKeys.persona.allMine() });
+  queryClient.invalidateQueries({ queryKey: queryKeys.persona.allDetails() });
+  queryClient.invalidateQueries({ queryKey: queryKeys.persona.allPosts() });
+  queryClient.invalidateQueries({ queryKey: queryKeys.nostr.authors() });
 }
 
 /**
@@ -142,7 +143,7 @@ export function NostrSync() {
         // useAuthor pulls kind 0 metadata which uses Blossom-hosted
         // pictures; refresh it so any per-user picture caching aligns
         // with the new server list.
-        queryClient.invalidateQueries({ queryKey: ['nostr', 'author'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nostr.authors() });
       } catch (error) {
         console.error('Failed to sync Blossom servers from Nostr:', error);
       }

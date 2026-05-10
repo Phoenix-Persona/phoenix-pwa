@@ -39,6 +39,7 @@ import {
   type Nip44Signer,
 } from "@/lib/personaCrypto";
 import { npubToHex } from "@/lib/nostrIds";
+import { queryKeys } from "@/lib/queryKeys";
 import { useCurrentUser } from "./useCurrentUser";
 
 // Module-level cache. Lives for the duration of the page session.
@@ -75,7 +76,7 @@ export function usePersona(npub: string | undefined) {
   const { user } = useCurrentUser();
 
   return useQuery({
-    queryKey: ["phoenix-persona", npub, user?.pubkey],
+    queryKey: queryKeys.persona.detail(npub, user?.pubkey),
     enabled: Boolean(npub && user),
     queryFn: async (
       c
@@ -135,7 +136,7 @@ export function useMyPersonas() {
   const { user } = useCurrentUser();
 
   return useQuery({
-    queryKey: ["phoenix-my-personas", user?.pubkey],
+    queryKey: queryKeys.persona.mine(user?.pubkey),
     enabled: Boolean(user),
     queryFn: async (c) => {
       if (!user) return [];
@@ -206,7 +207,7 @@ export function usePersonaActivityStats(pubkeys: string[] | undefined) {
   const sorted = (pubkeys ?? []).slice().sort();
 
   return useQuery({
-    queryKey: ["phoenix-persona-activity", sorted.join(",")],
+    queryKey: queryKeys.persona.activity(sorted.join(",")),
     enabled: sorted.length > 0,
     queryFn: async (c): Promise<Map<string, PersonaActivityStats>> => {
       const stats = new Map<string, PersonaActivityStats>();
@@ -261,7 +262,7 @@ export function usePersonaPosts(npub: string | undefined, limit = 50) {
   const { nostr } = useNostr();
 
   return useQuery({
-    queryKey: ["phoenix-persona-posts", npub, limit],
+    queryKey: queryKeys.persona.posts(npub, limit),
     enabled: Boolean(npub),
     queryFn: async (c) => {
       if (!npub) return [];

@@ -3,8 +3,7 @@
  * a file or generating one from a prompt via PPQ.
  *
  * Either path produces a Blossom URL the caller can stash on the
- * persona's kind 0 `picture` field (and the encrypted backup's
- * `persona.reference_image_url`). Generated images are fetched from
+ * persona's public profile and encrypted backup. Generated images are fetched from
  * PPQ and re-uploaded to Blossom so the persona's picture isn't tied
  * to PPQ's asset hosting.
  *
@@ -29,6 +28,7 @@ import { usePpqImage } from "@/hooks/usePpqImage";
 import { useToast } from "@/hooks/useToast";
 import { generatePollinationsImage } from "@/lib/pollinations/client";
 import { PpqError } from "@/lib/ppq/types";
+import { sanitizeHttpUrl } from "@/lib/url";
 import { cn } from "@/lib/utils";
 
 interface PersonaPictureFieldProps {
@@ -87,9 +87,15 @@ export function PersonaPictureField({
   const [prompt, setPrompt] = useState(promptHint ?? "");
   const [genError, setGenError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  // Staged progress for the generate flow:
+  //   drafting   → PPQ image gen (slowest, 10–30s typical)
+  //   fetching   → downloading the generated image from PPQ
+  //   uploading  → re-uploading to Blossom
   // We track this separately from the mutation states because the
-  // generate path runs upload AFTER the PPQ call resolves.
-  const [generating, setGenerating] = useState(false);
+  // generate path chains three async steps.
+  type GenStage = "idle" | "drafting" | "fetching" | "uploading";
+  const [genStage, setGenStage] = useState<GenStage>("idle");
+  const generating = genStage !== "idle";
 
   async function handleFileSelected(file: File) {
     setUploadError(null);
@@ -112,6 +118,7 @@ export function PersonaPictureField({
    * was produced.
    */
   async function uploadToBlossom(blob: Blob, sourceUrl?: string): Promise<string> {
+    setGenStage("uploading");
     const mime = blob.type || (sourceUrl ? guessImageMime(sourceUrl) : "image/png");
     const ext = mime.split("/")[1] ?? "png";
     const file = new File([blob], `persona-portrait.${ext}`, { type: mime });
@@ -145,6 +152,7 @@ export function PersonaPictureField({
     if (!ppqUrl) {
       throw new Error("PPQ returned no image. Try a different prompt.");
     }
+    setGenStage("fetching");
     const res = await fetch(ppqUrl);
     if (!res.ok) {
       throw new Error(`Could not fetch generated image (HTTP ${res.status}).`);
@@ -160,7 +168,7 @@ export function PersonaPictureField({
       return;
     }
     setGenError(null);
-    setGenerating(true);
+    setGenStage("drafting");
     try {
       let blossomUrl: string;
       let usedFreeTier = false;
@@ -171,6 +179,7 @@ export function PersonaPictureField({
         // fall back to the free Pollinations endpoint so the user
         // isn't blocked by an empty wallet they haven't funded yet.
         if (allowFreeFallback && e instanceof PpqError && e.status === 402) {
+          setGenStage("drafting");
           blossomUrl = await generateViaPollinations(trimmed);
           usedFreeTier = true;
         } else {
@@ -195,11 +204,36 @@ export function PersonaPictureField({
         );
       }
     } finally {
-      setGenerating(false);
+      setGenStage("idle");
     }
   }
 
   const busy = upload.isPending || generating;
+  const previewUrl = sanitizeHttpUrl(value);
+
+  // User-facing label for each stage of the generate pipeline.
+  const stageLabel: { button: string; detail: string } = (() => {
+    switch (genStage) {
+      case "drafting":
+        return {
+          button: "Drafting image…",
+          detail: "PPQ is rendering the image. This usually takes 10–30 seconds.",
+        };
+      case "fetching":
+        return {
+          button: "Fetching the image…",
+          detail: "Downloading the generated image from PPQ.",
+        };
+      case "uploading":
+        return {
+          button: "Saving to your media server…",
+          detail: "Mirroring the image to Blossom so the persona owns it.",
+        };
+      case "idle":
+      default:
+        return { button: "Generate", detail: "" };
+    }
+  })();
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -207,13 +241,15 @@ export function PersonaPictureField({
       {value ? (
         <div className="flex items-center gap-4">
           <div className="relative size-24 rounded-2xl overflow-hidden ring-1 ring-imigongo-clay/20 bg-muted flex-shrink-0">
-            <img
-              src={value}
-              alt=""
-              className="w-full h-full object-cover"
-              loading="eager"
-              crossOrigin="anonymous"
-            />
+            {previewUrl ? (
+              <img
+                src={previewUrl}
+                alt=""
+                className="w-full h-full object-cover"
+                loading="eager"
+                crossOrigin="anonymous"
+              />
+            ) : null}
           </div>
           <div className="flex-1 min-w-0 space-y-2">
             <p className="text-xs text-muted-foreground break-all line-clamp-2">
@@ -337,7 +373,7 @@ export function PersonaPictureField({
                 {generating ? (
                   <>
                     <Loader2 className="mr-2 size-4 animate-spin" />
-                    Generating…
+                    {stageLabel.button}
                   </>
                 ) : (
                   <>
@@ -346,6 +382,11 @@ export function PersonaPictureField({
                   </>
                 )}
               </Button>
+              {generating && stageLabel.detail ? (
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  {stageLabel.detail}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>
