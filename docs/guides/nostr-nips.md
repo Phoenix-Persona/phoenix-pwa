@@ -1,6 +1,6 @@
-# Nostr NIPs used by Phoenix
+# Nostr NIPs used by Zuka
 
-One-paragraph summary of every NIP Phoenix touches, plus the event-kind
+One-paragraph summary of every NIP Zuka touches, plus the event-kind
 cheat sheet. For the full text, fetch the NIP from
 `github.com/nostr-protocol/nips`.
 
@@ -17,7 +17,7 @@ Kind ranges:
 - `20000`–`29999` — **ephemeral** (not stored)
 - `30000`–`39999` — **addressable** (latest by `kind`+`pubkey`+`d` tag)
 
-Phoenix's kind 30078 is addressable; kind 0 is replaceable; kind 1 is regular.
+Zuka's kind 30078 is addressable; kind 0 is replaceable; kind 1 is regular.
 
 ### NIP-44 — Encrypted Payloads (Versioned)
 Used for the persona's encrypted backup (kind 30078, encrypted to the
@@ -49,20 +49,22 @@ Donation flow. Two events:
   server after the invoice is paid. Surfaced on the public persona feed
   (this is the "donation moment" of the demo, PROJECT.md §9).
 
-For Phoenix to **receive** zaps natively, kind 0 must advertise `lud16`
-(Lightning Address). For a Phoenix-hosted Lightning Address, an LNURL-pay
-endpoint must resolve to the Breeze wallet — see PROJECT.md §10 #2.
+For Zuka to **receive** zaps natively, kind 0 must advertise `lud16`
+(Lightning Address). For a Zuka-hosted Lightning Address, an LNURL-pay
+endpoint must resolve to the Breez Spark wallet — see PROJECT.md §10 #2.
 
 ### NIP-78 — Application-specific data (kind 30078)
-Used for the persona's encrypted backup. `d` tag = a fresh random UUID
-per publish; no other tags. Content is NIP-44 ciphertext encrypted to
-the user's own pubkey. The lack of any Phoenix-identifying tag means a
+Used for the persona's encrypted backup. `d` tag = an opaque random UUID
+**stable per persona** (generated once at creation, stored inside the
+encrypted plaintext as `persona.dTag`, reused on every update so
+addressable-event semantics replace the prior version). No other tags.
+Content is NIP-44 ciphertext encrypted to the user's own pubkey. The lack of any Zuka-identifying tag means a
 backup is externally indistinguishable from any other NIP-78 app data;
 discovery is scan-and-decrypt. Schema in PROJECT.md §5.2 /
 `docs/PERSONA-SCHEMA.md`.
 
 ### NIP-92 — Media Attachments (`imeta` tag)
-Adds inline metadata to a media URL referenced in event content. Phoenix
+Adds inline metadata to a media URL referenced in event content. Zuka
 uses it on kind 1 posts that include images or audio. Each `imeta` tag is
 variadic, space-delimited:
 
@@ -82,7 +84,7 @@ Companion to NIP-92. Defines the field set used inside `imeta`: `url`, `m`
 
 ## Event-kind cheat sheet
 
-| Kind   | Purpose                  | NIP   | Phoenix uses              |
+| Kind   | Purpose                  | NIP   | Zuka uses              |
 | ------ | ------------------------ | ----- | ------------------------- |
 | `0`    | User metadata            | 01    | Persona public profile    |
 | `1`    | Short text note          | 01/10 | Persona posts             |
@@ -92,11 +94,11 @@ Companion to NIP-92. Defines the field set used inside `imeta`: `url`, `m`
 | `24242`| Blossom auth token       | Blossom | Upload auth             |
 | `30078`| Application data         | 78    | Encrypted persona backup  |
 
-## Tags Phoenix uses
+## Tags Zuka uses
 
 | Tag       | Where         | Value                                            |
 | --------- | ------------- | ------------------------------------------------ |
-| `d`       | kind 30078    | random UUID per publish (no semantic value)      |
+| `d`       | kind 30078    | opaque UUID, stable per persona (`persona.dTag`) |
 | `t`       | kind 1        | `"phoenix"`, region/cause (e.g. `"rwanda"`)      |
 | `client`  | kind 1        | `"phoenix"` (auto-added by `useNostrPublish`)    |
 | `alt`     | kind 1        | Short summary for accessibility                  |

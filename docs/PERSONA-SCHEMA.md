@@ -6,7 +6,7 @@ Three Nostr events per persona, plus media on Blossom. **Source of truth:
 
 ## kind 0 — public profile (signed by *persona*, NIP-01)
 
-Standard kind-0 metadata, plus a Phoenix-specific namespace generic
+Standard kind-0 metadata, plus a Zuka-specific namespace generic
 clients can ignore.
 
 ```json
@@ -17,7 +17,7 @@ clients can ignore.
   "picture": "https://blossom.example/<sha256>.png",
   "lud16": "imani@spark.money",
   "lud06": "lnurl1...",
-  "nip05": "imani@phoenix.example",
+  "nip05": "imani@example.com",
   "phoenix": {
     "voice_sample": "https://blossom.example/<sha256>.mp3",
     "reference_image": "https://blossom.example/<sha256>.png",
@@ -28,7 +28,7 @@ clients can ignore.
 
 Replaceable event — only the latest is kept by relays. The `lud16`
 Lightning Address is provided natively by the Spark SDK (Breez's
-hosted `spark.money` LNURL server) — no Phoenix-hosted endpoint needed.
+hosted `spark.money` LNURL server) — no Zuka-hosted endpoint needed.
 
 ## kind 30078 — encrypted persona backup (signed by *operator*, one per persona)
 
@@ -41,10 +41,10 @@ apply and relays keep only the latest version.
 
 | Tag | Value                          | Purpose                                                                  |
 | --- | ------------------------------ | ------------------------------------------------------------------------ |
-| `d` | `<random opaque uuid>`, stable | Required for addressable-event addressing (NIP-01, kind 30078 ∈ 30000–39999). Generated once at persona creation, stored inside the encrypted plaintext as `persona.dTag`, reused on every update. The value is **opaque** — no Phoenix signal, no link to the persona pubkey. |
+| `d` | `<random opaque uuid>`, stable | Required for addressable-event addressing (NIP-01, kind 30078 ∈ 30000–39999). Generated once at persona creation, stored inside the encrypted plaintext as `persona.dTag`, reused on every update. The value is **opaque** — no Zuka signal, no link to the persona pubkey. |
 
 **No other tags.** A `t` or `alt` tag would help relay observers
-fingerprint Phoenix events. Externally a Phoenix backup is
+fingerprint Zuka events. Externally a Zuka backup is
 indistinguishable from any other NIP-78 application-data event.
 
 ### Content
@@ -80,7 +80,7 @@ keypair).
   "model_prefs": {
     "styling": "claude-sonnet-4.5",
     "image": "gpt-image-1",
-    "tts": "deepgram-aura-2",
+    "tts": null,
     "video": null
   },
   "settings": {
@@ -100,11 +100,11 @@ under that operator from these events alone.
    ```js
    { kinds: [30078], authors: [operator_pubkey] }
    ```
-   No Phoenix-specific filter — adding one would leak app usage. The
+   No Zuka-specific filter — adding one would leak app usage. The
    query may surface kind-30078 events from other apps; those fail
    decryption or schema validation and are discarded.
 3. For each event, decrypt content via the operator's signer (NIP-44
-   self-decrypt) and validate against Phoenix's payload schema.
+   self-decrypt) and validate against Zuka's payload schema.
 4. Surviving events are already deduplicated by relay (addressable
    semantics: one event per `(operator_pubkey, kind, d-tag)`), so
    each persona is represented exactly once. Group by
@@ -124,8 +124,8 @@ persona.
 
 ## kind 1 — posts (signed by *persona*, NIP-01)
 
-Public, signed by the persona keypair. **No Phoenix-identifying tags.**
-A Phoenix-published persona post is indistinguishable on the wire from
+Public, signed by the persona keypair. **No Zuka-identifying tags.**
+A Zuka-published persona post is indistinguishable on the wire from
 any other kind-1 note.
 
 | Tag        | Value                                            | Notes                              |
@@ -136,7 +136,7 @@ any other kind-1 note.
 | `imeta`    | per-attachment metadata (NIP-92)                 | For posts with media on Blossom    |
 
 Deliberately omitted: `t=phoenix`, `client=phoenix`, operator pubkey
-tags, persona name in `alt`, any other Phoenix-fingerprinting tag. The
+tags, persona name in `alt`, any other Zuka-fingerprinting tag. The
 persona's kind 0 bio is the right place to disclose AI usage;
 individual posts stay metadata-clean. See `src/lib/personaPost.ts:1-19`.
 
@@ -154,18 +154,13 @@ Voice samples are public — no encryption on Blossom.
 
 ## Code-vs-doc divergence
 
-The current code in `src/lib/persona.ts` differs from §5.2 on two
-points; both should be reconciled the next time the persona schema is
-touched.
-
 | Aspect           | Spec (`dev/PROJECT.md` §5.2)                    | Code (`src/lib/persona.ts`)                                    |
 | ---------------- | ----------------------------------------------- | -------------------------------------------------------------- |
-| d-tag scheme     | **stable per persona**, opaque random UUID stored as `persona.dTag` and reused on every update | random UUID generated **fresh per publish** (no replacement)  |
-| Plaintext payload| `persona`/`wallet`/`model_prefs`/`settings` blocks; `wallet.kind = "spark"`; voice fields under `persona`; `persona.dTag` | `app: "phoenix"` discriminator (main) / `app: "phoenix-persona"` + nested `config` (topher); no `wallet` block yet; no `dTag` field |
+| `model_prefs.tts`| **deferred to V2**; `null` when unset           | required `z.string().min(1).max(120)`; default `"openai/tts-1-hd"`. To reconcile, relax the field to `nullable().optional()` when voice flows are removed/postponed. |
 
-The d-tag scheme change is the bigger lift: switching from random-per-
-publish to stable-per-persona means storing a UUID at creation and
-reading it back on update.
+The `app:` discriminator and `persona.dTag` field are aligned with the
+spec in current code (`PHOENIX_PAYLOAD_APP = "phoenix-persona"`,
+`persona.dTag` stored at creation and reused on update).
 
 ## Source
 

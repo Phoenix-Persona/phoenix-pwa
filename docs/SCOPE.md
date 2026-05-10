@@ -43,7 +43,7 @@ What ships when, and what we are not building.
 **Do not build any of these. They are out of scope by design, not by
 oversight.**
 
-- A Phoenix-owned backend service that holds user data
+- A Zuka-owned backend service that holds user data
 - Server-side persona storage or "account recovery via email"
 - Custodial wallet
 - Centralized moderation, content filtering, or safety classifier in front
@@ -51,7 +51,7 @@ oversight.**
 
 ## Heuristics for agents
 
-- If a request would add a Phoenix-owned server that holds user data,
+- If a request would add a Zuka-owned server that holds user data,
   **stop and flag it** — that crosses an explicit line from §8.
 - If a request would add a "recover my account" flow that does not
   require the operator's nsec, **stop and flag it** — same.

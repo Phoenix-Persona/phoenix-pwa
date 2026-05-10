@@ -2,11 +2,11 @@
 
 **Owner:** Derek
 **Phase:** 0 (Hours 0–2)
-**Companion file:** `spikes/nostr-breeze/nostr/round-trip.test.ts`
+**Companion file:** `spikes/nostr-spark/nostr/round-trip.test.ts`
 **Status:** Complete (offline). Live-relay verification deferred to a runbook below.
-**Companion spike:** Jim — Spike C Part 2 (Breeze in browser)
+**Companion spike:** Jim — Spike C Part 2 (Breez Spark in browser)
 
-This document captures what we proved offline and what we still owe live-relay. The goal of the spike was to retire risk on the cryptographic patterns Phoenix V1 depends on **before** the persona library rewrite shipped — that constraint slipped because Phase 1a turned into a same-day rewrite, but the spike still validates the patterns the rewrite ended up using.
+This document captures what we proved offline and what we still owe live-relay. The goal of the spike was to retire risk on the cryptographic patterns Zuka V1 depends on **before** the persona library rewrite shipped — that constraint slipped because Phase 1a turned into a same-day rewrite, but the spike still validates the patterns the rewrite ended up using.
 
 ---
 
@@ -23,7 +23,7 @@ This document captures what we proved offline and what we still owe live-relay. 
 | 7 | NIP-44 self-encrypt latency for a typical envelope (50-op average) | ✅ |
 | 8 | Scan-and-decrypt over 100 candidate events, cache off vs. on | ✅ (268× speedup warm) |
 
-All 8 cases run under `npm test` as `spikes/nostr-breeze/nostr/round-trip.test.ts`. The benchmark cases log their numbers via `console.log` so the test runner doesn't assert on absolute timing (system-load dependent), but the numbers go below.
+All 8 cases run under `npm test` as `spikes/nostr-spark/nostr/round-trip.test.ts`. The benchmark cases log their numbers via `console.log` so the test runner doesn't assert on absolute timing (system-load dependent), but the numbers go below.
 
 ---
 
@@ -68,7 +68,7 @@ The 682ms desktop number is **70% slower than the plan's "~400ms" estimate**. Tw
 
 ### kind 30078 envelope shape (privacy-preserving)
 
-Per Derek's locked decision (`tasks/derek-plan.md` §2): the envelope reveals **nothing Phoenix-specific from the outside**.
+Per Derek's locked decision (`tasks/derek-plan.md` §2): the envelope reveals **nothing Zuka-specific from the outside**.
 
 ```jsonc
 {
@@ -82,7 +82,7 @@ Per Derek's locked decision (`tasks/derek-plan.md` §2): the envelope reveals **
 
 No `t:phoenix-persona`, no `alt:`, no `client:`. The spike's first test asserts `template.tags.map(t => t[0])` is exactly `["d"]`, so a future regression that adds discovery tags will trip the test before it ships.
 
-**What this preserves.** A relay observer can count "user has N kind 30078 events" but cannot say "M of N are Phoenix personas" without decryption. Anyone who learns the persona pubkey separately cannot reverse-link to the user by querying the relay for that string. The same holds for kind 1 persona posts — generic topical tags only, no Phoenix client tag.
+**What this preserves.** A relay observer can count "user has N kind 30078 events" but cannot say "M of N are Zuka personas" without decryption. Anyone who learns the persona pubkey separately cannot reverse-link to the user by querying the relay for that string. The same holds for kind 1 persona posts — generic topical tags only, no Zuka client tag.
 
 **The cost.** No tag-filter shortcut for persona discovery. Multi-persona load must `query → decrypt-each → filter`. The cache below is what makes that affordable.
 
@@ -104,7 +104,7 @@ async function decryptWithCache(ev, userPubkey, signer) {
 
 **Why event id is a stable cache key.** `event.id` is sha256 over the canonical event. If the ciphertext changes (a new revision of the persona) the id changes, so we never serve a stale envelope. If the same event flows past us twice on different relay queries, we decrypt once.
 
-**Spike result on 100 events (1 Phoenix + 99 noise):**
+**Spike result on 100 events (1 Zuka + 99 noise):**
 
 | Pass | Time | Notes |
 |---|---|---|
@@ -127,7 +127,7 @@ if (derived !== persona.pubkey) return null;
 
 The spike's tampered-envelope test confirms this: take persona A's metadata, splice in persona B's nsec, encrypt to the user, attempt decrypt. Decryption succeeds. JSON parses. Zod accepts (both pubkey and nsec are well-formed). Derive check fails → null.
 
-This matters because the user's signer is the encryption authority. Without derive-and-verify, an attacker who *also* has the user's signer (e.g. a malicious browser extension) could publish a Phoenix-shaped event that smuggles a different persona identity. The derive check pins the on-wire claim to the embedded key material.
+This matters because the user's signer is the encryption authority. Without derive-and-verify, an attacker who *also* has the user's signer (e.g. a malicious browser extension) could publish a Zuka-shaped event that smuggles a different persona identity. The derive check pins the on-wire claim to the embedded key material.
 
 ---
 
@@ -140,7 +140,7 @@ This matters because the user's signer is the encryption authority. Without deri
 **Runbook — verify on Damus, Ditto, primal.net, nostr.band** (pre-demo):
 
 ```js
-// Open the Phoenix dev server, sign in via the wizard, mint a persona.
+// Open the Zuka dev server, sign in via the wizard, mint a persona.
 // Then in DevTools console:
 
 const { nostr } = window.__nostrify;       // or grab via React DevTools if not exposed
@@ -168,7 +168,7 @@ The cache benchmark used a local in-process signer. With a real bunker, every `d
 
 ## Decisions resolved by the spike
 
-1. **Privacy posture verified:** the kind 30078 envelope reveals zero Phoenix-specific information from the outside. Test #4 enforces this on the schema/template side; reviewers can grep for `["d", "alt", "t"]` in `buildEncryptedPersonaTemplate` and verify by inspection.
+1. **Privacy posture verified:** the kind 30078 envelope reveals zero Zuka-specific information from the outside. Test #4 enforces this on the schema/template side; reviewers can grep for `["d", "alt", "t"]` in `buildEncryptedPersonaTemplate` and verify by inspection.
 2. **Cache architecture confirmed:** per-event-id cache works because event ids are content-hashes over canonical events. Stale-on-revision concerns are non-issues.
 3. **NIP-49 production log_n locked:** 18. Spinner-yield pattern is mandatory in any UI that touches it. WebWorker offload is on the table for mobile.
 4. **Derive-and-verify is non-optional:** the schema alone doesn't catch claim-vs-key mismatches. Test #4 enforces this.
@@ -181,4 +181,4 @@ The cache benchmark used a local in-process signer. With a real bunker, every `d
 
 ## Open items for Jim
 
-- Spike C Part 2 (Breeze in browser). Out of scope for this doc; deliverable is `docs/spike-breeze.md`.
+- Spike C Part 2 (Breez Spark in browser) — superseded by the production wallet at `src/lib/wallet/`.

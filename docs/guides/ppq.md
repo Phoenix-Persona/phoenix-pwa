@@ -1,11 +1,11 @@
 # PPQ (PayPerQ)
 
-OpenAI-compatible inference API. Phoenix routes **all** AI inference
+OpenAI-compatible inference API. Zuka routes **all** AI inference
 through PPQ. Auth is via PPQ's **credits system**: a unique `credit_id`
 per persona, funded with Lightning, auths every API request via a
 bearer token tied to that credit_id.
 
-> Phoenix usage: `dev/PROJECT.md` §6 for per-task model defaults and §7
+> Zuka usage: `dev/PROJECT.md` §6 for per-task model defaults and §7
 > for the wallet → PPQ payment story.
 
 ## Endpoint
@@ -14,9 +14,9 @@ bearer token tied to that credit_id.
 - **Compatibility:** Fully OpenAI-compatible. Any OpenAI client SDK
   works; override `baseURL` and `apiKey`.
 
-## Authentication — Phoenix uses credits
+## Authentication — Zuka uses credits
 
-Phoenix authenticates every PPQ request with a bearer token issued
+Zuka authenticates every PPQ request with a bearer token issued
 when an account is created:
 
 ```
@@ -40,13 +40,13 @@ ownership for the API.
 The credits system covers **the whole PPQ API surface** — chat,
 image, audio, video, models list, etc.
 
-### L402 — supported but not what Phoenix uses
+### L402 — supported but not what Zuka uses
 
 PPQ also supports L402 (`Authorization: L402 <token>:<preimage>` with
 a `WWW-Authenticate: Payment` challenge-pay-replay) for per-request
 Lightning auth. **L402 is only available on a subset of endpoints**
 (image-gen, video-gen, image-edit, data-enrichment); the credits
-system covers everything. Phoenix uses credits across the board.
+system covers everything. Zuka uses credits across the board.
 
 ## Endpoints we use
 
@@ -55,7 +55,7 @@ system covers everything. Phoenix uses credits across the board.
 | `POST /chat/completions`         | Text generation (Claude, GPT, Gemini, etc.) — via `pi-ai`        |
 | `POST /v1/images/generations`    | Image generation                                                 |
 | `POST /v1/audio/speech`          | TTS — voice sample (V1) + post audio (V1.5)                      |
-| `POST /v1/audio/transcriptions`  | STT (Deepgram Nova-3) — not used by Phoenix yet                  |
+| `POST /v1/audio/transcriptions`  | STT (Deepgram Nova-3) — not used by Zuka yet                  |
 | `POST /v1/videos`                | Video generation (V2 stretch)                                    |
 | `GET  /v1/models`                | List available models (used by Settings)                         |
 | `POST /accounts/create`          | Create a PPQ account (api_key + credit_id)                       |
@@ -72,20 +72,27 @@ persist in the encrypted kind 30078 backup under `model_prefs`.
 | ----------------------- | ------------------ | -------------------------- |
 | Persona text styling    | `claude-sonnet-4.5`| `/chat/completions`        |
 | Profile / post image    | `gpt-image-1`      | `/v1/images/generations`   |
-| Voice sample / TTS      | `deepgram-aura-2`  | `/v1/audio/speech`         |
+| Voice sample / TTS      | (deferred to V2)   | `/v1/audio/speech`         |
 | Video (V2)              | TBD                | `/v1/videos`               |
 
-### Voice models on PPQ
+### Voice models on PPQ (V2)
 
-`/v1/audio/speech` is OpenAI-compatible. Two providers:
+TTS is deferred to V2 per PROJECT.md §6 — no L402-compatible TTS
+provider was identified, and V1 doesn't grow the credits surface for
+voice features it isn't shipping. The notes below are reference for the
+V2 work.
 
-- **DeepGram Aura 2** (default) — named voices: `arcas`, `thalia`,
+`/v1/audio/speech` is OpenAI-compatible. Two providers on PPQ:
+
+- **DeepGram Aura 2** — named voices: `arcas`, `thalia`,
   `andromeda`, `helena`, `apollo`, `aries`. Max 2000 chars/request.
 - **ElevenLabs** — `eleven_multilingual_v2`, `eleven_flash_v2_5`. Max
   5000 chars/request.
 
-`tts-1-hd` is **not available** on PPQ — they migrated. Earlier
-PROJECT.md drafts referred to `tts-1-hd`; treat those as historical.
+`tts-1-hd` is **not available** on PPQ — they migrated. The persona
+schema in code currently has `model_prefs.tts` required with default
+`"openai/tts-1-hd"`; this should be relaxed to `nullable().optional()`
+when voice flows are explicitly punted to V2.
 
 The Settings page reads `/v1/models` at runtime so we don't have to
 hard-code the list.

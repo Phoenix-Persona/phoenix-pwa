@@ -1,25 +1,25 @@
-# Phoenix Project Plan
+# Zuka Project Plan
 
-**Read [`PROJECT.md`](./dev/PROJECT.md) first.** It is the authoritative design document for Phoenix Persona — the user-facing problem, the identity model, the persona Nostr schema, the wallet model, the AI capabilities, the V1 scope, and the demo arc. When this file and `PROJECT.md` disagree on *what* to build, **`PROJECT.md` wins**. This file describes *how* to build on the codebase (Nostr conventions, security, file layout, lint rules).
+**Read [`PROJECT.md`](./dev/PROJECT.md) first.** It is the authoritative design document for Zuka — the user-facing problem, the identity model, the persona Nostr schema, the wallet model, the AI capabilities, the V1 scope, and the demo arc. When this file and `PROJECT.md` disagree on *what* to build, **`PROJECT.md` wins**. This file describes *how* to build on the codebase (Nostr conventions, security, file layout, lint rules).
 
 The active hackathon plan against the V1 scope lives in [`tasks/todo.md`](./tasks/todo.md).
 
 **Doc indexes:** [`docs/INDEX.md`](./docs/INDEX.md) (engineering & architecture) · [`dev/INDEX.md`](./dev/INDEX.md) (design plan, parallel build streams).
 
-**Phoenix-specific stack additions** (beyond the MKStack base described below):
+**Zuka-specific stack additions** (beyond the MKStack base described below):
 
 - **`pi-mono`** ([github.com/earendil-works/pi](https://github.com/earendil-works/pi)) — agent runtime (`pi-agent-core`), unified LLM API (`pi-ai`), web chat components (`pi-web-ui`)
 - **PPQ** (`ppq.ai`) — OpenAI-compatible inference API, paid per-request in sats over Lightning
-- **Breeze SDK** — per-persona Bitcoin Lightning wallet; seed phrase recoverable from the encrypted kind 30078 backup
+- **Breez Spark SDK** — per-persona Bitcoin Lightning wallet; seed phrase recoverable from the encrypted kind 30078 backup
 - **NIP-49** for at-rest persona-nsec encryption; **NIP-44** for the encrypted backup event; **NIP-57** for donations
 
-**Reuse with adaptation — don't blindly extend, don't blindly rewrite.** The early `src/lib/persona*` and `src/hooks/usePersona*` sketch matches the user/persona architecture in PROJECT.md §3 closely; adapt it to the §5 schema (random per-publish d-tag, no app-specific tags — discovery is scan-and-decrypt for stronger anti-fingerprinting; embedded Breeze wallet seed; `model_prefs`) rather than rewriting from scratch. The Vercel `/style` endpoint plan in `src/lib/styleClient.ts` is gone — replace with a `pi-ai` PPQ client (PROJECT.md §6). PROJECT.md §11 lists exactly what to reuse, rewrite, replace, add, and delete.
+**Reuse with adaptation — don't blindly extend, don't blindly rewrite.** The early `src/lib/persona*` and `src/hooks/usePersona*` sketch matches the user/persona architecture in PROJECT.md §3 closely; adapt it to the §5 schema (stable per-persona d-tag stored as `persona.dTag` and reused on every update, no app-specific tags — discovery is scan-and-decrypt for stronger anti-fingerprinting; embedded Breez Spark wallet seed; `model_prefs`) rather than rewriting from scratch. The Vercel `/style` endpoint plan in `src/lib/styleClient.ts` is gone — replace with a `pi-ai` PPQ client (PROJECT.md §6). PROJECT.md §11 lists exactly what to reuse, rewrite, replace, add, and delete.
 
 ---
 
 # Project Overview
 
-Phoenix Persona is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, Vite, shadcn/ui, and Nostrify, extended with `pi-mono` (agent runtime), PPQ (Lightning-paid AI inference), and the Breeze SDK (per-persona Lightning wallet).
+Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, Vite, shadcn/ui, and Nostrify, extended with `pi-mono` (agent runtime), PPQ (Lightning-paid AI inference), and the Breez Spark SDK (per-persona Lightning wallet).
 
 ## Technology Stack
 
@@ -34,11 +34,20 @@ Phoenix Persona is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, Vi
 
 ## Project Structure
 
-- `/src/components/` — UI components. `ui/` holds shadcn/ui primitives; `auth/` holds login components (`LoginArea`, `AuthDialog`, `AccountSwitcher`).
-- `/src/hooks/` — custom hooks. Discover the full set with `ls src/hooks/`. Key ones: `useNostr`, `useAuthor`, `useCurrentUser`, `useNostrPublish`, `useUploadFile`, `useAppContext`, `useTheme`, `useToast`, `useLoggedInAccounts`, `useLoginActions`, `useIsMobile`.
-- `/src/pages/` — page components wired into React Router (`Index`, `NotFound`, `NIP19Page`).
+- `/src/components/` — UI components.
+  - `ui/` — shadcn/ui primitives.
+  - `auth/` — login components (`LoginArea`, `AuthDialog`, `AccountSwitcher`).
+  - `wallet/` — wallet UI (`WalletPanel`, `WalletDialog`, `WalletBadge`, `SendDialog`, `ReceiveDialog`).
+  - `howItWorks/` — landing-page explainer sections.
+- `/src/hooks/` — custom hooks. Discover the full set with `ls src/hooks/`. Key ones: `useNostr`, `useAuthor`, `useCurrentUser`, `useNostrPublish`, `useUploadFile`, `useAppContext`, `useTheme`, `useToast`, `useLoggedInAccounts`, `useLoginActions`, `useIsMobile`. Zuka-specific: `usePersona`, `usePersonaPublish`, `useOperatorEnvelope`, `useDeletePersona`, `useWallet`, `usePpqAccount`, `usePpqInference`, `usePpqImage`, `usePpqVideo`, `usePpqTopup`, `useCrossPost`, `useInstallPrompt`, `useRegisterPersonaLightningAddress`, `useUsernameAvailability`.
+- `/src/pages/` — page components wired into React Router. Current set: `Index`, `Onboard`, `Dashboard`, `EditPersona`, `MyPersonas`, `PersonaFeed`, `Verify`, `Settings`, `NIP19Page`, `NotFound`.
 - `/src/lib/` — utility functions and shared logic.
+  - `wallet/` — Breez Spark wallet (init, NWC, lightning address).
+  - `operator/` — operator-envelope crypto and storage.
+  - `ppq/` — PPQ client (`client.ts`, `storage.ts`, etc.).
+  - Top-level: `persona.ts`, `personaCrypto.ts`, `personaKey.ts`, `personaPost.ts`, `appRelays.ts`, `appBlossom.ts`, `nip49Storage.ts`, `genUserName.ts`, `polyfills.ts`, `utils.ts`, `env.ts`.
 - `/src/contexts/` — React context providers (`AppContext`).
+- `/src/dev/` — dev harnesses for slice-by-slice testing (`WalletHarness`, `InferencePayHarness`). Routed under `/dev/*` in `AppRouter.tsx`.
 - `/src/test/` — testing utilities including the `TestApp` wrapper.
 - `/public/` — static assets.
 - `App.tsx` — **already configured** with `QueryClientProvider`, `NostrProvider`, `UnheadProvider`, `AppProvider`, `NostrLoginProvider`. **Read before editing**; changes are rarely needed.
@@ -258,21 +267,18 @@ These are specialized workflows — load the matching skill when needed:
 
 ## App Configuration
 
-The `AppProvider` manages global state (theme + NIP-65 relay list), persisted to local storage.
+The `AppProvider` manages global state (theme + NIP-65 relay list + Blossom server list), persisted to local storage. The shape:
 
 ```ts
-const defaultConfig: AppConfig = {
-  theme: 'light',
-  relayMetadata: {
-    relays: [
-      { url: 'wss://relay.ditto.pub', read: true, write: true },
-      { url: 'wss://relay.primal.net', read: true, write: true },
-      { url: 'wss://relay.damus.io', read: true, write: true },
-    ],
-    updatedAt: 0,
-  },
+type AppConfig = {
+  theme: 'light' | 'dark';
+  relayMetadata: RelayMetadata;          // NIP-65 list
+  blossomServerMetadata: BlossomServerMetadata; // BUD-03 (kind 10063)
+  useAppBlossomServers: boolean;          // include APP_BLOSSOM_SERVERS in the merged set
 };
 ```
+
+Canonical defaults live in `src/lib/appRelays.ts` (`APP_RELAYS`) and `src/lib/appBlossom.ts` (`APP_BLOSSOM_SERVERS`). `App.tsx` composes these into a `defaultConfig` passed to `<AppProvider>`.
 
 ### Relay Management
 

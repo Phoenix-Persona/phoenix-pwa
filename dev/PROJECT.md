@@ -1,4 +1,4 @@
-# Phoenix Persona — Master Plan
+# Zuka — Master Plan
 
 > **Status:** Authoritative design document. This plan **supersedes** the
 > current code in the repository. The existing files are MKStack boilerplate
@@ -9,7 +9,7 @@
 
 ## 1. Mission
 
-Phoenix Persona helps a person publish on social media as an AI-driven persona
+Zuka helps a person publish on social media as an AI-driven persona
 that is cryptographically separate from their real identity. The persona has
 its own face, voice, writing style, Nostr identity, and Lightning wallet. It
 can accept donations and use those donations to pay for its own AI inference,
@@ -35,13 +35,13 @@ Same product. Two stories.
 ### The user journey
 
 ```
-1. Open Phoenix → "Create a new persona"
+1. Open Zuka → "Create a new persona"
 2. Character-creator wizard, guided by an embedded AI agent:
    - Interview (values, voice, region, languages, what this persona stands for)
    - Generate name + bio + system prompt
    - Generate profile picture (canonical reference image)
    - Generate voice sample
-   - Mint Nostr keypair + Breeze Lightning wallet
+   - Mint Nostr keypair + Breez Spark Lightning wallet
    - Publish encrypted backup event
 3. Persona dashboard:
    - Compose: write/dictate raw thoughts → agent styles them into the
@@ -72,19 +72,19 @@ gracefully disable when the wallet is empty.
 
 ## 3. Identity model
 
-Phoenix uses a **two-level identity** model.
+Zuka uses a **two-level identity** model.
 
 **Operator.** A single Nostr keypair owned by the human running the
-app. It never posts publicly under Phoenix. Its only job is to sign
+app. It never posts publicly under Zuka. Its only job is to sign
 encrypted backups (kind 30078, §5.2) for the personas this operator
 has created. The operator keypair can be:
 
 - An existing Nostr identity (NIP-07 extension, NIP-46 remote signer, or
   pasted nsec) — useful for operators who already have a Nostr account
   and want one place to manage everything.
-- A fresh Phoenix-generated keypair — useful for operators who want
-  their Phoenix activity unlinkable from any other Nostr identity. In
-  this case Phoenix never publishes a kind 0 profile under the operator
+- A fresh Zuka-generated keypair — useful for operators who want
+  their Zuka activity unlinkable from any other Nostr identity. In
+  this case Zuka never publishes a kind 0 profile under the operator
   keypair, so to outside observers the operator pubkey is just a
   publisher of opaque ciphertext.
 
@@ -107,10 +107,10 @@ operator's is unknowable.
 **What does leak: the persona count.** A relay observer can see that
 `operator_pubkey` has authored N kind-30078 events with N distinct
 d-tag values, and infer "this operator runs N addressable items."
-Phoenix backup events carry no Phoenix-identifying tags (no `t`, no
-`alt`), so the observer cannot tell those items are Phoenix backups
+Zuka backup events carry no Zuka-identifying tags (no `t`, no
+`alt`), so the observer cannot tell those items are Zuka backups
 specifically — they look identical to any other NIP-78
-application-data event. Phoenix participation is only knowable to
+application-data event. Zuka participation is only knowable to
 anyone who already has the operator's nsec.
 
 **Compartmentalization.** All personas under a single operator share
@@ -118,12 +118,12 @@ one fate: anyone who compromises that operator nsec can decrypt every
 persona's backup and operate every voice. For activists who need
 persona groups that can't fall together, the answer is **separate
 operator keypairs per group** — but multi-operator complexity is V2.
-For V1, Phoenix is **one operator per device**.
+For V1, Zuka is **one operator per device**.
 
 **Multi-persona UX.** When the operator is logged in, the app fetches
 all kind 30078 events authored by the current operator pubkey,
 attempts NIP-44 self-decryption on each, keeps the ones whose
-plaintext validates as a Phoenix envelope (events from other apps
+plaintext validates as a Zuka envelope (events from other apps
 fail decryption or schema validation and are discarded), and presents
 the persona list. Switching personas swaps which persona nsec the
 composer signs with — no separate "login" per persona.
@@ -132,17 +132,17 @@ composer signs with — no separate "login" per persona.
 
 - *Operator nsec*. For operators bringing an existing Nostr identity,
   custody is whatever signer they use (NIP-07, NIP-46, etc.). For
-  fresh Phoenix-generated operator keypairs, stored locally as NIP-49
+  fresh Zuka-generated operator keypairs, stored locally as NIP-49
   (passphrase-encrypted) — **one passphrase per device**, applied to
   the operator nsec.
-- *Persona nsec*. Never written to disk by Phoenix. Lives only inside
+- *Persona nsec*. Never written to disk by Zuka. Lives only inside
   the operator's encrypted kind 30078 backup. When the operator opens
-  a persona, Phoenix fetches the event from relays, decrypts it via
+  a persona, Zuka fetches the event from relays, decrypts it via
   the operator's signer (NIP-44 self-decrypt), holds the persona nsec
   in memory, and uses it to sign that session's posts.
 - *Recovery on a new device*. Operator logs in with the operator nsec;
   app re-fetches all kind 30078 events authored by them, decrypts
-  each, filters to valid Phoenix envelopes; every persona is
+  each, filters to valid Zuka envelopes; every persona is
   re-hydrated in one step.
 - *Loss of operator nsec*. Every persona under that operator is
   unrecoverable. The wizard surfaces a one-time "download operator
@@ -163,7 +163,7 @@ mitigated (V2) with separate operator keypairs per unlinkable group.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  Phoenix PWA  (React 19 + Vite + TailwindCSS 4 + shadcn/ui)      │
+│  Zuka PWA  (React 19 + Vite + TailwindCSS 4 + shadcn/ui)      │
 │                                                                  │
 │  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────────┐  │
 │  │ Character   │  │ Dashboard /  │  │ Wallet UI               │  │
@@ -172,7 +172,7 @@ mitigated (V2) with separate operator keypairs per unlinkable group.
 │  └──────┬──────┘  └──────┬───────┘  └──────────┬──────────────┘  │
 │         │                │                     │                 │
 │  ┌──────▼────────────────▼─────────────────────▼──────────────┐  │
-│  │  Phoenix runtime                                           │  │
+│  │  Zuka runtime                                           │  │
 │  │   - pi-agent-core   (agent loop, tool calling)             │  │
 │  │   - pi-ai           (LLM client → PPQ)                     │  │
 │  │   - Nostrify        (Nostr publish/query, NIP-44, NIP-49)  │  │
@@ -204,7 +204,7 @@ mitigated (V2) with separate operator keypairs per unlinkable group.
 | Lightning wallet | `@breeztech/breez-sdk-spark` (Breez SDK — Spark / Nodeless variant) | Per-persona wallet, BIP-39 seed inside the encrypted backup. WASM in browser; needs `await init()` before any SDK call. Native Lightning Address (no self-hosted LNURL endpoint). API key via `VITE_BREEZ_API_KEY`. |
 | Media            | Blossom upload (`useUploadFile`)     | Already in scaffold                                          |
 
-There is no Phoenix-owned backend. Everything runs in the PWA against
+There is no Zuka-owned backend. Everything runs in the PWA against
 public services (PPQ, Nostr relays, Blossom, Lightning). This is a
 deliberate choice so the project survives loss of any one piece of
 infrastructure — including loss of the original developers.
@@ -217,7 +217,7 @@ Three Nostr events per persona, plus media on Blossom.
 
 ### 5.1 kind 0 — public profile (NIP-01, signed by persona)
 
-Standard kind-0 metadata, plus the additions Phoenix needs to be useful in
+Standard kind-0 metadata, plus the additions Zuka needs to be useful in
 generic Nostr clients without breaking them.
 
 ```json
@@ -226,9 +226,9 @@ generic Nostr clients without breaking them.
   "display_name": "Imani Uwase",
   "about": "Voice of Rwanda. Press freedom, civil society, the long memory.",
   "picture": "https://blossom.example/<sha256>.png",
-  "lud16": "imani@phoenix.example",
+  "lud16": "imani@spark.money",
   "lud06": "lnurl1...",
-  "nip05": "imani@phoenix.example",
+  "nip05": "imani@example.com",
   "phoenix": {
     "voice_sample": "https://blossom.example/<sha256>.mp3",
     "reference_image": "https://blossom.example/<sha256>.png",
@@ -237,7 +237,7 @@ generic Nostr clients without breaking them.
 }
 ```
 
-`phoenix.*` is a Phoenix-specific namespace clients can ignore. Everything
+`phoenix.*` is a Zuka-specific namespace clients can ignore. Everything
 above it is standard.
 
 ### 5.2 kind 30078 — encrypted persona backup (signed by *operator*, one per persona)
@@ -253,15 +253,15 @@ Tags:
   once at persona creation, stored inside the encrypted plaintext as
   `persona.dTag`, and reused on every update. The `d` tag is required
   by NIP-01 for kind 30078 (addressable range 30000–39999); its value
-  here is **opaque** — it carries no Phoenix-identifying signal and
+  here is **opaque** — it carries no Zuka-identifying signal and
   no link to the persona pubkey. Each persona under an operator gets
   its own d-tag, so the relay sees N distinct addressable items
   (= the operator's persona count); this count leak is acknowledged
   in §3.
 
-**No other tags.** A `t` tag would advertise Phoenix usage; an `alt`
+**No other tags.** A `t` tag would advertise Zuka usage; an `alt`
 tag would advertise "encrypted backup"; both would help observers
-fingerprint Phoenix events. Externally a Phoenix kind-30078 event is
+fingerprint Zuka events. Externally a Zuka kind-30078 event is
 indistinguishable from any other NIP-78 application-data event
 (Coracle settings, Damus prefs, etc.).
 
@@ -309,13 +309,13 @@ Plaintext payload:
 
 1. Operator logs in with their operator nsec (NIP-07 / NIP-46 / paste).
 2. App queries `{ kinds: [30078], authors: [operator_pubkey] }` — no
-   Phoenix-specific filter, since adding one would leak app usage. The
+   Zuka-specific filter, since adding one would leak app usage. The
    query may surface kind-30078 events from other apps (Coracle
    settings, Damus prefs, etc.); they fail decryption (different
-   conversation key) or fail Phoenix's payload schema and are
+   conversation key) or fail Zuka's payload schema and are
    discarded.
 3. For each event, decrypt content via the operator's signer (NIP-44
-   self-decrypt) and validate against Phoenix's payload schema.
+   self-decrypt) and validate against Zuka's payload schema.
 4. Surviving events are already deduplicated by relay (addressable
    semantics: one event per `(operator_pubkey, kind, d-tag)` triple),
    so each persona is represented exactly once. Group by
@@ -323,7 +323,7 @@ Plaintext payload:
 5. The decrypted payload yields the persona keypair, wallet seed,
    reference image URL, `persona.dTag`, etc.
 6. Persona nsec is held in memory for the session; never written to
-   disk by Phoenix.
+   disk by Zuka.
 
 **Updating a persona.** Republish a kind 30078 event with the **same**
 d-tag as the prior event (read from the decrypted `persona.dTag`) and
@@ -339,8 +339,8 @@ blocking on a single large payload.
 
 ### 5.3 kind 1 — posts (NIP-01, signed by persona)
 
-Public, signed by the persona keypair. **No Phoenix-identifying tags.**
-A Phoenix-published persona post is indistinguishable on the wire from
+Public, signed by the persona keypair. **No Zuka-identifying tags.**
+A Zuka-published persona post is indistinguishable on the wire from
 any other kind-1 note. Tags are limited to content-discovery and
 attribution:
 
@@ -351,7 +351,7 @@ attribution:
   (NIP-92, pointing at Blossom URLs).
 
 Deliberately omitted: `t=phoenix`, `client=phoenix`, operator pubkey
-tags, persona name in `alt`, any other Phoenix-fingerprinting tag. The
+tags, persona name in `alt`, any other Zuka-fingerprinting tag. The
 persona's kind 0 bio is the right place to disclose AI usage;
 individual posts stay metadata-clean. See `src/lib/personaPost.ts:1-19`.
 
@@ -378,7 +378,7 @@ across endpoints. Each persona has its own PPQ `credit_id`; every
 request authenticates with the bearer token tied to that credit_id.
 
 The persona's PPQ credit balance is funded by **NIP-47 NWC auto-topup**
-from the persona's Spark wallet — Phoenix hands PPQ the wallet's NWC
+from the persona's Spark wallet — Zuka hands PPQ the wallet's NWC
 URL once at persona creation, and PPQ pulls the next chunk of credit
 whenever the balance dips below a configured threshold. The persona
 sustains itself: anyone who funds the wallet (donations via zaps,
@@ -393,8 +393,8 @@ for how `pi-ai` is configured against it.
 > sats per 1024×1024 image, verified 2026-05-09). Chat completions
 > (`/v1/chat/completions`) are NOT L402-supported (returns 401 without
 > a bearer header). Building a hybrid payment surface for V1 added
-> code paths without enabling new features Phoenix actually ships, so
-> Phoenix V1 sticks with credits uniformly. L402 becomes a documented
+> code paths without enabling new features Zuka actually ships, so
+> Zuka V1 sticks with credits uniformly. L402 becomes a documented
 > future direction; revisit when PPQ exposes L402 on chat (which would
 > let us drop the standing-credit-balance state entirely).
 
@@ -422,7 +422,7 @@ PPQ's `/v1/models` endpoint at runtime so we don't have to hard-code it.
 **Agent harness — deferred to V2.** V1 ships a **form-based**
 character-creator wizard. The operator fills in name, region, cause,
 languages, system prompt, and source URLs through ordinary form
-inputs; Phoenix calls `pi-ai` for sample-post styling and image
+inputs; Zuka calls `pi-ai` for sample-post styling and image
 generation, plus `/v1/audio/speech` directly for the one-shot voice
 sample — but does not run an LLM-driven interview.
 
@@ -455,7 +455,7 @@ Each persona surfaces:
 
 - A **Lightning Address** (e.g. `imani@spark.money`) — provided
   natively by the Spark SDK via Breez's hosted LNURL server. **No
-  self-hosted LNURL endpoint required.** Phoenix calls
+  self-hosted LNURL endpoint required.** Zuka calls
   `sdk.registerLightningAddress({ username, description })` at persona
   creation; the resulting address is published in the persona's kind
   0 `lud16` field and stored in the encrypted backup under
@@ -482,8 +482,8 @@ The wallet pays for:
 - **Blossom uploads** if the chosen Blossom server is paid.
 - **Nothing else** without explicit user action.
 
-Phoenix never custodies funds. The seed lives only in the persona's
-encrypted backup. Phoenix UI never shows the seed except during the
+Zuka never custodies funds. The seed lives only in the persona's
+encrypted backup. Zuka UI never shows the seed except during the
 "download backup" flow.
 
 ### 7.4 Empty-wallet UX
@@ -542,7 +542,7 @@ by token estimates from `pi-ai`.
 
 ### Explicitly out of scope
 
-- A Phoenix-owned backend service that holds user data
+- A Zuka-owned backend service that holds user data
 - Server-side persona storage or "account recovery via email"
 - Custodial wallet
 - Centralized moderation, content filtering, or safety classifier in front
@@ -584,7 +584,7 @@ constructive, not just resilient.
 
 - *Wallet SDK*: locked to **`@breeztech/breez-sdk-spark`** (Breez SDK
   Spark / Nodeless variant). Lightning Addresses are SDK-native via
-  Breez's hosted `spark.money` LNURL server — no Phoenix-hosted
+  Breez's hosted `spark.money` LNURL server — no Zuka-hosted
   endpoint required.
 - *PPQ payment*: **credits + NWC auto-topup**, uniform across all PPQ
   endpoints. Per-persona `credit_id` funded by NIP-47 NWC auto-topup
@@ -594,7 +594,7 @@ constructive, not just resilient.
   `/v1/images/generations`, `/v1/images/edits`, and `/v1/videos` but
   NOT on `/v1/chat/completions` (returns 401 without a bearer header,
   verified 2026-05-09). Building a hybrid surface for V1 didn't enable
-  any new features Phoenix actually ships. **Deferred** until PPQ
+  any new features Zuka actually ships. **Deferred** until PPQ
   exposes L402 on chat — at which point credits + standing balance
   could be retired entirely.
 - *Image-gen cost at demo scale*: ~29 sats per 1024×1024 image at
@@ -608,7 +608,7 @@ constructive, not just resilient.
 
 - *Voice generation*: PPQ supports TTS via `/v1/audio/speech` (DeepGram
   Aura 2, ElevenLabs) but only via the credits + bearer flow — there is
-  no L402-compatible TTS provider Phoenix has identified. **TTS is
+  no L402-compatible TTS provider Zuka has identified. **TTS is
   deferred from V1.** The persona schema retains `voice_id`,
   `voice_sample_url`, and `model_prefs.tts` as optional/null fields so
   V2 can populate them without a schema migration.
@@ -680,14 +680,14 @@ adaptation, not a full rewrite. Replace what the new stack obsoletes.
 - Any reference to OpenRouter and the Vercel `/style` endpoint plan
 
 `tasks/todo.md` should be rewritten as a build plan for the scope in §8.
-`AGENTS.md` should be amended with a "Phoenix-specific guidance" section
+`AGENTS.md` should be amended with a "Zuka-specific guidance" section
 that points contributors at this document.
 
 ---
 
 ## 12. Team
 
-Roles after the wallet → PPQ stream merge (see `STREAMS.md`):
+Roles after the wallet → PPQ stream merge:
 
 - **Anaïse** — Captain, product voice, demo lead, persona sign-off
 - **Derek** — Frontend, Nostr integration, PWA shell; persona harnesses
@@ -710,17 +710,17 @@ wallet/agent/Nostr/image-gen seams are where bugs will live.
   by one operator.
 - **Operator** — the human's Nostr identity. Signs encrypted persona
   backups (kind 30078); never publishes kind 0 or kind 1 under
-  Phoenix. See §3 for the full two-level identity model.
+  Zuka. See §3 for the full two-level identity model.
 - **User keypair** — synonym for "operator" used in some passing prose;
   prefer "operator."
-- **PPQ** — `ppq.ai`. OpenAI-compatible inference API. Phoenix uses
+- **PPQ** — `ppq.ai`. OpenAI-compatible inference API. Zuka uses
   PPQ's **credits system**: per-persona `credit_id` funded by NIP-47
   NWC auto-topup from the persona's Spark wallet, bearer-authed on
   every API request. One auth surface for the whole API. See
   `docs/guides/ppq.md` and §6.
 - **L402** — Lightning-native HTTP 402 payment protocol (per-request
   invoice, no standing account). PPQ supports it on `/v1/images/*`
-  and `/v1/videos` but not on `/v1/chat/completions`. **Phoenix V1
+  and `/v1/videos` but not on `/v1/chat/completions`. **Zuka V1
   does not use L402** — see §10's deferred-items note for why.
 - **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit. V1 uses
   `pi-ai` (LLM client) only; `pi-agent-core` and `pi-web-ui` are

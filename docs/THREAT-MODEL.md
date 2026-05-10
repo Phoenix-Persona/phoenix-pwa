@@ -1,6 +1,6 @@
 # Threat model
 
-What Phoenix protects, what it doesn't, and where the secrets live.
+What Zuka protects, what it doesn't, and where the secrets live.
 
 > Source of truth: `dev/PROJECT.md` §3. If this disagrees with §3, §3 wins
 > — update this file.
@@ -16,12 +16,12 @@ public personas a given operator is responsible for.
 
 ## Identity layout (two-level)
 
-Phoenix uses a two-level identity model (PROJECT.md §3,
+Zuka uses a two-level identity model (PROJECT.md §3,
 `docs/GLOSSARY.md`):
 
 - **Operator** — the human's Nostr identity. Signs encrypted persona
   backups (kind 30078). **Never publishes kind 0 or kind 1 under
-  Phoenix.** To outside observers, it's just a publisher of opaque
+  Zuka.** To outside observers, it's just a publisher of opaque
   ciphertext.
 - **Persona keypair** — separately generated per persona. Publishes
   the persona's public kind 0 / kind 1 events.
@@ -44,8 +44,8 @@ operator's nsec.
   `<operator_pubkey>` has authored N kind-30078 events with N distinct
   d-tag values (stable per persona; addressable-event semantics) and
   infer "this operator runs N addressable items." They **cannot** tell
-  those items are Phoenix backups specifically — Phoenix backup events
-  carry no `t`, no `alt`, and a Phoenix-opaque d-tag value, so
+  those items are Zuka backups specifically — Zuka backup events
+  carry no `t`, no `alt`, and a Zuka-opaque d-tag value, so
   externally they're indistinguishable from any other NIP-78
   application-data event (Coracle settings, Damus prefs, etc.). And
   they cannot tell which public personas this operator runs — the
@@ -61,10 +61,10 @@ These are explicit limits, not oversights:
 
 - **Catastrophic device compromise.** A keylogger that captures the
   operator's passphrase plus the encrypted operator nsec defeats
-  Phoenix.
+  Zuka.
 - **Coercion of the operator.** If someone forces the operator to type
   the passphrase, every persona under that operator is compromised.
-- **Traffic analysis.** Phoenix runs in a browser and talks to public
+- **Traffic analysis.** Zuka runs in a browser and talks to public
   Nostr relays, PPQ, and Blossom. Network observers can correlate
   timing. Tor / VPN is the operator's responsibility.
 - **NIP-44 limitations** (per the spec): no forward secrecy, no
@@ -116,12 +116,12 @@ every wallet, and post as every persona under that operator.
   this.
 - **Never derive the operator keypair from anything tied to the
   human's real identity** when the operator wants a fresh
-  Phoenix-generated identity — no email, no device ID.
+  Zuka-generated identity — no email, no device ID.
 - **Always encrypt the kind 30078 backup** to the operator's *own*
   pubkey via NIP-44 before publishing.
-- **Phoenix UI never shows a persona seed except during the explicit
+- **Zuka UI never shows a persona seed except during the explicit
   "download backup" flow.**
-- **No Phoenix-owned backend service** — see `docs/SCOPE.md` "out of
+- **No Zuka-owned backend service** — see `docs/SCOPE.md` "out of
   scope".
 
 ## Recovery and loss
@@ -131,7 +131,7 @@ every wallet, and post as every persona under that operator.
   30078 the operator has authored, decrypts each via the operator's
   signer, and re-hydrates every persona in one step.
 - **Loss of operator nsec:** every persona under that operator is
-  unrecoverable. Phoenix cannot recover them. The wizard's one-time
+  unrecoverable. Zuka cannot recover them. The wizard's one-time
   "download operator backup" affordance is the only safety net.
 - **Loss of a single persona's posts/wallet:** not possible to lose
   individually as long as the operator nsec is intact — the persona's

@@ -3,7 +3,7 @@
 A map of `src/`. Read this first. Source of truth is the code — when this
 doc disagrees with what's on disk, the code wins; update this file.
 
-> **Identity model.** Phoenix uses an **operator + persona split**
+> **Identity model.** Zuka uses an **operator + persona split**
 > (`dev/PROJECT.md` §3). The operator signs in with a single Nostr
 > identity that NIP-44-self-encrypts each persona's config as a kind
 > 30078 event. Each persona has its own separate keypair that publishes
@@ -15,12 +15,10 @@ doc disagrees with what's on disk, the code wins; update this file.
 > **kind-30078 tag scheme.** Per `dev/PROJECT.md` §5.2, the only tag is
 > `["d", "<opaque random uuid>"]`, **stable per persona** (generated
 > at creation, stored as `persona.dTag` inside the encrypted plaintext,
-> reused on every update). No `t`, no `alt`. Externally a Phoenix
+> reused on every update). No `t`, no `alt`. Externally a Zuka
 > backup is indistinguishable from any other NIP-78 app-data event.
 > Discovery is by scan-and-decrypt over the operator's own kind-30078
-> events. **Code-vs-doc divergence**: `src/lib/persona.ts` currently
-> uses a fresh random UUID per publish; switching to
-> stable-per-persona is the next persona-schema change.
+> events.
 
 ## Entry & root
 
@@ -84,10 +82,10 @@ Pure logic and HTTP clients. No React imports.
 
 | File              | What it does                                                                |
 | ----------------- | --------------------------------------------------------------------------- |
-| `persona.ts`      | Persona Zod schemas, kind 30078 event template builder, envelope parser. **Read the file header (lines 1-43)** — it documents the privacy posture (no Phoenix-specific tags) and the four-layer envelope verification. |
+| `persona.ts`      | Persona Zod schemas, kind 30078 event template builder, envelope parser. **Read the file header (lines 1-43)** — it documents the privacy posture (no Zuka-specific tags) and the four-layer envelope verification. |
 | `personaCrypto.ts`| `encryptPhoenixEnvelope` / `tryDecryptPhoenixEnvelope` — operator-self-encrypted NIP-44 ciphertext. |
 | `personaKey.ts`   | Persona keypair generation, nsec ↔ keypair, `signWithPersona()`.            |
-| `personaPost.ts`  | `buildPersonaPostTemplate` — kind 1 with **no Phoenix-identifying tags** (no `client`, no operator pubkey, no persona name). Read lines 1-19 for what's deliberately omitted. |
+| `personaPost.ts`  | `buildPersonaPostTemplate` — kind 1 with **no Zuka-identifying tags** (no `client`, no operator pubkey, no persona name). Read lines 1-19 for what's deliberately omitted. |
 
 ### PPQ layer (built; not wired into pages yet)
 
@@ -106,7 +104,7 @@ Pure logic and HTTP clients. No React imports.
 | `genUserName.ts`  | Deterministic display name from a pubkey for "Unknown persona" fallbacks. Has tests. |
 | `polyfills.ts`    | Loaded first in `main.tsx`. Browser polyfills.                              |
 | `utils.ts`        | shadcn `cn()` helper.                                                       |
-| `styleClient.ts`  | **Legacy — scheduled for deletion per `dev/PROJECT.md` §11.** POSTs to `/api/style` (Vercel function) for persona text styling. Both `Onboard.tsx` and `Dashboard.tsx` still call this. The PPQ hooks exist but are not yet wired in — see `DATA-FLOW.md` "Unwired seams". Migration: replace with `usePpqInference` (see Stream A `/dev/ppq-pay` in `dev/STREAMS.md` §A3). |
+| `styleClient.ts`  | **Legacy — scheduled for deletion per `dev/PROJECT.md` §11.** POSTs to `/api/style` (Vercel function) for persona text styling. Both `Onboard.tsx` and `Dashboard.tsx` still call this. The PPQ hooks exist but are not yet wired in — see `DATA-FLOW.md` "Unwired seams". Migration: replace with `usePpqInference`. |
 
 ## `src/hooks/`
 
@@ -115,7 +113,7 @@ Pure logic and HTTP clients. No React imports.
 | Hook                  | Signature                                  | Notes                                                         |
 | --------------------- | ------------------------------------------ | ------------------------------------------------------------- |
 | `usePersona(npub)`    | `useQuery → { event, config } \| null`    | Scans operator's kind 30078s, decrypts each, matches `personaPubkey`. Slow by design (privacy). |
-| `useMyPersonas()`     | `useQuery → { event, config, npub }[]`    | Scan-and-decrypt across all of the operator's kind 30078s; returns Phoenix-shaped envelopes. |
+| `useMyPersonas()`     | `useQuery → { event, config, npub }[]`    | Scan-and-decrypt across all of the operator's kind 30078s; returns Zuka-shaped envelopes. |
 | `usePersonaPosts(npub, limit)` | `useQuery → NostrEvent[]`         | Public kind 1 query by author pubkey. Anyone can call.        |
 | `usePersonaPublish()` | `useMutation({ personaNsec, template })`  | Decodes nsec, finalizes/signs the event with `signWithPersona`, publishes via `nostr.event(...)`. |
 
@@ -154,7 +152,7 @@ Pure logic and HTTP clients. No React imports.
 
 ## `src/components/`
 
-### Top-level (Phoenix-specific UI)
+### Top-level (Zuka-specific UI)
 
 | File                  | What it does                                                          |
 | --------------------- | --------------------------------------------------------------------- |
@@ -232,7 +230,7 @@ operator's signer. See `lib/personaKey.ts:1-9`.
 - **`useNostr.ts` — re-export only**, do not add logic (file comment lines 1-5).
 - **`useLoginActions.ts` — only edit to add new login methods** (file comment line 10).
 - **`components/ui/` — shadcn-generated**, regenerate, don't hand-edit.
-- **No Phoenix-specific tags on persona-published events.** Read `lib/persona.ts:1-43` and `lib/personaPost.ts:1-19` before touching tag arrays.
+- **No Zuka-specific tags on persona-published events.** Read `lib/persona.ts:1-43` and `lib/personaPost.ts:1-19` before touching tag arrays.
 - **No NIP-04 anywhere.** Use NIP-44 via `signer.nip44.{encrypt,decrypt}`.
 - **The current-user signer is at `useCurrentUser().user.signer`.** It satisfies the `Nip44Signer` interface — cast to that when calling `lib/personaCrypto.ts` helpers.
 

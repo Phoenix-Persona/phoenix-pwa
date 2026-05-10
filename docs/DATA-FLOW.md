@@ -7,19 +7,11 @@ the actual code so you don't have to grep five files to follow it.
 > Companion to `docs/ARCHITECTURE.md`. The architecture doc tells you
 > *what each file does*; this doc tells you *what calls what*.
 >
-> **kind-30078 d-tag note.** The code paths below use a **fresh random
-> UUID per publish** for the kind-30078 d-tag (`generatePersonaDTag()`
-> in `src/lib/persona.ts`). Per `dev/PROJECT.md` §5.2 this should be
-> **stable per persona** (generated once at creation, stored as
-> `persona.dTag`, reused on every update so addressable-event semantics
-> apply). The next persona-schema change should reconcile.
->
-> **Legacy `/api/style` callout.** The `lib/styleClient.ts` →
-> `/api/style` path documented below is **scheduled for deletion** per
-> PROJECT.md §11. Migration target: `usePpqInference` (Stream A
-> `/dev/ppq-pay` in `dev/STREAMS.md` §A3). Treat the flow descriptions
-> below as accurate-as-of-current-code documentation of code about to
-> be replaced.
+> **Note.** Some flow descriptions below still reference
+> `lib/styleClient.ts` → `/api/style`, which has been deleted in favor
+> of `usePpqInference` (PROJECT.md §11). The flows on this page are
+> being rewritten in a separate pass; treat them as
+> accurate-as-of-pre-PR-#8 until then.
 
 ## Flows at a glance
 
@@ -120,7 +112,7 @@ navigate(`/dashboard/${kp.npub}`)
 **Two events published:**
 
 1. **kind 30078** — encrypted envelope, signed by the operator. The
-   only "Phoenix" signal is inside the ciphertext; tags are `[["d",
+   only "Zuka" signal is inside the ciphertext; tags are `[["d",
    <uuid>]]` and nothing else (`lib/persona.ts:117-122`).
 2. **kind 0** — public profile, signed by the persona's keypair. Looks
    like any other Nostr account.
@@ -148,8 +140,8 @@ useMyPersonas()                                              ← hooks/usePerson
    │
    ▼
 nostr.query([{ kinds: [30078], authors: [user.pubkey], limit: 200 }])
-   │  No Phoenix-specific filter — by design. Anything narrower
-   │  would leak Phoenix usage to relays/observers.
+   │  No Zuka-specific filter — by design. Anything narrower
+   │  would leak Zuka usage to relays/observers.
    ▼
 events: NostrEvent[]
    │
@@ -349,11 +341,11 @@ picture is currently published with empty `picture` (`Onboard.tsx:206`).
 ## PPQ flows (built; not yet wired into pages)
 
 The `lib/ppq/*` and `hooks/usePpq*` layers are complete but no page
-calls them yet. The eventual seams. **PPQ and Breeze are complementary,
-not alternatives:** the per-persona Breeze wallet (PROJECT.md §7,
-`docs/guides/breeze-sdk.md`) is the source of funds; the persona's wallet
+calls them yet. The eventual seams. **PPQ and Breez Spark are complementary,
+not alternatives:** the per-persona Breez Spark wallet (PROJECT.md §7,
+`docs/guides/breez-spark.md`) is the source of funds; the persona's wallet
 exposes itself as a NIP-47 NWC endpoint, and PPQ's auto-topup pulls
-from it on demand. Breeze integration is still pending; PPQ NWC
+from it on demand. Breez Spark integration is still pending; PPQ NWC
 primitives are wired below.
 
 ### PPQ account auto-create
@@ -415,7 +407,7 @@ because the API has both `"New"/"Settled"` and lowercase variants
 
 ### PPQ NWC auto-topup (NIP-47)
 
-The "wallet tops Phoenix up at will" primitive. Operator hands PPQ an
+The "wallet tops Zuka up at will" primitive. Operator hands PPQ an
 NWC URL and a USD threshold:
 
 ```
@@ -433,7 +425,7 @@ PpqNwcSettings
 ```
 
 PPQ then pulls `topup_amount_usd` from the connected wallet whenever the
-balance dips below `threshold_usd`. No Phoenix-side polling needed.
+balance dips below `threshold_usd`. No Zuka-side polling needed.
 
 ---
 

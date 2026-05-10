@@ -27,7 +27,7 @@ export function AppRouter() {
         <Route path="/p/:npub" element={<PersonaFeed />} />
         <Route path="/verify/:npub" element={<Verify />} />
         <Route path="/settings" element={<Settings />} />
-        {/* Developer harnesses — see dev/STREAMS.md §A2/§A3. */}
+        {/* Developer harnesses. */}
         <Route path="/dev/wallet" element={<WalletHarness />} />
         <Route path="/dev/inference-pay" element={<InferencePayHarness />} />
         {/* NIP-19 catch-all stays at the root for raw npub/note/naddr URLs */}
