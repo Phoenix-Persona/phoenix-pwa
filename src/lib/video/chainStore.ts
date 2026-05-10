@@ -49,6 +49,14 @@ export interface ChainInputs {
   previewUrl?: string;
   /** Blossom-permanent seed for clip 1. */
   seedImageUrl?: string;
+  /**
+   * Background-music selection — stable id from
+   * `src/lib/video/musicTracks.ts:BACKGROUND_MUSIC_TRACKS`. When unset
+   * the stitch step skips audio mixing and the output has only the
+   * persona's voice. Persisting the id (not the URL) means the resume
+   * path picks up the latest URL if the catalog gets updated mid-run.
+   */
+  musicTrackId?: string;
 }
 
 export interface ChainRecord {

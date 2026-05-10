@@ -49,9 +49,14 @@ import {
   generateMonologueScript,
   type ScriptSegment,
 } from "@/lib/video/generateMonologueScript";
-import { fmtBytes, fmtMs, verror, vlog } from "@/lib/video/log";
+import { fmtBytes, fmtMs, verror, vlog, vwarn } from "@/lib/video/log";
 import { runChain, type ClipResult } from "@/lib/video/runChain";
+import { addBackgroundMusic } from "@/lib/video/addBackgroundMusic";
 import { stitchClips, type StitchProgress } from "@/lib/video/stitchClips";
+import {
+  DEFAULT_MUSIC_VOLUME,
+  getMusicTrack,
+} from "@/lib/video/musicTracks";
 import { extractUrlFromTags } from "@/lib/video/uploadBlobToBlossom";
 import {
   NO_TEXT_OVERLAY_DIRECTIVE,
@@ -162,12 +167,26 @@ export interface UseGenerateVideoPipelineArgs {
   personaAvatarUrl?: string;
 }
 
+/** Per-run knobs the dialog passes when locking in duration. */
+export interface ConfirmAndGenerateOptions {
+  /**
+   * Background-music track id from `BACKGROUND_MUSIC_TRACKS`. When
+   * set, the stitch step layers the track at the catalog's specified
+   * volume (default 0.1) under the persona's voice. When unset, the
+   * stitched video has only the persona's voice.
+   */
+  musicTrackId?: string;
+}
+
 export interface UseGenerateVideoPipelineResult {
   phase: GenerationPhase;
   /** Step 1: generate or regenerate the preview image. */
   generatePreview: () => Promise<void>;
   /** Step 2: lock in duration and start the chain. */
-  confirmAndGenerate: (totalDurationSecs: number) => Promise<void>;
+  confirmAndGenerate: (
+    totalDurationSecs: number,
+    opts?: ConfirmAndGenerateOptions,
+  ) => Promise<void>;
   /** Step 4: publish the kind 1 with the user-edited caption. */
   publish: (editedCaption: string) => Promise<void>;
   /** Resume a previously-checkpointed chain by id. */
@@ -433,20 +452,28 @@ export function useGenerateVideoPipeline(
         vlog("pipeline", "resume: all clips already done, skipping chain");
       }
 
-      // 4. Stitch — skip if we already have a stitched blob.
+      // 4. Stitch (pass 1) → optionally overlay music (pass 2).
+      // Each pass is independent. If pass 2 fails (CORS on the music
+      // host, transient ffmpeg issue), we fall through to the
+      // voice-only stitched blob and toast a non-blocking warning —
+      // the chain still ships.
       let stitchedBlob = record.stitchedBlob;
       if (!stitchedBlob && !record.stitchedUrl) {
         const totalInputBytes = completedClips.reduce(
           (sum, c) => sum + c.blob.size,
           0,
         );
+        const musicTrack = getMusicTrack(record.inputs.musicTrackId);
         vlog("pipeline", "phase → stitching", {
           numClips: completedClips.length,
           totalInputSize: fmtBytes(totalInputBytes),
+          music: musicTrack?.id ?? "(none)",
         });
         setPhase({ type: "stitching", segments, completedClips });
+
+        // Pass 1 — concat with `-c copy`, no re-encode.
         const tStitch = Date.now();
-        stitchedBlob = await stitchClips({
+        let voiceOnlyBlob = await stitchClips({
           clips: completedClips.map((c) => c.blob),
           onProgress: (p: StitchProgress) =>
             setPhase((prev) =>
@@ -456,9 +483,56 @@ export function useGenerateVideoPipeline(
         });
         vlog(
           "pipeline",
-          `stitched in ${fmtMs(Date.now() - tStitch)}`,
-          { outputSize: fmtBytes(stitchedBlob.size) },
+          `stitched (voice-only) in ${fmtMs(Date.now() - tStitch)}`,
+          { outputSize: fmtBytes(voiceOnlyBlob.size) },
         );
+
+        // Pass 2 — overlay music. Best-effort: any failure falls
+        // back to the voice-only blob.
+        if (musicTrack) {
+          const tMix = Date.now();
+          try {
+            const mixed = await addBackgroundMusic({
+              videoBlob: voiceOnlyBlob,
+              musicUrl: musicTrack.url,
+              musicVolume: musicTrack.volume ?? DEFAULT_MUSIC_VOLUME,
+              onProgress: (p) =>
+                setPhase((prev) =>
+                  prev.type === "stitching" ? { ...prev, ratio: p.ratio } : prev,
+                ),
+              signal,
+            });
+            vlog(
+              "pipeline",
+              `music mixed in ${fmtMs(Date.now() - tMix)}`,
+              {
+                track: musicTrack.id,
+                outputSize: fmtBytes(mixed.size),
+              },
+            );
+            voiceOnlyBlob = mixed;
+          } catch (err) {
+            // Honor user-initiated cancels — surface them rather
+            // than swallow.
+            if (err instanceof DOMException && err.name === "AbortError") {
+              throw err;
+            }
+            const reason = err instanceof Error ? err.message : String(err);
+            vwarn(
+              "pipeline",
+              `music overlay failed; shipping voice-only: ${reason}`,
+              { trackUrl: musicTrack.url },
+            );
+            toast({
+              title: "Background music skipped",
+              description:
+                "Couldn't apply the music track. Shipping voice-only.",
+              variant: "destructive",
+            });
+          }
+        }
+
+        stitchedBlob = voiceOnlyBlob;
         record.stitchedBlob = stitchedBlob;
         await saveChain(record);
       }
@@ -528,11 +602,14 @@ export function useGenerateVideoPipeline(
         captionDraft,
       });
     },
-    [account, ensureAccount, persona, upload],
+    [account, ensureAccount, persona, upload, toast],
   );
 
   const confirmAndGenerate = useCallback(
-    async (totalDurationSecs: number): Promise<void> => {
+    async (
+      totalDurationSecs: number,
+      opts: ConfirmAndGenerateOptions = {},
+    ): Promise<void> => {
       const current = phaseRef.current;
       if (current.type !== "preview-ready") {
         return;
@@ -556,6 +633,7 @@ export function useGenerateVideoPipeline(
         totalDurationSecs,
         segmentSecs: SEGMENT_SECS,
         previewUrl,
+        musicTrackId: opts.musicTrackId ?? "(none)",
       });
       try {
         const acct = account ?? (await ensureAccount());
@@ -620,6 +698,7 @@ export function useGenerateVideoPipeline(
             personaName: persona.name,
             previewUrl,
             seedImageUrl,
+            musicTrackId: opts.musicTrackId,
           },
           segments,
           clips: [],

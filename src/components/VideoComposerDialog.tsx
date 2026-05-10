@@ -43,10 +43,23 @@ import {
   findResumableForPersona,
   type ChainSummary,
 } from "@/lib/video/chainStore";
+import {
+  BACKGROUND_MUSIC_TRACKS,
+  DEFAULT_MUSIC_TRACK_ID,
+} from "@/lib/video/musicTracks";
 import { postToTwitterIntent } from "@/lib/twitter/intent";
 import type { Persona } from "@/lib/persona";
 import { BrandedVideo } from "@/components/BrandedVideo";
 import { XLogo } from "@/components/icons/XLogo";
+
+/**
+ * localStorage key for the picked background-music track id. An
+ * empty string means "no music". Replaces the old boolean
+ * `phoenix:video:musicEnabled` key — `loadStoredMusicTrackId` reads
+ * either format for back-compat.
+ */
+const MUSIC_TRACK_STORAGE_KEY = "phoenix:video:musicTrackId";
+const LEGACY_MUSIC_ENABLED_STORAGE_KEY = "phoenix:video:musicEnabled";
 
 const DURATION_MIN_SECS = 10;
 const DURATION_MAX_SECS = 120;
@@ -174,7 +187,7 @@ export function VideoComposerDialog(props: VideoComposerDialogProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-6 py-5 space-y-5 min-h-[20rem]">
+        <div className="px-6 py-5 space-y-5 min-h-[20rem] min-w-0">
           {resumable && phase.type === "idle" ? (
             <ResumePrompt
               summary={resumable}
@@ -195,8 +208,8 @@ export function VideoComposerDialog(props: VideoComposerDialogProps) {
               phase={phase}
               personaAvatarUrl={personaAvatarUrl}
               onRegeneratePreview={() => void pipeline.generatePreview()}
-              onConfirmDuration={(dur) =>
-                void pipeline.confirmAndGenerate(dur)
+              onConfirmDuration={(dur, opts) =>
+                void pipeline.confirmAndGenerate(dur, opts)
               }
               onPublish={(caption) => void pipeline.publish(caption)}
               onResume={(id) => void pipeline.resume(id)}
@@ -229,7 +242,10 @@ function PhaseView(props: {
   phase: GenerationPhase;
   personaAvatarUrl?: string;
   onRegeneratePreview: () => void;
-  onConfirmDuration: (durationSecs: number) => void;
+  onConfirmDuration: (
+    durationSecs: number,
+    opts: { musicTrackId?: string },
+  ) => void;
   onPublish: (caption: string) => void;
   onResume: (chainId: string) => void;
   onDiscardCheckpoint: (chainId: string) => void;
@@ -439,13 +455,21 @@ function PreviewStep(props: {
   previewUrl: string;
   avatarUrl?: string;
   onRegenerate: () => void;
-  onConfirm: (durationSecs: number) => void;
+  onConfirm: (
+    durationSecs: number,
+    opts: { musicTrackId?: string },
+  ) => void;
 }) {
   const { previewUrl, avatarUrl, onRegenerate, onConfirm } = props;
   // Default to the user's last picked length, snapped to the slider's
   // step grid. First-time users get DURATION_DEFAULT_SECS (20s).
   const [duration, setDuration] = useState<number>(() =>
     loadStoredDuration(),
+  );
+  // Selected music track id (or null for none). Persisted across
+  // sessions; first-time users get null.
+  const [musicTrackId, setMusicTrackId] = useState<string | null>(() =>
+    loadStoredMusicTrackId(),
   );
 
   const numClips = Math.max(1, Math.ceil(duration / SEGMENT_SECS));
@@ -521,9 +545,63 @@ function PreviewStep(props: {
         </p>
       </div>
 
+      {/* Background music — horizontally-scrollable, mutually-exclusive
+          pills. "None" first; rest mirrors the kind-34011 catalog.
+          ~10% volume bed under the persona's voice; voice stays
+          dominant.
+
+          Containment notes:
+            - Outer wrapper has `min-w-0` so the inner overflow-x-auto
+              actually clips instead of letting `flex` items push the
+              parent wider than the dialog.
+            - `relative` + an absolute right-edge gradient + a chevron
+              dot signal that there's more content off-screen, so the
+              affordance is discoverable on touch devices that don't
+              show scrollbars. */}
+      <div className="min-w-0">
+        <div className="flex items-baseline justify-between mb-2">
+          <h3 className="text-sm font-semibold">Background music</h3>
+          <span className="text-[11px] text-muted-foreground">
+            Scroll → · ~10% volume
+          </span>
+        </div>
+        <div className="relative">
+          <div className="overflow-x-auto -mx-1 px-1 pb-1 [scrollbar-width:thin]">
+            <div className="flex gap-1.5">
+              <MusicPill
+                label="None"
+                selected={musicTrackId === null}
+                onClick={() => persistMusicTrackId(null, setMusicTrackId)}
+              />
+              {BACKGROUND_MUSIC_TRACKS.map((track) => (
+                <MusicPill
+                  key={track.id}
+                  label={track.label}
+                  selected={musicTrackId === track.id}
+                  onClick={() =>
+                    persistMusicTrackId(track.id, setMusicTrackId)
+                  }
+                />
+              ))}
+            </div>
+          </div>
+          {/* Right-edge fade — visual cue that more content lives
+              past the viewport. pointer-events:none so it doesn't
+              swallow taps on the last pill. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background via-background/85 to-transparent"
+          />
+        </div>
+      </div>
+
       <div className="flex justify-end pt-2">
         <Button
-          onClick={() => onConfirm(duration)}
+          onClick={() =>
+            onConfirm(duration, {
+              musicTrackId: musicTrackId ?? undefined,
+            })
+          }
           className="shadow-md shadow-primary/20"
         >
           <Wand2 className="size-4 mr-2" aria-hidden="true" />
@@ -533,6 +611,68 @@ function PreviewStep(props: {
       </div>
     </div>
   );
+}
+
+function MusicPill(props: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      aria-pressed={props.selected}
+      className={
+        "shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs transition-colors " +
+        (props.selected
+          ? "border-rw-gold bg-rw-gold/15 text-foreground font-medium"
+          : "border-imigongo-clay/20 bg-card text-muted-foreground hover:border-imigongo-clay/40 hover:text-foreground")
+      }
+    >
+      {props.label}
+    </button>
+  );
+}
+
+/**
+ * Persist the picked track id to localStorage and update React state
+ * in one step. Pass `null` for "no music".
+ */
+function persistMusicTrackId(
+  id: string | null,
+  setter: (next: string | null) => void,
+): void {
+  setter(id);
+  try {
+    localStorage.setItem(MUSIC_TRACK_STORAGE_KEY, id ?? "");
+  } catch {
+    /* private mode etc — fine to ignore */
+  }
+}
+
+/**
+ * Read the last picked music track id from localStorage. Returns
+ * null for "no music". Honors the legacy boolean flag from before
+ * the catalog grew past one entry: a stored `"1"` resolves to the
+ * default track id; `"0"` or missing → null.
+ */
+function loadStoredMusicTrackId(): string | null {
+  try {
+    const v = localStorage.getItem(MUSIC_TRACK_STORAGE_KEY);
+    if (v !== null) {
+      if (!v) return null;
+      // Validate against the current catalog — a stale id from a
+      // catalog that's since rotated should fall back to null.
+      return BACKGROUND_MUSIC_TRACKS.some((t) => t.id === v) ? v : null;
+    }
+    // Legacy boolean migration.
+    const legacy = localStorage.getItem(LEGACY_MUSIC_ENABLED_STORAGE_KEY);
+    if (legacy === "1") return DEFAULT_MUSIC_TRACK_ID;
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function ClipChainProgress(props: {
