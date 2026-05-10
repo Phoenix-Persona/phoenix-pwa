@@ -123,7 +123,14 @@ export type GenerationPhase =
       captionDraft: string;
     }
   | { type: "publishing"; stitchedUrl: string }
-  | { type: "done"; stitchedUrl: string; eventId: string }
+  | {
+      type: "done";
+      stitchedUrl: string;
+      eventId: string;
+      /** The caption text actually published — preserved so the post-publish
+          UI can reuse it (e.g. cross-posting to X). */
+      caption: string;
+    }
   | {
       type: "error";
       message: string;
@@ -721,7 +728,12 @@ export function useGenerateVideoPipeline(
           `phase → done · published in ${fmtMs(Date.now() - tPublish)}`,
           { eventId: event.id },
         );
-        setPhase({ type: "done", stitchedUrl, eventId: event.id });
+        setPhase({
+          type: "done",
+          stitchedUrl,
+          eventId: event.id,
+          caption: editedCaption,
+        });
         toast({
           title: "Posted",
           description:

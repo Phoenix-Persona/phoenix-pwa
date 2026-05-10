@@ -1,13 +1,17 @@
 import { useMemo } from "react";
 import type { NostrEvent } from "@nostrify/nostrify";
 
+import { BrandedVideo } from "./BrandedVideo";
 import { PostBody } from "./PostBody";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { XLogo } from "@/components/icons/XLogo";
 import {
   extractImetaImages,
   extractImetaVideos,
   extractSourceDomains,
 } from "@/lib/personaPost";
+import { postToTwitterIntent } from "@/lib/twitter/intent";
 import { cn } from "@/lib/utils";
 
 interface PostCardProps {
@@ -63,16 +67,11 @@ export function PostCard({ event, className }: PostCardProps) {
       {videos.length > 0 && (
         <div className="mt-4 space-y-1.5">
           {videos.slice(0, 2).map((v, idx) => (
-            <video
+            <BrandedVideo
               key={`${v.url}-${idx}`}
               src={v.url}
               poster={v.poster}
-              controls
-              preload="metadata"
-              playsInline
-              crossOrigin="anonymous"
-              aria-label={v.alt}
-              className="w-full max-h-[28rem] rounded-lg bg-imigongo-charcoal"
+              alt={v.alt}
             />
           ))}
         </div>
@@ -129,13 +128,28 @@ export function PostCard({ event, className }: PostCardProps) {
         </div>
       )}
 
-      <div className="mt-3 pt-3 border-t border-border/60 text-xs text-muted-foreground">
+      <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <time
           dateTime={new Date(event.created_at * 1000).toISOString()}
           title={absoluteTime}
         >
           {relativeTime(event.created_at)}
         </time>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-xs hover:bg-black/5"
+          onClick={() =>
+            postToTwitterIntent({
+              text: event.content,
+              mediaUrl: videos[0]?.url ?? images[0]?.url,
+            })
+          }
+          title="Open X compose tab with this post pre-filled. If there's a video, it'll start downloading so you can attach it."
+        >
+          <XLogo className="mr-1 size-3" aria-hidden="true" />
+          Post to X
+        </Button>
       </div>
     </article>
   );
