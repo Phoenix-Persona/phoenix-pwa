@@ -532,7 +532,7 @@ function UsernameAvailabilityHint({
       return (
         <p className="text-xs text-amber-600 dark:text-amber-500">
           <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code> is
-          taken — pick a different Lightning address before creating the persona.
+          already taken. Try another handle.
         </p>
       );
     case "error":

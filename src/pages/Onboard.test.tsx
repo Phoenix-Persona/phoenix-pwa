@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   generatePersonaKeypair: vi.fn(),
   createPersonaSigner: vi.fn(),
   uploadFileToBlossom: vi.fn(),
+  availability: { status: "idle" } as { status: "idle" } | { status: "taken"; username: string },
 }));
 
 vi.mock("@unhead/react", () => ({
@@ -54,7 +55,7 @@ vi.mock("@/hooks/useCreatePersona", () => ({
 }));
 
 vi.mock("@/hooks/useUsernameAvailability", () => ({
-  useUsernameAvailability: () => ({ status: "idle" }),
+  useUsernameAvailability: () => mocks.availability,
 }));
 
 vi.mock("@/lib/personaKey", () => ({
@@ -84,6 +85,7 @@ describe("Onboard", () => {
     });
     mocks.createPersonaSigner.mockReset();
     mocks.uploadFileToBlossom.mockReset();
+    mocks.availability = { status: "idle" };
     mocks.mutateAsync.mockReset().mockResolvedValue({
       npub: "npub1persona",
       envelope: {
@@ -118,5 +120,18 @@ describe("Onboard", () => {
         }),
       ),
     );
+  });
+
+  it("shows direct copy when the Lightning address is taken", () => {
+    mocks.availability = {
+      status: "taken",
+      username: "voice-of-rwanda",
+    };
+
+    render(<Onboard />);
+
+    expect(screen.getByText("voice-of-rwanda@breez.tips")).toBeInTheDocument();
+    expect(screen.getByText(/already taken\. Try another handle\./i)).toBeInTheDocument();
+    expect(screen.queryByText(/before creating the persona/i)).not.toBeInTheDocument();
   });
 });
