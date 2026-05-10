@@ -163,8 +163,14 @@ export function useOperatorEnvelope() {
     OperatorEnvelopeInput | undefined
   >({
     mutationFn: async (overrides) => {
-      const wallet = overrides?.wallet ?? (await buildFreshWallet());
-      const ppq = overrides?.ppq;
+      const current = qc.getQueryData<OperatorEnvelopeState | null>(
+        OPERATOR_QK(user?.pubkey),
+      );
+      const wallet =
+        overrides?.wallet ??
+        current?.envelope.wallet ??
+        (await buildFreshWallet());
+      const ppq = overrides?.ppq ?? current?.envelope.ppq;
       return publish({ wallet, ppq });
     },
     onSuccess: (state) => {

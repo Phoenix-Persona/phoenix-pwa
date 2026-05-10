@@ -31,7 +31,10 @@ vi.mock("@/lib/env", () => ({
 }));
 
 interface FakeEnvelopeState {
-  envelope?: unknown;
+  envelope?: {
+    wallet?: { kind: "spark"; seed: string };
+    ppq?: { api_key: string; credit_id: string };
+  };
   isLoading: boolean;
   isMinting: boolean;
   mint: ReturnType<typeof vi.fn>;
@@ -94,15 +97,31 @@ describe("OperatorWalletInit", () => {
     expect(env.mint).toHaveBeenCalledTimes(1);
   });
 
-  it("does not mint when an existing envelope is already present", async () => {
+  it("does not mint when an existing envelope already has a wallet", async () => {
     const env = setupEnvelope({
-      envelope: { app: "phoenix-operator", version: 1 },
+      envelope: {
+        wallet: { kind: "spark", seed: "operator seed words" },
+      },
     });
 
     render(<OperatorWalletInit />);
     await Promise.resolve();
 
     expect(env.mint).not.toHaveBeenCalled();
+  });
+
+  it("mints a wallet when an existing envelope has no wallet seed", async () => {
+    const ppq = { api_key: "api-existing", credit_id: "credit-existing" };
+    const env = setupEnvelope({
+      envelope: { ppq },
+    });
+
+    render(<OperatorWalletInit />);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(env.mint).toHaveBeenCalledTimes(1);
+    expect(env.mint).toHaveBeenCalledWith({ ppq });
   });
 
   it("does not mint while the envelope query is still loading", async () => {

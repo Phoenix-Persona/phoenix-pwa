@@ -2,7 +2,7 @@
  * Auto-mint the operator wallet on first login.
  *
  * When the operator logs in and:
- *   - has no operator envelope on record yet, AND
+ *   - has no operator wallet seed on record yet, AND
  *   - hasn't pinned both `VITE_WALLET_SEED` + `VITE_PPQ_API_KEY` via
  *     env (in which case env override is sufficient and minting would
  *     just be noise),
@@ -18,7 +18,7 @@
  * Conservative behavior:
  *   - Won't mint until the query has settled (so we don't double-mint
  *     if an envelope is in flight).
- *   - Won't mint if an existing envelope was found.
+ *   - Won't mint if an existing wallet seed was found.
  *   - Won't mint if env override is already complete.
  *   - Runs at most once per session per user. On failure we don't
  *     auto-retry; the user recovers via the manual "Set up wallet"
@@ -51,13 +51,13 @@ export function OperatorWalletInit() {
       return;
     }
     if (isLoading) return;
-    if (envelope) return;
+    if (envelope?.wallet?.seed) return;
     if (isMinting) return;
     if (ran.current) return;
     if (envOverrideComplete()) return;
 
     ran.current = true;
-    mint(undefined).catch((err) => {
+    mint(envelope ? { ppq: envelope.ppq } : undefined).catch((err) => {
       // Auto-mint runs at most once per session per user. The error is
       // surfaced through `useOperatorEnvelope().mintError`; the AppHeader
       // renders a destructive "Wallet setup failed — retry" CTA the user
