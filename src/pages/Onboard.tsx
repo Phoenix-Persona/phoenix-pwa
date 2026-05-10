@@ -50,6 +50,7 @@ import {
   PHOENIX_PAYLOAD_APP,
   PHOENIX_PAYLOAD_VERSION,
   type Persona,
+  type PersonaWallet,
   type PhoenixEnvelope,
 } from "@/lib/persona";
 import {
@@ -60,6 +61,8 @@ import {
   generatePersonaKeypair,
   signWithPersona,
 } from "@/lib/personaKey";
+import { generateMnemonic } from "@/lib/wallet/client";
+import { DEFAULT_AUTO_TOPUP_CONFIG } from "@/lib/wallet/types";
 
 type WizardStep = "details" | "picture";
 
@@ -133,12 +136,27 @@ const Onboard = () => {
         created_at: Math.floor(Date.now() / 1000),
       };
 
+      // Mint a fresh BIP-39 mnemonic for the persona's Spark wallet.
+      // Stored only inside the encrypted envelope; recoverable on any
+      // device with the user's signer (PROJECT.md §7.1).
+      const mnemonic = await generateMnemonic();
+      const wallet: PersonaWallet = {
+        kind: "spark",
+        seed: mnemonic,
+        auto_topup: {
+          enabled: DEFAULT_AUTO_TOPUP_CONFIG.enabled,
+          threshold_usd: DEFAULT_AUTO_TOPUP_CONFIG.thresholdUsd,
+          target_usd: DEFAULT_AUTO_TOPUP_CONFIG.targetUsd,
+        },
+      };
+
       const signer = user.signer as unknown as Nip44Signer;
 
       // 1. Encrypt the Phoenix envelope (user self-encryption).
       const ciphertext = await encryptPhoenixEnvelope(
         {
           persona,
+          wallet,
           model_prefs: DEFAULT_MODEL_PREFS,
         },
         user.pubkey,

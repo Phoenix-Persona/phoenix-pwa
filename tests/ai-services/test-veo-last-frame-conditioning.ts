@@ -23,7 +23,7 @@
  * Run:
  *   npx tsx tests/ai-services/test-veo-last-frame-conditioning.ts
  *
- * Loads `dev/.env` automatically.
+ * Loads `.env` automatically.
  *
  * Prereqs:
  *   - ffmpeg on your $PATH (the script extracts the last frame of clip 1

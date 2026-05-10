@@ -296,7 +296,7 @@ Plaintext payload:
   "model_prefs": {
     "styling": "claude-sonnet-4.5",
     "image": "gpt-image-1",
-    "tts": "deepgram-aura-2",
+    "tts": null,
     "video": null
   },
   "settings": {
@@ -372,27 +372,40 @@ encryption is needed on Blossom.
 
 ## 6. AI capabilities
 
-All inference goes through **PPQ** (`https://api.ppq.ai`, OpenAI-compatible)
-via `pi-ai`. Phoenix uses PPQ's **credits system**: each persona has
-its own `credit_id` (PPQ account), funded via Lightning from the
-persona's Spark wallet. NIP-47 NWC keeps the credit_id topped up
-hands-off — Phoenix hands PPQ the wallet's NWC URL once at persona
-creation, and PPQ pulls the next chunk of credit whenever the balance
-dips below a threshold. Every API request authenticates with the
-bearer token tied to that credit_id; one auth surface for the whole
-PPQ API. (PPQ also supports L402 per-request, but only on a subset of
-endpoints; credits are simpler and complete.) See
-`docs/guides/ppq.md` for the PPQ surface and `docs/guides/pi-mono.md`
+All AI inference goes through **PPQ** (`https://api.ppq.ai`,
+OpenAI-compatible) using the **credits + bearer** auth flow uniformly
+across endpoints. Each persona has its own PPQ `credit_id`; every
+request authenticates with the bearer token tied to that credit_id.
+
+The persona's PPQ credit balance is funded by **NIP-47 NWC auto-topup**
+from the persona's Spark wallet — Phoenix hands PPQ the wallet's NWC
+URL once at persona creation, and PPQ pulls the next chunk of credit
+whenever the balance dips below a configured threshold. The persona
+sustains itself: anyone who funds the wallet (donations via zaps,
+direct invoice top-ups) keeps the credits flowing, no operator
+intervention needed.
+
+See `docs/guides/ppq.md` for the PPQ surface and `docs/guides/pi-mono.md`
 for how `pi-ai` is configured against it.
+
+> **L402 — investigated, deferred.** PPQ exposes per-request L402 on
+> `/v1/images/generations`, `/v1/images/edits`, and `/v1/videos` (~29
+> sats per 1024×1024 image, verified 2026-05-09). Chat completions
+> (`/v1/chat/completions`) are NOT L402-supported (returns 401 without
+> a bearer header). Building a hybrid payment surface for V1 added
+> code paths without enabling new features Phoenix actually ships, so
+> Phoenix V1 sticks with credits uniformly. L402 becomes a documented
+> future direction; revisit when PPQ exposes L402 on chat (which would
+> let us drop the standing-credit-balance state entirely).
 
 | Task                    | Default model    | Notes                                                       |
 | ----------------------- | ---------------- | ----------------------------------------------------------- |
 | Persona text styling    | claude-sonnet-4.5 | Raw thought → polished post in persona's voice             |
-| Profile picture         | upload OR `gpt-image-1` | User uploads an image OR generates one via PPQ during the wizard. The chosen image is saved to Blossom and referenced as the canonical likeness for subsequent post-image generation. |
-| Post images             | gpt-image-1      | Always pass the reference image as input for likeness      |
-| Voice sample            | `deepgram-aura-2` (or ElevenLabs) | One-shot during creation, ~10–20 s, saved to Blossom. PPQ exposes DeepGram Aura 2 (named voices: `arcas`, `thalia`, `andromeda`, `helena`, `apollo`, `aries`) and ElevenLabs (`eleven_multilingual_v2`, `eleven_flash_v2_5`) at `/v1/audio/speech`. `tts-1-hd` is no longer the default — PPQ migrated. |
-| Post audio (V1.5)       | `deepgram-aura-2` (or ElevenLabs) | TTS each published post in the persona's voice            |
-| Video (V2 stretch)      | TBD              | Decide once we know what PPQ proxies                       |
+| Profile picture         | upload OR `gpt-image-1` | User uploads an image OR generates one during the wizard. The chosen image is saved to Blossom and referenced as the canonical likeness for subsequent post-image generation. |
+| Post images             | gpt-image-1      | Always pass the reference image as input for likeness. ~29 sats per 1024×1024 image at current PPQ pricing. |
+| Voice sample            | (deferred to V2) | TTS deferred — no L402-compatible TTS provider identified, and we don't want to grow the credits surface for voice features V1 isn't shipping. The persona schema fields (`voice_id`, `voice_sample_url`, `model_prefs.tts`) remain optional/null. |
+| Post audio              | (deferred to V2) | Same. |
+| Video (V2 stretch)      | TBD              | PPQ exposes `/v1/videos`; model TBD. Pricing decision will revisit L402 vs. credits at that time. |
 
 **Likeness consistency.** During wizard step 4 we generate the profile
 image and save it as the canonical reference. Every subsequent image
@@ -460,9 +473,14 @@ headline emotional beat of the demo.
 
 The wallet pays for:
 
-- PPQ inference, on demand, per request
-- Blossom uploads, if the chosen Blossom server is paid
-- Nothing else without explicit user action
+- **PPQ inference**, indirectly via NWC auto-topup. The persona's PPQ
+  `credit_id` carries a small standing balance (default $5); when it
+  dips below the configured threshold, PPQ uses the NWC URL it was
+  given at persona creation to pull the next chunk of credit from the
+  Spark wallet. Both chat completions and image generation route
+  through this single flow.
+- **Blossom uploads** if the chosen Blossom server is paid.
+- **Nothing else** without explicit user action.
 
 Phoenix never custodies funds. The seed lives only in the persona's
 encrypted backup. Phoenix UI never shows the seed except during the
@@ -470,13 +488,15 @@ encrypted backup. Phoenix UI never shows the seed except during the
 
 ### 7.4 Empty-wallet UX
 
-When `balance < estimated_cost(action)`:
+When the persona's Spark wallet can't cover the auto-topup target:
 
-- AI-gated buttons (compose/style, image gen, TTS) are disabled with a
+- AI-gated buttons (compose/style, image gen) are disabled with a
   tooltip: "This persona needs sats to think. Top up the wallet."
-- A sticky banner offers a one-tap "Generate top-up invoice" sheet.
-- Already-published content stays public and readable; the wallet running
-  dry only stops *new* AI-mediated work.
+- A sticky banner offers a one-tap "Generate top-up invoice" sheet
+  — the user funds the persona's own wallet via Lightning Address or
+  LNURL.
+- Already-published content stays public and readable; the wallet
+  running dry only stops *new* AI-mediated work.
 
 ### 7.5 Pricing model surfaced to user
 
@@ -495,7 +515,6 @@ by token estimates from `pi-ai`.
 - [ ] Persona keypair + kind 30078 backup with stable per-persona d-tag
 - [ ] Per-persona Spark wallet (Breez Spark SDK), BIP-39 seed inside the backup event
 - [ ] Profile picture: user uploads OR generates via PPQ (`gpt-image-1`); saved as canonical reference
-- [ ] Voice sample generation via PPQ (`/v1/audio/speech`, DeepGram Aura 2 or ElevenLabs), stored on Blossom
 - [ ] Multi-persona UX: list, switch, back up, restore
 - [ ] Compose flow: thought → styled → kind 1 publish (text only)
 - [ ] Post-image generation in compose flow (with reference image)
@@ -567,23 +586,32 @@ constructive, not just resilient.
   Spark / Nodeless variant). Lightning Addresses are SDK-native via
   Breez's hosted `spark.money` LNURL server — no Phoenix-hosted
   endpoint required.
-- *PPQ payment*: Phoenix uses PPQ's **credits system** — Lightning
-  top-ups buy credit on a per-persona `credit_id`, and every API
-  request authenticates with the bearer token tied to that credit_id.
-  NWC (NIP-47) auto-topup from the persona's Spark wallet keeps the
-  credit_id funded hands-off. PPQ also supports L402 per-request, but
-  only on a subset of endpoints; the credits system covers the entire
-  API and is what Phoenix uses everywhere.
-- *Image-gen cost at demo scale*: affordable; budget enables ten image
-  generations per persona during the demo without concern.
+- *PPQ payment*: **credits + NWC auto-topup**, uniform across all PPQ
+  endpoints. Per-persona `credit_id` funded by NIP-47 NWC auto-topup
+  from the persona's Spark wallet; every request bearer-authed with
+  the credit_id's API key. One auth surface for the whole API.
+- *L402*: investigated; PPQ supports it on
+  `/v1/images/generations`, `/v1/images/edits`, and `/v1/videos` but
+  NOT on `/v1/chat/completions` (returns 401 without a bearer header,
+  verified 2026-05-09). Building a hybrid surface for V1 didn't enable
+  any new features Phoenix actually ships. **Deferred** until PPQ
+  exposes L402 on chat — at which point credits + standing balance
+  could be retired entirely.
+- *Image-gen cost at demo scale*: ~29 sats per 1024×1024 image at
+  current PPQ pricing (verified 2026-05-09 against the L402 challenge
+  invoice). Affordable; ten image generations per persona during the
+  demo is well under any reasonable budget.
 - *NIP-49 passphrase UX*: **one passphrase per device**, applied to the
   operator nsec only. Multi-operator-per-device is a V2 stretch.
-- *Voice generation*: PPQ supports TTS via `/v1/audio/speech` with
-  DeepGram Aura 2 (named voices: `arcas`, `thalia`, `andromeda`,
-  `helena`, `apollo`, `aries`) and ElevenLabs
-  (`eleven_multilingual_v2`, `eleven_flash_v2_5`). `tts-1-hd` is no
-  longer the default — pick one of the above. Voice sample (V1) and
-  post-audio TTS (V1.5) stay in scope.
+
+**Deferred / out-of-V1:**
+
+- *Voice generation*: PPQ supports TTS via `/v1/audio/speech` (DeepGram
+  Aura 2, ElevenLabs) but only via the credits + bearer flow — there is
+  no L402-compatible TTS provider Phoenix has identified. **TTS is
+  deferred from V1.** The persona schema retains `voice_id`,
+  `voice_sample_url`, and `model_prefs.tts` as optional/null fields so
+  V2 can populate them without a schema migration.
 
 | # | Question                              | Why it matters                                                                      |
 | - | ------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -622,20 +650,31 @@ adaptation, not a full rewrite. Replace what the new stack obsoletes.
 
 **Rewrite.**
 - `src/pages/Onboard.tsx`
-  → rebuild as the agent-driven character creator using `pi-web-ui`
+  → form-based 5-step wizard; mints persona keypair AND BIP-39 wallet
+  seed during creation; encrypts both into the kind 30078 backup. (V1
+  is form-based; agent-driven is V2.)
 - `src/pages/Dashboard.tsx`
-  → integrate image generation, wallet status, model picker
+  → integrate "style in voice" composer (`usePpqInference`), image
+  generation (`usePpqImage`), wallet badge + dialog, model picker.
 
 **Replace.**
-- `src/lib/styleClient.ts` → `src/lib/ppq.ts` (wraps `pi-ai`, no Vercel
-  endpoint; persona's wallet pays PPQ directly)
+- `src/lib/styleClient.ts` → already deleted (Derek's PR #1). Compose
+  flow now points at `usePpqInference` (chat) and `usePpqImage`
+  (images), both authed via the persona's PPQ `credit_id` (auto-topped
+  from the Spark wallet via NWC).
 
 **New.**
-- `src/lib/wallet/{client,init,types,autoTopup}.ts`, `src/hooks/useWallet.ts` — Breez Spark SDK integration (already prototyped on `jc/add-spark-wallet`)
-- `src/components/Wallet*.tsx` — wallet UI
-- `src/lib/agent.ts`, `src/components/CharacterCreator.tsx` — `pi-agent-core` wiring
-- `src/pages/Settings.tsx` — model selection per task, relays, danger zone
-- `src/components/DonateButton.tsx`, `src/components/ZapFeed.tsx`
+- `src/lib/wallet/{client,init,types,autoTopup}.ts`, `src/hooks/useWallet.ts` — Breez Spark SDK integration + NWC auto-topup (PR #2 shipped headless).
+- `src/components/wallet/{WalletBadge,WalletPanel,WalletDialog,ReceiveDialog,SendDialog}.tsx` — wallet UI; balance, lightning address, receive, send, tx history, credits state.
+- `src/dev/{WalletHarness,InferencePayHarness}.tsx` — `/dev/wallet` and `/dev/inference-pay` harness pages.
+- `src/pages/Settings.tsx` — model selection per task, relays, danger zone (V1.5+).
+- `src/components/DonateButton.tsx`, `src/components/ZapFeed.tsx` — donation surfacing.
+
+**Deferred to V2.**
+- L402 inference clients — revisit when PPQ exposes L402 on `/v1/chat/completions`.
+- TTS / audio inference — no L402 TTS provider identified; not growing the credits surface for V2 features.
+- `src/lib/agent.ts`, `src/components/CharacterCreator.tsx` —
+  `pi-agent-core`-driven character creator. V2.
 
 **Delete.**
 - Any reference to OpenRouter and the Vercel `/style` endpoint plan
@@ -675,11 +714,14 @@ wallet/agent/Nostr/image-gen seams are where bugs will live.
 - **User keypair** — synonym for "operator" used in some passing prose;
   prefer "operator."
 - **PPQ** — `ppq.ai`. OpenAI-compatible inference API. Phoenix uses
-  PPQ's **credits system**: a per-persona `credit_id` funded by
-  Lightning from the persona's Spark wallet (NWC auto-topup) auths
-  every API request via a bearer token. (L402 per-request is also
-  supported by PPQ but only on a subset of endpoints; not Phoenix's
-  path.) See `docs/guides/ppq.md`.
+  PPQ's **credits system**: per-persona `credit_id` funded by NIP-47
+  NWC auto-topup from the persona's Spark wallet, bearer-authed on
+  every API request. One auth surface for the whole API. See
+  `docs/guides/ppq.md` and §6.
+- **L402** — Lightning-native HTTP 402 payment protocol (per-request
+  invoice, no standing account). PPQ supports it on `/v1/images/*`
+  and `/v1/videos` but not on `/v1/chat/completions`. **Phoenix V1
+  does not use L402** — see §10's deferred-items note for why.
 - **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit. V1 uses
   `pi-ai` (LLM client) only; `pi-agent-core` and `pi-web-ui` are
   reserved for the V2 agent-driven wizard.

@@ -35,7 +35,7 @@ import { readEnv } from "@/lib/env";
 const DEFAULT_BASE_URL = "https://api.ppq.ai";
 
 function readEnvBase(): string {
-  return readEnv("VITE_PPQ_API_BASE") ?? DEFAULT_BASE_URL;
+  return readEnv("VITE_PPQ_BASE_URL") ?? DEFAULT_BASE_URL;
 }
 
 /**

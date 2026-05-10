@@ -9,10 +9,6 @@ import { defineConfig } from "vitest/config";
 
 // https://vitejs.dev/config/
 export default defineConfig(() => ({
-  // Look for `.env`, `.env.local`, `.env.development`, … inside `dev/`. The
-  // Phoenix repo keeps developer-only config there (master plan, spike notes,
-  // .env) — gitignored where it should be.
-  envDir: "dev",
   server: {
     host: "::",
     port: 8080,

@@ -14,9 +14,8 @@
 import { useMutation, type UseMutationResult } from "@tanstack/react-query";
 
 import { chatCompletion } from "@/lib/ppq/client";
-import { ppqAccountStore } from "@/lib/ppq/storage";
 import type { PpqChatRequest, PpqChatResponse } from "@/lib/ppq/types";
-import { createAccount } from "@/lib/ppq/client";
+import { usePpqAccount } from "./usePpqAccount";
 
 export const DEFAULT_INFERENCE_MODEL = "claude-sonnet-4.5";
 
@@ -24,23 +23,18 @@ export type PpqInferenceVars = Omit<PpqChatRequest, "model"> & {
   model?: string;
 };
 
-async function ensureAccountForCall() {
-  const existing = ppqAccountStore.load();
-  if (existing) return existing;
-  const fresh = await createAccount();
-  ppqAccountStore.save(fresh);
-  return fresh;
-}
-
 export function usePpqInference(): UseMutationResult<
   PpqChatResponse,
   Error,
   PpqInferenceVars
 > {
+  // Resolution lives in usePpqAccount: env > operator envelope > cache > mint.
+  const { account, ensureAccount } = usePpqAccount();
+
   return useMutation({
     mutationFn: async (vars) => {
-      const { api_key } = await ensureAccountForCall();
-      return chatCompletion(api_key, {
+      const acct = account ?? (await ensureAccount());
+      return chatCompletion(acct.api_key, {
         model: vars.model ?? DEFAULT_INFERENCE_MODEL,
         messages: vars.messages,
         plugins: vars.plugins,

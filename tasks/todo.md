@@ -52,9 +52,9 @@ Sync at ~hour +1 — kick streams off in parallel.
 The wallet → PPQ end-to-end demo lives entirely in this stream.
 
 ### Phase 0 — Spike (3h, partly already shipped)
-- [ ] PPQ from a TS client (chat, image, TTS) paid in sats (in flight: commits `96c0f98`, `b7b45d4`, `d06adeb`)
+- [x] PPQ from a TS client paid in sats — chat via credits + bearer + NWC auto-topup (in flight: commits `96c0f98`, `b7b45d4`, `d06adeb`); image via L402 per-request (verified 2026-05-09 — chat is NOT L402-supported on PPQ; TTS deferred to V2)
 - [ ] Document payment flow, model availability, costs, latency in `docs/spike-ppq.md`
-- [ ] Pre-fund demo wallet seed (~50 chats / 10 images / 5 TTS / live-zap cushion) → `docs/demo-funding.md`
+- [ ] Pre-fund demo wallet seed (~50 chats via credits + ~10 image gens via L402 + live-zap cushion) → `docs/demo-funding.md` (gitignored)
 - [x] Wallet SDK locked to Breez Spark (`@breeztech/breez-sdk-spark`) — see commit `287c091`; no separate decision doc needed
 
 ### Phase 1 — Independent harnesses (~10h)
@@ -96,7 +96,7 @@ The wallet → PPQ end-to-end demo lives entirely in this stream.
 - [ ] **`/dev/agent`** (B1, ~3h) — `pi-agent-core` + `pi-web-ui` chat with one wizard tool
 - [ ] **`/dev/styling`** (B2, ~2h) — system prompt + raw thought → styled output via PPQ
 - [ ] **`/dev/image-gen`** (B3, ~3h) — `gpt-image-1` with reference-image input for likeness
-- [ ] **`/dev/voice-gen`** (B4, ~2h) — TTS sample with voice picker
+- [ ] ~~`/dev/voice-gen` (B4)~~ — **deferred to V2.** No L402-compatible TTS provider; we don't want to grow the credits surface for it. Persona schema retains `voice_id`, `voice_sample_url`, `model_prefs.tts` as optional/null for V2.
 - [ ] **`/dev/zap`** (B5, ~3h) — LNURL/lud16 mechanics, donate button, zap receipt rendering
 
 If pressed for time at hour +20, trim voice-gen to a hardcoded sample or push zap polish to Phase 3.
@@ -121,57 +121,34 @@ If pressed for time at hour +20, trim voice-gen to a hardcoded sample or push za
 
 ## Stream C — Derek (Nostr + Frontend)
 
-**Owns:** persona-crypto, user identity, publish, feed (originally specced as `/dev/*` harnesses in `dev/STREAMS.md` §C1–C4 — implemented directly as integrated UI; the harness step was bypassed in favor of shipping the real pages).
-**Leads:** persona-create wizard, persona-restore (composite, §C5–C6).
+**Owns:** `/dev/persona-crypto`, `/dev/operator`, `/dev/publish`, `/dev/feed` (specs in `dev/STREAMS.md` §C1–C4)
+**Leads:** `/dev/persona-create`, `/dev/persona-restore` (composite, §C5–C6)
 
 ### Phase 0 — Spike (3h)
-- [x] Spike — Nostr crypto (NIP-44 self / NIP-49 / kind 30078) — `spikes/nostr-breeze/nostr/round-trip.test.ts`
-- [x] Spike — Breez Spark SDK in browser (Jim's PR #2)
+- [ ] Spike — Nostr crypto (NIP-44 self / NIP-49 / kind 30078) — ~1h
+- [x] Spike — Breez Spark SDK in browser (variant choice, init, invoice, pay) — landed via Jim's PR #2 (headless wallet shipped to `src/lib/wallet/`)
 - [x] Nostr crypto spike documented in `docs/spike-nostr.md`
-- [ ] Live-relay verification runbook (5 min with Anaïse — owed)
-- [ ] Mobile NIP-49 latency on Anaïse's phone (owed; affects WebWorker decision)
 
-### Phase 1 — Independent harnesses (skipped; built directly as integrated UI)
-- [x] persona-crypto adapted to PROJECT.md §5.2 schema, full round-trip — `src/lib/persona*`, `src/hooks/usePersona*`
-- [x] User identity: NIP-07 / NIP-46 / paste / fresh-Phoenix-NIP-49 — `AuthDialog.tsx` + `nip49Storage.ts` + `<UnlockGate>`
-- [x] kind 1 publish with attribution tags — `personaPost.ts` + `usePersonaPublish`
-- [x] Render persona profile + posts — `PersonaFeed.tsx` (zap receipts pending Topher's stream B5)
+### Phase 1 — Independent harnesses (12h)
+- [ ] **`/dev/persona-crypto`** (C1, ~3h) — adapt existing `src/lib/persona*` to PROJECT.md §5.2 schema; full round-trip
+- [ ] **`/dev/operator`** (C2, ~3h) — fresh keypair / NIP-07 / NIP-46 / paste; NIP-49 backup/restore
+- [ ] **`/dev/publish`** (C3, ~3h) — kind 1 publish with full attribution tags
+- [ ] **`/dev/feed`** (C4, ~3h) — render persona profile + posts + zap receipts from a pubkey
 
-### Phase 2 — Composite (most of this is shipped as integrated UI; some parts depend on Jim/Topher)
-- [x] persona-create flow — two-step Onboard wizard (Details → Picture → Mint) with PPQ image gen / Blossom upload
-- [x] persona-restore flow — sign in fresh, scan-and-decrypt re-hydrates personas, NostrSync invalidates caches on user/relay change
-- [ ] Wizard agent harness (`pi-agent-core` interview) — V2 per PROJECT.md §6, deferred
-- [x] Composer brief shape (idea + sources + hints + cross-post indicator) — PR #5 (Derek shipped the scaffold; AI styling + video gen wiring is Jim's seam)
-- [x] PostCard NIP-92 imeta image render — PR #4
-- [x] PostCard NIP-92 imeta video render — PR #5
-- [ ] Composer AI styling on publish — Jim seam (`useStyle` hook)
-- [ ] Composer video generation pipeline (`usePpqVideo` → Blossom → imeta on kind 1) — **Jim** (took over from Derek post-PR #5)
-- [ ] Inline post-image generation in compose — Jim seam
-- [ ] Empty-wallet UX (sticky banner + disabled buttons) — Jim seam
+### Phase 2 — Composite harnesses (8h)
+- [ ] **`/dev/persona-create`** (C5, ~5h) — full wizard composing wallet + persona-crypto + image-gen (agent and voice-gen are V2; V1 wizard is form-based)
+- [ ] **`/dev/persona-restore`** (C6, ~3h) — operator login → load all kind 30078 → present persona list
 
-### Phase 3 — Main UI integration
-- [x] `Onboard.tsx` — two-step wizard with profile-picture step (PR #3)
-- [x] `MyPersonas.tsx` — list with profile-picture avatars + 3-dot Edit/Delete menu + activity stats (PRs #3, #5)
-- [x] `PersonaFeed.tsx` — public profile header + posts (zap receipts pending Topher)
-- [x] `Verify.tsx` rebuilt — real client-side signature checks, post counts, profile timestamp (PR #3)
-- [x] `Settings.tsx` — Account + Relays + Media (Blossom servers) + Personas (PRs #3, #4)
-- [x] `EditPersona.tsx` — same-d-tag re-publish for name / bio / picture / system prompt / tags / languages / cross-post webhook (PRs #3, #5)
-- [x] AuthDialog NIP-49 import — kill-and-resurrect inverse of download-backup (PR #3)
-- [x] PWA install prompt + manifest + service worker (PR #4)
-- [x] Persona Edit/Delete affordances: 3-dot card menu + inline dashboard buttons (PR #3)
-- [x] Cross-post webhook scaffold (`cross_post` schema + `useCrossPost` hook + EditPersona UI + Dashboard dispatch) (PR #5)
-- [x] Persona activity stats (post count + last-active) on every card (PR #5)
-- [x] Composer reframe: video-first with text-only fallback (PR #5)
-- [ ] Mobile QA: 360 / 414 / 768 px on iPhone Safari + Android Chrome (needs a real device)
-- [ ] App shortcuts manifest entry for "New persona" / "My personas"
+### Phase 3 — Main UI integration (5h)
+- [ ] `Onboard.tsx` ← `<CharacterCreator>` from C5
+- [ ] `MyPersonas.tsx` ← `<PersonaList>` from C6
+- [ ] `PersonaFeed.tsx` ← `<PersonaProfileHeader>` + `<PersonaPostList>` + `<ZapReceiptCard>` (C4 + B5)
+- [ ] `Verify.tsx` rebuilt against the §5 schema
+- [ ] PWA polish: install prompt, service worker, manifest icons (if time)
 
-### Phase 4 — Demo prep
-- [ ] Kill-and-resurrect rehearsal: Device A logs in, posts; Device B drops in `.ncryptsec` and resumes
-- [ ] Persona nsec backups on multiple devices (exercises export/import round-trip)
-- [ ] Live-relay verification runbook (5 min with Anaïse — `docs/spike-nostr.md`)
-- [ ] Mobile NIP-49 latency measurement on Anaïse's phone
-- [ ] PWA install demonstrated on Anaïse's phone
-- [ ] Pre-load demo browser tabs + sign-ins on demo laptop
+### Phase 4 — Demo prep (1h)
+- [ ] Kill-and-resurrect rehearsal: device A logs in, posts; device B picks up via nsec restore
+- [ ] Persona nsec backups on multiple devices
 
 ---
 
