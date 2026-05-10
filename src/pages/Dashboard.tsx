@@ -87,7 +87,10 @@ const Dashboard = () => {
   const stylingModel =
     envelope?.model_prefs?.agent ?? "anthropic/claude-sonnet-4.5";
 
-  const wallet = useWallet({ mnemonic: walletSeed });
+  const wallet = useWallet({
+    walletId: personaConfig ? `persona:${personaConfig.pubkey}` : undefined,
+    mnemonic: walletSeed,
+  });
   const styling = usePpqInference();
 
   async function onStyle() {

@@ -47,7 +47,10 @@ export default function InferencePayHarness() {
   const [activeMnemonic, setActiveMnemonic] = useState<string | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
 
-  const wallet = useWallet({ mnemonic: activeMnemonic });
+  const wallet = useWallet({
+    walletId: activeMnemonic ? "dev:inference-pay" : undefined,
+    mnemonic: activeMnemonic,
+  });
   const chat = usePpqInference();
   const image = usePpqImage();
 

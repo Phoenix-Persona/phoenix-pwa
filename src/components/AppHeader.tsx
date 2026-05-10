@@ -26,7 +26,10 @@ export function AppHeader() {
   const operator = useOperatorEnvelope();
   const operatorSeed =
     readEnv("VITE_WALLET_SEED") ?? operator.envelope?.wallet?.seed;
-  const operatorWallet = useWallet({ mnemonic: operatorSeed });
+  const operatorWallet = useWallet({
+    walletId: user ? `operator:${user.pubkey}` : undefined,
+    mnemonic: operatorSeed,
+  });
   const [walletOpen, setWalletOpen] = useState(false);
 
   return (
