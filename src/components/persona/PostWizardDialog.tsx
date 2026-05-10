@@ -261,8 +261,8 @@ export function PostWizardDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90dvh] p-0 gap-0 overflow-hidden">
-        <DialogHeader className="px-5 sm:px-6 pt-5 pb-4 border-b border-imigongo-clay/15 bg-gradient-to-r from-rw-sky/5 via-rw-gold/10 to-rw-green/5">
+      <DialogContent className="flex max-h-[90dvh] max-w-[95vw] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+        <DialogHeader className="shrink-0 px-5 sm:px-6 pt-5 pb-4 border-b border-imigongo-clay/15 bg-gradient-to-r from-rw-sky/5 via-rw-gold/10 to-rw-green/5">
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-imigongo-clay font-semibold">
             <Sparkles className="size-3.5" aria-hidden="true" />
             AI post wizard
@@ -276,7 +276,7 @@ export function PostWizardDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="overflow-y-auto px-5 sm:px-6 py-5 space-y-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-6">
           <WizardStepper step={step} />
           <Progress value={progressValue} className="h-1.5 bg-muted" />
 
@@ -329,7 +329,7 @@ export function PostWizardDialog({
           ) : null}
         </div>
 
-        <DialogFooter className="border-t border-imigongo-clay/15 px-5 sm:px-6 py-4 bg-background">
+        <DialogFooter className="shrink-0 border-t border-imigongo-clay/15 px-5 sm:px-6 py-4 bg-background">
           <div className="flex w-full flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Button
               type="button"
