@@ -25,7 +25,7 @@ export function AppHeader() {
   const operatorWallet = useOperatorWallet(walletOpen);
 
   return (
-    <header className="relative bg-card/85 backdrop-blur-md sticky top-safe z-30 border-b border-imigongo-clay/15">
+    <header className="relative bg-card/85 backdrop-blur-md sticky top-0 z-30 border-b border-imigongo-clay/15">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-imigongo-charcoal focus:text-imigongo-cream focus:px-3 focus:py-2 focus:text-sm focus:font-medium"

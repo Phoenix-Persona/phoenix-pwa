@@ -333,9 +333,10 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased pt-safe pb-safe;
+    @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
     font-feature-settings: "cv11", "ss01", "ss03";
+    overflow-x: hidden;
   }
 
   h1,
@@ -362,16 +363,19 @@
 
   /* Honor user reduced-motion preference globally for any CSS animation
      not already gated by a motion-safe Tailwind variant. */
-  /* Hide scrollbar on all platforms — the app uses its own scroll
-     container and pointer-scroll interactions. Keep scroll behavior
-     intact so keyboard / assistive-tech scrolling still works. */
+  /* Hide scrollbar — the app uses its own scroll container and
+     pointer-scroll interactions. Keep scroll behavior intact so
+     keyboard / assistive-tech scrolling still works. */
   html {
     scrollbar-width: none;
     -ms-overflow-style: none;
+    overflow-x: hidden;
   }
   html::-webkit-scrollbar {
     display: none;
   }
+
+
 
   @media (prefers-reduced-motion: reduce) {
     *,
