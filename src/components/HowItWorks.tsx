@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { BuildVisual } from "./howItWorks/BuildVisual";
 import { SpeakVisual } from "./howItWorks/SpeakVisual";
 import { OutliveVisual } from "./howItWorks/OutliveVisual";
+import { SustainVisual } from "./howItWorks/SustainVisual";
 
 interface ChapterProps {
   number: string;
@@ -83,7 +84,7 @@ export function HowItWorks() {
           How it works
         </p>
         <h2 className="font-display text-4xl md:text-5xl font-medium tracking-tight">
-          Three steps. One unstoppable voice.
+          Four steps. One unstoppable voice.
         </h2>
       </div>
 
@@ -152,20 +153,48 @@ export function HowItWorks() {
         }
         body={
           <>
-            Every post lives on dozens of public Nostr relays — independently
-            operated, globally distributed, censorship-resistant by design.
-            Silence the operator and the voice keeps speaking. Hand the
-            persona to a successor, and the voice continues — same key, same
-            conviction.
+            Every post is saved across dozens of independent servers around
+            the world — no single government or platform can delete it. No
+            server to seize. No company to pressure. No account to ban. Lose
+            your phone, flee the country, switch devices — your persona is
+            fully restored in seconds. Pass it to someone you trust, and the
+            voice keeps speaking. Unchanged.
           </>
         }
         pills={[
-          "Replicated to N relays",
-          "Successor-resilient",
+          "Replicated globally",
           "No central server",
           "No takedown surface",
+          "Successor-resilient",
         ]}
         visual={<OutliveVisual />}
+      />
+
+      <Chapter
+        reverse
+        number="04"
+        eyebrow="Sustain"
+        headline={
+          <>
+            A voice that{" "}
+            <span className="italic text-rw-gold">funds itself.</span>
+          </>
+        }
+        body={
+          <>
+            Each persona has its own Bitcoin wallet — created at setup, locked
+            to the persona, never held by Zuka. Supporters anywhere in the
+            world can send Bitcoin directly to the voice they believe in.
+            Donations automatically fund the AI that keeps it speaking.
+          </>
+        }
+        pills={[
+          "Per-persona wallet",
+          "Lightning Address",
+          "Borderless donations",
+          "Self-funding AI",
+        ]}
+        visual={<SustainVisual />}
       />
     </section>
   );
