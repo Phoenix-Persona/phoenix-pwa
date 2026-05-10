@@ -28,6 +28,7 @@ import { usePpqImage } from "@/hooks/usePpqImage";
 import { useToast } from "@/hooks/useToast";
 import { generatePollinationsImage } from "@/lib/pollinations/client";
 import { PpqError } from "@/lib/ppq/types";
+import { withNoTextOverlay } from "@/lib/visualPromptGuards";
 import { sanitizeHttpUrl } from "@/lib/url";
 import { cn } from "@/lib/utils";
 
@@ -132,7 +133,10 @@ export function PersonaPictureField({
 
   async function generateViaPollinations(prompt: string): Promise<string> {
     const blob = await generatePollinationsImage({
-      prompt,
+      // Suppress baked-in subtitles / captions / on-screen text by
+      // default. The directive yields if the user's prompt explicitly
+      // asks for text overlays (idempotent).
+      prompt: withNoTextOverlay(prompt),
       width: 1024,
       height: 1024,
       model: "flux",
@@ -144,7 +148,7 @@ export function PersonaPictureField({
   async function generateViaPpq(prompt: string): Promise<string> {
     const result = await generate.mutateAsync({
       model: DEFAULT_IMAGE_MODEL,
-      prompt,
+      prompt: withNoTextOverlay(prompt),
       size: "1:1",
       n: 1,
     });

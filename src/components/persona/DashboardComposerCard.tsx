@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Film, Loader2, PencilLine, Sparkles, Wand2 } from "lucide-react";
+import { Film, Loader2, PencilLine, Search, Sparkles, Wand2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { ResearchPanel } from "@/components/persona/ResearchPanel";
 import type { Persona } from "@/lib/persona";
 
 interface DashboardComposerCardProps {
@@ -24,6 +25,19 @@ interface DashboardComposerCardProps {
   onStyle: () => void;
   onPost: () => void;
   onOpenVideo: () => void;
+  /**
+   * Called when the operator clicks "Add as source" on a research
+   * result. Implementation should append the URL to the comma-separated
+   * sources field (the kind 1 emits each as an `r` tag).
+   */
+  onAppendSource: (url: string) => void;
+  /**
+   * Called when the operator clicks "Quote in idea" on a research
+   * result. Implementation should append the formatted block (quote
+   * + attribution + URL) to the idea textarea so the persona styling
+   * pass can build on it.
+   */
+  onAppendIdea: (text: string) => void;
 }
 
 type ComposerTab = "post" | "video";
@@ -44,8 +58,11 @@ export function DashboardComposerCard({
   onStyle,
   onPost,
   onOpenVideo,
+  onAppendSource,
+  onAppendIdea,
 }: DashboardComposerCardProps) {
   const [tab, setTab] = useState<ComposerTab>("post");
+  const [researchOpen, setResearchOpen] = useState(false);
 
   const showCrossPost = crossPostEnabled && Boolean(crossPost?.webhook_url);
   const styleDisabled = isStyling || isPublishing || !raw.trim() || !walletSeed;
@@ -85,7 +102,7 @@ export function DashboardComposerCard({
         onValueChange={(value) => setTab(value as ComposerTab)}
         className="gap-0"
       >
-        <div className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 px-6 pt-4 pb-0 border-b border-imigongo-clay/15">
+        <div className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 px-6 pt-4 pb-0 border-b border-imigongo-clay/15 flex items-center justify-between gap-3">
           <TabsList variant="line" className="h-auto p-0 gap-2">
             <TabsTrigger value="post" className="gap-2 px-3 pb-3 text-sm">
               <PencilLine className="size-4" aria-hidden="true" />
@@ -96,6 +113,16 @@ export function DashboardComposerCard({
               Compose a video
             </TabsTrigger>
           </TabsList>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setResearchOpen(true)}
+            className="mb-2 h-7 px-2.5 text-xs gap-1.5 hover:bg-imigongo-clay/10"
+            title="Pull recent coverage from trusted human-rights and press-freedom sources"
+          >
+            <Search className="size-3.5" aria-hidden="true" />
+            Research
+          </Button>
         </div>
         <CardContent className="space-y-5 pt-5">
           <div className="space-y-2">
@@ -298,6 +325,12 @@ export function DashboardComposerCard({
           </TabsContent>
         </CardContent>
       </Tabs>
+      <ResearchPanel
+        open={researchOpen}
+        onOpenChange={setResearchOpen}
+        onAddSource={onAppendSource}
+        onQuoteIntoIdea={onAppendIdea}
+      />
     </Card>
   );
 }

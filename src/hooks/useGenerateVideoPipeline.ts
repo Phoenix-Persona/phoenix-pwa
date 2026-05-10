@@ -53,6 +53,10 @@ import { fmtBytes, fmtMs, verror, vlog } from "@/lib/video/log";
 import { runChain, type ClipResult } from "@/lib/video/runChain";
 import { stitchClips, type StitchProgress } from "@/lib/video/stitchClips";
 import { extractUrlFromTags } from "@/lib/video/uploadBlobToBlossom";
+import {
+  NO_TEXT_OVERLAY_DIRECTIVE,
+  withNoTextOverlay,
+} from "@/lib/visualPromptGuards";
 
 import { usePersonaPublish } from "./usePersonaPublish";
 import { usePpqAccount } from "./usePpqAccount";
@@ -83,7 +87,8 @@ const WORLD_BLOCK_PREFIX =
   "AUDIO: ONLY the speaker's voice — no background music, no score, no " +
   "soundtrack, no instruments, no humming, no ambient music of any kind. " +
   "Faint room tone is acceptable; music is not. Every clip in this series " +
-  "must use the SAME audio treatment so they cut together seamlessly.";
+  "must use the SAME audio treatment so they cut together seamlessly. " +
+  NO_TEXT_OVERLAY_DIRECTIVE;
 
 export type GenerationPhase =
   | { type: "idle" }
@@ -779,7 +784,7 @@ function buildPreviewPrompt(
 ): string {
   const tone = persona.tone ?? "";
   const hintLine = hints?.trim() ? `\n\nStyle hints: ${hints.trim()}` : "";
-  return [
+  const body = [
     `A photorealistic 9:16 portrait of a person matching the input image.`,
     `The portrait will be used as the SEED FRAME for a series of`,
     `talking-head video clips, so the framing must work as a still.`,
@@ -798,6 +803,7 @@ function buildPreviewPrompt(
   ]
     .filter(Boolean)
     .join("\n");
+  return withNoTextOverlay(body);
 }
 
 /**
