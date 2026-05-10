@@ -43,6 +43,7 @@ import {
   type WalletHandle,
   type WalletInfo,
 } from "@/lib/wallet/types";
+import type { PpqAccount } from "@/lib/ppq/types";
 
 import { usePpqAccount } from "./usePpqAccount";
 
@@ -90,6 +91,7 @@ export interface UseWalletResult {
   sendError: Error | undefined;
   /* ----- ppq.ai credit ----- */
   ppqBalanceUsd: number | undefined;
+  ppqAccount: PpqAccount | null;
   isPpqBalanceLoading: boolean;
   refreshPpqBalance: () => void;
   /* ----- Auto-topup ----- */
@@ -270,6 +272,7 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
       });
       ppq.refreshBalance();
       refreshInfo();
+      refreshPayments();
     },
     onError: (err) => {
       setAutoTopupRun((s) => ({
@@ -321,6 +324,7 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
       isSending: sendMutation.isPending,
       sendError: sendMutation.error ?? undefined,
       ppqBalanceUsd: ppq.balance?.balance_usd,
+      ppqAccount: ppq.account,
       isPpqBalanceLoading: ppq.isBalanceLoading,
       refreshPpqBalance: ppq.refreshBalance,
       autoTopup,
@@ -341,6 +345,7 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
       receiveMutation,
       sendMutation,
       ppq.balance?.balance_usd,
+      ppq.account,
       ppq.isBalanceLoading,
       ppq.refreshBalance,
       autoTopup,
