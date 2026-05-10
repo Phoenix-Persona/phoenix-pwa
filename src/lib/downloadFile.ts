@@ -1,5 +1,62 @@
+import { Capacitor } from '@capacitor/core';
+
 /**
- * Force a browser download of a remote URL.
+ * Download a text file to the user's device.
+ *
+ * On the web this uses the classic `<a download>` trick.
+ * On native (Android & iOS) the file is saved to the app's Documents
+ * directory, which is visible in the iOS Files app and Android's
+ * app-scoped documents. No permissions are required.
+ *
+ * @example
+ *   await downloadTextFile('backup.json', JSON.stringify(data));
+ */
+export async function downloadTextFile(filename: string, content: string): Promise<void> {
+  if (Capacitor.isNativePlatform()) {
+    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+
+    // Write straight to Documents — visible in the iOS Files app and
+    // Android's app-scoped documents. No storage permissions needed.
+    // NOTE: encoding is required — without it Capacitor expects base64 data
+    // and will throw for plain-text strings.
+    await Filesystem.writeFile({
+      path: filename,
+      data: content,
+      directory: Directory.Documents,
+      encoding: Encoding.UTF8,
+    });
+  } else {
+    // Web: anchor-click download from a Blob URL.
+    const blob = new Blob([content], { type: 'text/plain; charset=utf-8' });
+    const url = globalThis.URL.createObjectURL(blob);
+    triggerAnchorDownload(url, filename);
+    setTimeout(() => globalThis.URL.revokeObjectURL(url), 5_000);
+  }
+}
+
+/**
+ * Open a URL in a new browser tab, or present the native share sheet on Capacitor.
+ *
+ * The programmatic `<a target="_blank">` click pattern doesn't work inside
+ * WKWebView on iOS. On native platforms this presents the share sheet instead,
+ * letting the user open, save, or share the resource.
+ *
+ * @example
+ *   <Button onClick={() => openUrl('https://example.com')}>Visit site</Button>
+ */
+export async function openUrl(url: string): Promise<void> {
+  if (Capacitor.isNativePlatform()) {
+    const { Share } = await import('@capacitor/share');
+    await Share.share({ url });
+  } else {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}
+
+/**
+ * Force a browser download of a remote URL (e.g. a video on a Blossom
+ * server). Used by the cross-post-to-X flow to save the rendered video
+ * locally before opening the X intent.
  *
  * Two paths:
  *   1. fetch the bytes into a Blob → object URL → hidden `<a download>`
@@ -14,7 +71,6 @@
  * Failures are non-fatal — caller decides whether to surface them.
  * Returns the route that was used so callers can log it if they care.
  */
-
 export async function downloadFile(
   url: string,
   filename?: string,

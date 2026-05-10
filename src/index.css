@@ -1,4 +1,18 @@
 @import "tailwindcss";
+@import "tailwindcss-safe-area";
+/*
+  Bridge Capacitor's --safe-area-inset-* → tailwindcss-safe-area
+  --twsa-safe-area-inset-*: on Android WebView < 140, env() returns 0,
+  so we prefer the CSS variables that the Capacitor SystemBars plugin
+  injects. Must come AFTER the @import above so these override the
+  plugin's :root defaults.
+*/
+:root {
+  --twsa-safe-area-inset-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --twsa-safe-area-inset-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --twsa-safe-area-inset-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --twsa-safe-area-inset-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+}
 @import "tw-animate-css";
 
 /* Rwandan-rooted typography:
@@ -322,6 +336,7 @@
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
     font-feature-settings: "cv11", "ss01", "ss03";
+    overscroll-behavior: none;
   }
 
   h1,
@@ -331,6 +346,14 @@
     font-family: var(--font-display);
     font-feature-settings: "ss01", "ss02";
     letter-spacing: -0.015em;
+  }
+
+  /* Clip horizontal overflow from page content without affecting the
+     sticky header (which is outside #main-content). overflow: clip
+     avoids the WebKit overflow-x + sticky-positioning bug because it
+     does NOT create a scroll container. */
+  #main-content {
+    overflow: clip;
   }
 
   /* Brand-colored selection */
@@ -348,6 +371,20 @@
 
   /* Honor user reduced-motion preference globally for any CSS animation
      not already gated by a motion-safe Tailwind variant. */
+  /* Hide scrollbar — the app uses its own scroll container and
+     pointer-scroll interactions. Keep scroll behavior intact so
+     keyboard / assistive-tech scrolling still works. */
+  html {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    overscroll-behavior: none;
+  }
+  html::-webkit-scrollbar {
+    display: none;
+  }
+
+
+
   @media (prefers-reduced-motion: reduce) {
     *,
     ::before,

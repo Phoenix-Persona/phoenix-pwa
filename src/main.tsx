@@ -8,6 +8,13 @@ import App from './App.tsx';
 import './index.css';
 import { ensureWalletReady } from './lib/wallet/init';
 import { clearStaleNostrLoginIfLocked } from './lib/nip49Storage';
+import { bootstrapNative } from './lib/nativeBootstrap';
+
+// Capacitor native bootstrap — must run BEFORE React mounts so the
+// system bar style is themed at first paint and the iOS keyboard
+// accessory bar is suppressed before any <input> can focus. On web,
+// this is a silent no-op (returns early via Capacitor.isNativePlatform).
+bootstrapNative();
 
 // Run BEFORE React renders. If a Phoenix-managed ncryptsec is parked
 // in localStorage AND this tab hasn't unlocked yet (no sessionStorage

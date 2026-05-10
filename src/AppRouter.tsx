@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { ScrollToTop } from "./components/ScrollToTop";
+import { DeepLinkHandler } from "./components/DeepLinkHandler";
 
 import Index from "./pages/Index";
 import Onboard from "./pages/Onboard";
@@ -17,6 +18,11 @@ import InferencePayHarness from "./dev/InferencePayHarness";
 export function AppRouter() {
   return (
     <BrowserRouter>
+      {/* Capacitor: forwards OS appUrlOpen events into React Router so
+          deep links (zuka://npub1…, https://zuka.live/<npub> opened by
+          the OS once Universal Links are configured) navigate
+          correctly inside the WebView. No-op on web. */}
+      <DeepLinkHandler />
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<Index />} />

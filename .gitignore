@@ -57,3 +57,8 @@ tests/wallet/.persona.json
 phoenix-wallet/
 
 SCRATCH.md
+
+# Capacitor Android signing — never commit keystore passwords or .jks files
+android/keystore.properties
+android/*.jks
+android/*.keystore
