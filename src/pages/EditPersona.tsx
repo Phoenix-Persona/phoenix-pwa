@@ -23,10 +23,9 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useNostr } from "@nostrify/react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { NostrEvent } from "@nostrify/nostrify";
-import { nip19 } from "nostr-tools";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe } from "@/components/ImigongoBand";
@@ -39,24 +38,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePersona } from "@/hooks/usePersona";
 import { useToast } from "@/hooks/useToast";
+import { useUpdatePersona } from "@/hooks/useUpdatePersona";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
-import {
-  buildEncryptedPersonaTemplate,
-  type Persona,
-  type PersonaWallet,
-  type PhoenixEnvelope,
-} from "@/lib/persona";
-import {
-  encryptPhoenixEnvelope,
-  type Nip44Signer,
-} from "@/lib/personaCrypto";
-import { connectWallet, disconnectWallet } from "@/lib/wallet/client";
+import { type PhoenixEnvelope } from "@/lib/persona";
 import {
   isValidLightningUsername,
-  registerLightningAddressWithRetry,
   slugifyForUsername,
 } from "@/lib/wallet/lightningAddress";
-import { buildPersonaProfileMetadata } from "@/lib/personaProfile";
 import { parseCommaList } from "@/lib/text";
 
 const EditPersona = () => {
@@ -139,10 +127,10 @@ interface EditPersonaFormProps {
 
 function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) {
   const navigate = useNavigate();
-  const { user } = useCurrentUser();
   const { nostr } = useNostr();
+  const { user } = useCurrentUser();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const updatePersona = useUpdatePersona();
 
   const original = envelope.persona;
 
@@ -183,7 +171,7 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   const [webhookPlatformsInput, setWebhookPlatformsInput] = useState(
     (original.cross_post?.webhook_platforms ?? []).join(", ")
   );
-  const [saving, setSaving] = useState(false);
+  const saving = updatePersona.isPending;
 
   // Live availability check for the username field. Skip while the
   // value still matches the original (no-op rename).
@@ -283,7 +271,6 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
       return;
     }
 
-    setSaving(true);
     try {
       // Cross-post block — only emit if a webhook URL is set, so we
       // don't bloat the encrypted payload with empty fields. Empty
@@ -296,155 +283,31 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
             ...(webhookPlatforms.length > 0
               ? { webhook_platforms: webhookPlatforms }
               : {}),
-          }
+        }
         : undefined;
 
-      // Re-register the LN address only if the username actually
-      // changed AND we have a wallet seed to drive the SDK. Spark's
-      // `registerLightningAddress` is per-Spark-identity idempotent —
-      // calling it with a new username automatically frees the old one.
-      let registeredAddress: string | undefined;
-      let registeredLnurl: string | undefined;
-      let resolvedUsername = trimmedUsername || original.username;
-      const usernameChanged =
-        trimmedUsername.length > 0 && trimmedUsername !== original.username;
-      const seed = envelope.wallet?.seed;
-      if (usernameChanged && seed) {
-        try {
-          const handle = await connectWallet({ mnemonic: seed });
-          try {
-            const ln = await registerLightningAddressWithRetry(handle, {
-              baseUsername: trimmedUsername,
-              description: `Donations to ${name.trim() || original.name}`,
-              fallbackBase: "persona",
-            });
-            registeredAddress = ln.lightningAddress;
-            registeredLnurl = ln.lnurl;
-            resolvedUsername = ln.username;
-          } finally {
-            await disconnectWallet(handle).catch(() => undefined);
-          }
-        } catch (err) {
-          toast({
-            title: "Lightning Address update failed",
-            description:
-              err instanceof Error
-                ? err.message
-                : "Couldn't claim the new username. Other changes were not saved — fix the username or revert it.",
-            variant: "destructive",
-          });
-          setSaving(false);
-          return;
-        }
-      }
-
-      const trimmedName = name.trim() || original.name;
-      const updated: Persona = {
-        ...original,
-        // Promote the resolved d-tag into the plaintext payload so
-        // future updates don't have to fall back to the event tag.
-        dTag,
-        name: trimmedName,
-        display_name: trimmedName,
-        username: resolvedUsername,
-        system_prompt: systemPrompt,
-        voice_id: voiceId.trim() || original.voice_id,
+      const result = await updatePersona.mutateAsync({
+        backupEvent,
+        envelope,
+        npub,
+        name,
+        username: trimmedUsername,
+        systemPrompt,
+        voiceId,
         languages: parseCommaList(languagesInput, original.languages),
         tags: parseCommaList(tagsInput, []),
-        reference_image_url: pictureUrl || undefined,
-        cross_post,
-      };
-
-      // Wallet — if we registered a new address, embed it. Otherwise
-      // preserve the existing wallet block verbatim.
-      const updatedWallet: PersonaWallet | undefined = envelope.wallet
-        ? {
-            ...envelope.wallet,
-            ...(registeredAddress !== undefined
-              ? { lightning_address: registeredAddress }
-              : {}),
-            ...(registeredLnurl !== undefined
-              ? { lnurl: registeredLnurl }
-              : {}),
-          }
-        : undefined;
-
-      const signer = user.signer as unknown as Nip44Signer;
-
-      const ciphertext = await encryptPhoenixEnvelope(
-        {
-          persona: updated,
-          wallet: updatedWallet,
-          model_prefs: envelope.model_prefs,
-          settings: envelope.settings,
-        },
-        user.pubkey,
-        signer
-      );
-
-      const tmpl = buildEncryptedPersonaTemplate({
-        dTag,
-        encryptedContent: ciphertext,
-      });
-      const signed = await user.signer.signEvent(tmpl);
-      await nostr.event(signed, { signal: AbortSignal.timeout(8000) });
-
-      // If anything that surfaces in the public kind 0 changed,
-      // re-publish kind 0 signed by the persona keypair. This includes
-      // the new lud16 from registration so Nostr clients show the zap
-      // button against the current address.
-      const displayNameChanged = updated.name !== original.name;
-      const bioChanged = bioHydrated && bio !== originalBio;
-      const pictureChanged = pictureHydrated && pictureUrl !== originalPicture;
-      const lud16Changed = registeredAddress !== undefined;
-      if (
-        displayNameChanged ||
-        bioChanged ||
-        pictureChanged ||
-        usernameChanged ||
-        lud16Changed
-      ) {
-        try {
-          const decoded = nip19.decode(updated.nsec);
-          if (decoded.type !== "nsec") throw new Error("Bad nsec");
-          const { finalizeEvent } = await import("nostr-tools/pure");
-          const finalLightningAddress =
-            registeredAddress ?? envelope.wallet?.lightning_address;
-          const kind0Content = buildPersonaProfileMetadata({
-            name: updated.name,
-            username: updated.username,
-            displayName: updated.display_name ?? updated.name,
-            bio,
-            pictureUrl: pictureUrl || undefined,
-            lightningAddress: finalLightningAddress,
-          });
-          const profileTemplate = {
-            kind: 0,
-            created_at: Math.floor(Date.now() / 1000),
-            tags: [],
-            content: JSON.stringify(kind0Content),
-          };
-          const profileEvent = finalizeEvent(profileTemplate, decoded.data);
-          await nostr.event(profileEvent, {
-            signal: AbortSignal.timeout(8000),
-          });
-        } catch (e) {
-          // Profile update is best-effort — the encrypted backup is
-          // already saved at this point.
-          console.warn("Failed to update persona profile:", e);
-        }
-      }
-
-      queryClient.invalidateQueries({ queryKey: ["phoenix-persona"] });
-      queryClient.invalidateQueries({ queryKey: ["phoenix-my-personas"] });
-      queryClient.invalidateQueries({ queryKey: ["nostr", "author"] });
-      queryClient.invalidateQueries({
-        queryKey: ["persona-public-profile"],
+        bio,
+        originalBio,
+        bioHydrated,
+        pictureUrl,
+        originalPicture,
+        pictureHydrated,
+        crossPost: cross_post,
       });
 
       toast({
         title: "Saved",
-        description: `${updated.name} updated.`,
+        description: `${result.updated.name} updated.`,
       });
       navigate(`/dashboard/${npub}`);
     } catch (e) {
@@ -453,8 +316,6 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
         description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       });
-    } finally {
-      setSaving(false);
     }
   }
 
