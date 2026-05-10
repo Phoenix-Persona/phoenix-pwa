@@ -90,7 +90,7 @@ describe("nip49Storage — localStorage helpers", () => {
     // Defends against unrelated values getting parked under the key
     // (e.g. by an older version of the app or a test left an artifact).
     if (typeof window !== "undefined") {
-      window.localStorage.setItem("feniksi:user:ncryptsec", "garbage");
+      window.localStorage.setItem("zuka:user:ncryptsec", "garbage");
       expect(loadUserNcryptsec()).toBeNull();
     }
   });

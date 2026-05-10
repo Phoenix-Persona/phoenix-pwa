@@ -64,7 +64,7 @@ import {
 type WizardStep = "details" | "picture";
 
 const Onboard = () => {
-  useSeoMeta({ title: "Create a persona — Feniksi" });
+  useSeoMeta({ title: "Create a persona — Zuka" });
   const navigate = useNavigate();
   const { user } = useCurrentUser();
   const { nostr } = useNostr();
@@ -273,7 +273,7 @@ const Onboard = () => {
                 </h1>
                 <p className="text-imigongo-cream/80 leading-relaxed max-w-xl">
                   {step === "details"
-                    ? "Mint a new voice. Feniksi generates a fresh Nostr keypair for the persona — only you can operate it. The configuration below is encrypted to your key and published privately to relays; the persona's public profile goes out so anyone can find and follow its feed."
+                    ? "Mint a new voice. Zuka generates a fresh Nostr keypair for the persona — only you can operate it. The configuration below is encrypted to your key and published privately to relays; the persona's public profile goes out so anyone can find and follow its feed."
                     : "Add a portrait so the persona has a face. Upload an image or generate one. You can skip this step and add a picture later."}
                 </p>
               </div>

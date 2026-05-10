@@ -1,5 +1,5 @@
 /**
- * InstallBanner — a soft prompt to install Feniksi as a PWA.
+ * InstallBanner — a soft prompt to install Zuka as a PWA.
  *
  * Visibility rules:
  *   - The browser must have fired `beforeinstallprompt` (canInstall).
@@ -36,13 +36,13 @@ export function InstallBanner() {
   return (
     <div
       role="region"
-      aria-label="Install Feniksi"
+      aria-label="Install Zuka"
       className="fixed bottom-4 right-4 z-40 max-w-sm w-[calc(100%-2rem)] sm:w-auto pointer-events-none"
     >
       <div className="pointer-events-auto rounded-2xl border border-imigongo-clay/20 bg-card shadow-2xl shadow-black/20 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
         <div className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 px-5 py-3 border-b border-imigongo-clay/15 flex items-center justify-between gap-2">
           <p className="font-display text-base font-medium tracking-tight">
-            Install Feniksi
+            Install Zuka
           </p>
           <button
             type="button"
@@ -55,7 +55,7 @@ export function InstallBanner() {
         </div>
         <div className="p-5 space-y-3">
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Add Feniksi to your home screen for quicker access and
+            Add Zuka to your home screen for quicker access and
             offline reading. No accounts, no tracking — same app, just
             faster to launch.
           </p>

@@ -30,7 +30,7 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
-const DISMISS_KEY = "feniksi:install-banner-dismissed-at";
+const DISMISS_KEY = "zuka:install-banner-dismissed-at";
 /** Don't re-prompt for 30 days after a dismissal. */
 const DISMISS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 

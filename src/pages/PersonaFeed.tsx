@@ -39,7 +39,7 @@ const PersonaFeed = () => {
   const picture = author.data?.metadata?.picture;
 
   useSeoMeta({
-    title: `${displayName} — Feniksi`,
+    title: `${displayName} — Zuka`,
     description: bio || undefined,
   });
 

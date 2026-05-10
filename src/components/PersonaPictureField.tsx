@@ -263,7 +263,7 @@ export function PersonaPictureField({
                 Generate
               </p>
               <p className="text-xs text-muted-foreground">
-                Describe the look — Feniksi will draft an image via PPQ.
+                Describe the look — Zuka will draft an image via PPQ.
               </p>
             </div>
             <div className="space-y-2">

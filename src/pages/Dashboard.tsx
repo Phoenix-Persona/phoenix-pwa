@@ -9,7 +9,7 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
-import { Loader2, Send, Sparkles } from "lucide-react";
+import { FileText, Film, Loader2, Sparkles } from "lucide-react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
@@ -41,7 +41,7 @@ function npubToHex(npub: string): string | null {
 
 const Dashboard = () => {
   const { npub = "" } = useParams();
-  useSeoMeta({ title: "Dashboard — Feniksi" });
+  useSeoMeta({ title: "Dashboard — Zuka" });
 
   const { user } = useCurrentUser();
   const { toast } = useToast();
@@ -265,13 +265,20 @@ const Dashboard = () => {
           {personaConfig && (
             <Card className="border-imigongo-clay/20 bg-gradient-to-br from-card via-card to-rw-gold-soft/10 overflow-hidden">
               <div className="bg-gradient-to-r from-rw-sky/10 via-rw-gold/10 to-rw-green/10 px-6 py-4 border-b border-imigongo-clay/15 flex items-center gap-2">
-                <Sparkles className="size-5 text-imigongo-clay" aria-hidden="true" />
-                <h2 className="font-display text-2xl font-medium tracking-tight">
-                  Compose
-                </h2>
+                <Film className="size-5 text-imigongo-clay" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-display text-2xl font-medium tracking-tight">
+                    Compose a video
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Idea + sources + hints feed the AI prompt that
+                    generates the persona's video. Text-only posting
+                    is available as a fallback.
+                  </p>
+                </div>
               </div>
               <CardContent className="space-y-5 pt-5">
-                {/* Idea — the post body */}
+                {/* Idea — drives both the video script and the text fallback */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label
@@ -289,7 +296,7 @@ const Dashboard = () => {
                     rows={5}
                     value={raw}
                     onChange={(e) => setRaw(e.target.value)}
-                    placeholder="What does the persona need to say? Drop the rawest version of your thought — AI styling will polish it once that step lands."
+                    placeholder="What does the persona need to say? Drop the rawest version of your brief — Zuka turns it into a video script in the persona's voice."
                     onKeyDown={(e) => {
                       if (
                         (e.metaKey || e.ctrlKey) &&
@@ -305,7 +312,7 @@ const Dashboard = () => {
                   />
                 </div>
 
-                {/* Sources + style hints */}
+                {/* Sources + style hints — feed the AI prompt */}
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label
@@ -326,9 +333,10 @@ const Dashboard = () => {
                       className="text-sm bg-background/60 resize-none"
                     />
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Comma-separated URLs. Attached to the post as{" "}
-                      <code className="font-mono">r</code> tags so anyone can
-                      see what informed it.
+                      Comma-separated URLs. Grounds the video script
+                      and rides the published post as{" "}
+                      <code className="font-mono">r</code> tags for
+                      attribution.
                     </p>
                   </div>
                   <div className="space-y-2">
@@ -350,8 +358,8 @@ const Dashboard = () => {
                       className="text-sm bg-background/60 resize-none"
                     />
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Will guide the AI styling + video framing once that
-                      step lands. Captured locally for now.
+                      Tone, framing, length. Steers the AI prompt for
+                      both video script and visual direction.
                     </p>
                   </div>
                 </div>
@@ -387,15 +395,12 @@ const Dashboard = () => {
                   </div>
                 )}
 
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                  <p className="text-[11px] text-muted-foreground">
-                    Press{" "}
-                    <kbd className="font-mono px-1 py-0.5 rounded bg-muted border border-border text-[10px]">
-                      ⌘ Enter
-                    </kbd>{" "}
-                    in the idea field to publish.
-                  </p>
-                  <div className="flex gap-2">
+                {/* Action row — primary 'Generate video' (disabled until
+                    Jim's PPQ video → Blossom seam lands), secondary
+                    'Publish text-only' fallback that ships the kind 1
+                    immediately. */}
+                <div className="space-y-3 pt-1">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <Button
                       variant="ghost"
                       onClick={() => {
@@ -407,31 +412,55 @@ const Dashboard = () => {
                     >
                       Discard
                     </Button>
-                    <Button
-                      onClick={onPost}
-                      disabled={
-                        publish.isPending ||
-                        crossPost.isPending ||
-                        !raw.trim()
-                      }
-                      className="shadow-lg shadow-primary/20"
-                    >
-                      {publish.isPending || crossPost.isPending ? (
-                        <>
-                          <Loader2
-                            className="mr-2 size-4 animate-spin"
-                            aria-hidden="true"
-                          />
-                          Publishing…
-                        </>
-                      ) : (
-                        <>
-                          <Send className="mr-2 size-4" aria-hidden="true" />
-                          Publish
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={onPost}
+                        disabled={
+                          publish.isPending ||
+                          crossPost.isPending ||
+                          !raw.trim()
+                        }
+                        title="Publish a text-only kind 1 note (no video)"
+                      >
+                        {publish.isPending || crossPost.isPending ? (
+                          <>
+                            <Loader2
+                              className="mr-2 size-4 animate-spin"
+                              aria-hidden="true"
+                            />
+                            Publishing…
+                          </>
+                        ) : (
+                          <>
+                            <FileText
+                              className="mr-2 size-4"
+                              aria-hidden="true"
+                            />
+                            Publish text-only
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        disabled
+                        className="shadow-lg shadow-primary/20"
+                        title="Video generation lands once the PPQ video pipeline + Blossom upload seam ships"
+                      >
+                        <Sparkles
+                          className="mr-2 size-4"
+                          aria-hidden="true"
+                        />
+                        Generate video
+                      </Button>
+                    </div>
                   </div>
+                  <p className="text-[11px] text-muted-foreground text-right">
+                    <span className="opacity-80">
+                      Video generation arrives in the next build —
+                      until then, the text-only fallback publishes
+                      a clean kind 1 note grounded by your sources.
+                    </span>
+                  </p>
                 </div>
               </CardContent>
             </Card>

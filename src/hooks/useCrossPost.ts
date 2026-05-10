@@ -9,7 +9,7 @@
  * therefore a webhook to a third-party aggregator (Buffer, Zapier,
  * Make.com, n8n, Pipedream, etc.) — the user signs up there, points
  * their integrations at their X/FB/IG/TikTok accounts, and pastes
- * the webhook URL into Feniksi. On every persona publish, we POST
+ * the webhook URL into Zuka. On every persona publish, we POST
  * a structured payload; the aggregator does the platform fan-out.
  *
  * What we send:

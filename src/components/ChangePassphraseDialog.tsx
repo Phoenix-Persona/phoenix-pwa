@@ -2,14 +2,14 @@
  * ChangePassphraseDialog — rotate the at-rest passphrase that
  * protects the user's nsec on this device.
  *
- * Reads the current `feniksi:user:ncryptsec` from localStorage,
+ * Reads the current `zuka:user:ncryptsec` from localStorage,
  * decrypts with the old passphrase, re-encrypts with the new one,
  * and writes the new ncryptsec back. The Nostrify session stays
  * untouched (the user's plaintext nsec is already in memory) — only
  * the at-rest layer rotates.
  *
  * Only meaningful for Phoenix-managed accounts (those with an
- * `feniksi:user:ncryptsec` parked in localStorage). For BYO logins
+ * `zuka:user:ncryptsec` parked in localStorage). For BYO logins
  * we don't render the affordance.
  */
 
@@ -195,7 +195,7 @@ export function ChangePassphraseDialog({
           )}
 
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            At least 12 characters. Feniksi can't recover this for you
+            At least 12 characters. Zuka can't recover this for you
             — write it down somewhere offline.
           </p>
         </div>

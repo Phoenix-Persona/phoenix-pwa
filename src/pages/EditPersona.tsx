@@ -51,7 +51,7 @@ import {
 
 const EditPersona = () => {
   const { npub = "" } = useParams();
-  useSeoMeta({ title: "Edit persona — Feniksi" });
+  useSeoMeta({ title: "Edit persona — Zuka" });
   const { user } = useCurrentUser();
   const personaQ = usePersona(npub);
 
@@ -441,7 +441,7 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
             <p className="text-xs text-muted-foreground leading-relaxed">
               Paste a webhook URL from your social-media aggregator
               (Buffer, Zapier, Make.com, n8n, etc.). On every persona
-              publish, Feniksi POSTs the event payload there so the
+              publish, Zuka POSTs the event payload there so the
               aggregator can fan it out to X / Facebook / Instagram /
               TikTok / wherever you've connected. Leave blank to
               disable.

@@ -81,7 +81,7 @@ const Verify = () => {
   // pubkey. We surface this affirmatively rather than re-verifying.
   const allPostsValid = posts.data && posts.data.length > 0;
 
-  useSeoMeta({ title: `Verify ${displayName} — Feniksi` });
+  useSeoMeta({ title: `Verify ${displayName} — Zuka` });
 
   const firstPost = posts.data?.[posts.data.length - 1];
   const lastPost = posts.data?.[0];
@@ -118,7 +118,7 @@ const Verify = () => {
               <div className="space-y-2">
                 <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
                   <span className="h-px w-6 bg-rw-gold" />
-                  Feniksi attestation
+                  Zuka attestation
                 </p>
                 <h1 className="font-display text-3xl md:text-4xl font-medium tracking-tight">
                   {displayName}
@@ -170,7 +170,7 @@ const Verify = () => {
                   <p className="text-xs text-muted-foreground pt-2 leading-relaxed">
                     The human accountable for this voice is{" "}
                     <strong>intentionally not disclosed</strong> on the
-                    network. Feniksi is built for activists who would be at
+                    network. Zuka is built for activists who would be at
                     risk if the operator-persona link were public. The
                     persona's configuration is encrypted to the operator's
                     Nostr key — only they can operate the persona, and only
@@ -225,7 +225,7 @@ const Verify = () => {
                     }
                   />
                   <p className="text-xs text-muted-foreground pt-2 leading-relaxed">
-                    Every signature is verified in your browser — Feniksi
+                    Every signature is verified in your browser — Zuka
                     runs no server. A relay that returned a forged event
                     would fail this check visibly.
                   </p>

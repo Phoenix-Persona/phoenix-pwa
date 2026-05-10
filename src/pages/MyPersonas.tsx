@@ -14,7 +14,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useMyPersonas, usePersonaActivityStats } from "@/hooks/usePersona";
 
 const MyPersonas = () => {
-  useSeoMeta({ title: "My personas — Feniksi" });
+  useSeoMeta({ title: "My personas — Zuka" });
   const { user } = useCurrentUser();
   const { data, isLoading, isError, error } = useMyPersonas();
   // Batched activity query keyed on the union of persona pubkeys —
@@ -195,7 +195,7 @@ const MyPersonas = () => {
                 </p>
                 <p className="text-muted-foreground max-w-md mx-auto">
                   Create the first voice. Choose a cause, shape the tone,
-                  and Feniksi will mint a fresh keypair just for it.
+                  and Zuka will mint a fresh keypair just for it.
                 </p>
               </div>
               <Button
