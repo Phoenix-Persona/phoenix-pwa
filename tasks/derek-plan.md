@@ -1,4 +1,8 @@
-# Derek's Plan — Feniksi (formerly Phoenix Persona)
+# Derek's Plan — Zuka (formerly Feniksi, originally Phoenix Persona)
+
+> Brand history: Phoenix → Feniksi (PR #3) → Zuka (current PR). Each
+> rebrand is user-visible only; the on-wire NIP-78 discriminator
+> stays `phoenix-persona` forever for protocol compatibility.
 
 **Role:** Frontend + Nostr + PWA (PROJECT.md §12).
 **Source of truth:** [`dev/PROJECT.md`](../dev/PROJECT.md). When this plan and PROJECT.md disagree, **PROJECT.md wins**.
@@ -112,14 +116,14 @@ backend" principle.
 |---|---|---|
 | (a) Phoenix backend | Stand up an OAuth proxy service | Breaks PROJECT.md §4. Single point of failure that contradicts the entire pitch ("the voice doesn't depend on us"). **Rejected.** |
 | (b) Twitter PKCE only | OAuth 2.0 PKCE with no secret. Twitter v2 supports it. | Twitter-only. Per-user rate limits painful. ✅ for V1.5 power-user path. |
-| (c) BYO tokens in encrypted backup | User authenticates on platform's mobile/desktop app, pastes refresh tokens into Feniksi. Tokens stored in `cross_post_tokens` field of the kind 30078 plaintext. Browser uses tokens directly to publish. | Privacy-preserving, no backend. UX brutal — token expiry, refresh per platform. Long tail. |
-| (d) Webhook to a third-party aggregator | User signs up at Buffer / Hootsuite / Zapier / Make.com, creates a webhook for cross-posting, pastes the webhook URL into Feniksi. On publish, Feniksi POSTs to the webhook with the post payload. Aggregator handles cross-posting. | **No backend. No tokens stored. User owns the aggregator account.** Cleanest no-backend path. ✅ **Recommended for V1.5 default.** |
+| (c) BYO tokens in encrypted backup | User authenticates on platform's mobile/desktop app, pastes refresh tokens into Zuka. Tokens stored in `cross_post_tokens` field of the kind 30078 plaintext. Browser uses tokens directly to publish. | Privacy-preserving, no backend. UX brutal — token expiry, refresh per platform. Long tail. |
+| (d) Webhook to a third-party aggregator | User signs up at Buffer / Hootsuite / Zapier / Make.com, creates a webhook for cross-posting, pastes the webhook URL into Zuka. On publish, Zuka POSTs to the webhook with the post payload. Aggregator handles cross-posting. | **No backend. No tokens stored. User owns the aggregator account.** Cleanest no-backend path. ✅ **Recommended for V1.5 default.** |
 
 **Recommended cross-post architecture:**
 
 - **V1.5 default:** option (d). User pastes a webhook URL in Settings
   → Cross-posting. Each persona has its own webhook (or shared per
-  user). On publish, Feniksi POSTs `{caption, video_url, platforms[]}`
+  user). On publish, Zuka POSTs `{caption, video_url, platforms[]}`
   to the webhook. Aggregator does the platform fan-out.
 - **V1.5 power-user path:** option (b). For users who want a more
   direct route, Twitter PKCE OAuth flow lets them post to X without
@@ -395,50 +399,24 @@ V1 ships the form-based wizard (`Onboard.tsx`); the picture step uses PPQ image 
 - [ ] Final palette + type pairing sign-off from Anaïse
 - [x] Splash + 404 + empty-state polish
 
-### Rebrand: Phoenix → Feniksi (Kinyarwanda for "phoenix")
+### Brand history — Phoenix → Feniksi → Zuka (✅ shipped across PRs #3 and the current PR)
 
-**Decision needed before execution.** The rebrand splits into two
-layers with very different blast radii:
+**On-wire policy (locked):** the NIP-78 payload discriminator stays
+`phoenix-persona` regardless of brand changes. Rebrands shouldn't
+break parser compatibility — they're a UI concern, not a protocol
+concern. The `PHOENIX_PAYLOAD_APP` constant is a private wire-format
+detail; the function name `encryptPhoenixEnvelope` is similarly an
+internal API identifier.
 
-**Layer A — Visible / cosmetic (cheap, mostly safe):**
-- App name in `package.json`, `README.md`, `index.html` `<title>`
-- Documentation: `dev/PROJECT.md` (and the team should know — needs Anaïse's blessing), `AGENTS.md`, `tasks/todo.md`, `docs/*.md`, `tasks/derek-plan.md`
-- UI strings: `PhoenixHeader.tsx` brand mark, `useSeoMeta` titles ("— Phoenix" → "— Feniksi"), splash copy, dialog titles, error messages
-- Component file rename: `src/components/PhoenixHeader.tsx` → `FeniksiHeader.tsx` (or just `BrandHeader.tsx`)
-- Assets: any logo / favicon / OG image referencing "Phoenix"
-- PWA manifest `name` / `short_name` / `description`
-- Demo deck, one-pager, social copy (Anaïse's lane)
+**What changes per rebrand:** user-visible strings (`useSeoMeta`
+titles, AppHeader wordmark, hero/footer copy, dialog copy, toast
+copy), `package.json` `name`, `index.html` titles, PWA manifest
+name/short_name, app cache name, localStorage keys (e.g.
+`zuka:user:ncryptsec`).
 
-**Layer B — On-wire / persistent identifiers (REQUIRES TEAM DECISION):**
-- `PHOENIX_PAYLOAD_APP = "phoenix-persona"` — the magic discriminator inside every encrypted kind 30078 payload. Changing it makes existing personas unreadable.
-- The `client` tag value (currently we deliberately omit it for kind 1, so this is a non-issue for now).
-- Any future Lightning Address domain (`@phoenix.example`) — Topher's decision; should align with the rebrand.
-- The `app:` field inside the NIP-44 plaintext envelope (set to `"phoenix-persona"` via `PHOENIX_PAYLOAD_APP`).
-
-**Recommended on-wire strategy:**
-1. **Keep `phoenix-persona` as the on-wire discriminator forever.** It's the protocol identifier; rebrands shouldn't break parser compatibility. Comparable to how npm packages keep their original published name.
-2. Document this in `NIP.md` and `dev/PROJECT.md`: "The product is Feniksi. The on-wire NIP-78 payload discriminator stays `phoenix-persona` for forward/backward compatibility with V1 personas."
-3. Internal type names + comments + docs say Feniksi; the string constant `PHOENIX_PAYLOAD_APP` becomes a private compatibility detail (could rename the constant to `WIRE_APP_DISCRIMINATOR` to make this explicit).
-
-**Execution checklist (after team approves):**
-- [ ] **Decide on-wire policy** — keep `"phoenix-persona"` discriminator (recommended) or migrate (requires v2 envelope + dual-read fallback for any V1 personas already in the wild)
-- [ ] **Anaïse signs off** on the brand swap and demo language change
-- [ ] Find/replace `Phoenix` → `Feniksi` in user-visible strings only:
-  - [ ] `package.json` (`name`, `description`)
-  - [ ] `index.html`
-  - [ ] `README.md`
-  - [ ] All `useSeoMeta({ title: ... })` calls
-  - [ ] All toast / error / dialog copy
-  - [ ] `PhoenixHeader.tsx` brand wordmark + file rename
-  - [ ] `nip49Storage.ts` storage key (`phoenix:user:ncryptsec` → `feniksi:user:ncryptsec`) — **breaks any existing on-device unlock state; OK pre-launch but needs a migration shim if any users have signed up first**
-  - [ ] PWA manifest (Phase 3 task — coordinate)
-  - [ ] Favicon, OG image, og:title metadata
-- [ ] Update docs: `dev/PROJECT.md`, `AGENTS.md`, `tasks/todo.md`, `tasks/derek-plan.md`, `docs/*.md`
-- [ ] Add a paragraph in `dev/PROJECT.md` §13 (Glossary) explaining the bilingual brand: "Feniksi (Kinyarwanda for phoenix). The protocol-level identifier `phoenix-persona` is retained for compatibility."
-- [ ] Update demo opening: "Feniksi gives an activist a voice that can outlive them." (or whatever Anaïse lands on)
-- [ ] One round of grep-and-fix for any straggler "phoenix" strings that should be "Feniksi"
-
-**Coordination note.** This crosses every owner's lane (UI → Derek, on-wire → Derek + Topher, docs/demo → Anaïse, prompts → Jim). Don't execute solo — surface at next sync, pick a window when no one is mid-feature, and do it as a single atomic commit so we don't ship a half-rebranded build.
+**What stays:** all on-wire identifiers, the `phoenix-persona`
+discriminator, the GitHub repo URL (`Phoenix-Persona/phoenix-pwa`),
+internal function/type names that reference the protocol concept.
 
 ### PWA — current branch (`derek/phase-3-polish`)
 - [ ] `vite-plugin-pwa` manifest with Imigongo-themed 192 / 512 / maskable icons (config exists; icons need real artwork beyond the favicon)

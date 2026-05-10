@@ -209,7 +209,7 @@ export function PersonaActionsMenu({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {personaName}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Feniksi will publish a deletion request for this persona's
+              Zuka will publish a deletion request for this persona's
               encrypted backup. The persona keypair becomes inaccessible
               to you afterwards. Posts already published to relays will
               remain public — Nostr cannot retract them.

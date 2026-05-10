@@ -13,7 +13,7 @@
  *
  * Only available for nsec-type logins (Phoenix-managed or pasted
  * nsec). NIP-07 / NIP-46 users hold their key in an external signer
- * — Feniksi never sees the plaintext, so it can't export.
+ * — Zuka never sees the plaintext, so it can't export.
  */
 
 import { useState } from "react";
@@ -46,7 +46,7 @@ interface DownloadBackupDialogProps {
 /** Generate a date-stamped filename for the export. */
 function exportFilename(): string {
   const stamp = new Date().toISOString().slice(0, 10);
-  return `feniksi-backup-${stamp}.ncryptsec`;
+  return `zuka-backup-${stamp}.ncryptsec`;
 }
 
 export function DownloadBackupDialog({
@@ -184,7 +184,7 @@ export function DownloadBackupDialog({
 
           <p className="text-[11px] text-muted-foreground leading-relaxed">
             At least 12 characters. We recommend a different passphrase
-            than your at-rest one. Feniksi can't recover this file for
+            than your at-rest one. Zuka can't recover this file for
             you — write the passphrase down somewhere offline.
           </p>
         </div>

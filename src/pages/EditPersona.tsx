@@ -51,7 +51,7 @@ import {
 
 const EditPersona = () => {
   const { npub = "" } = useParams();
-  useSeoMeta({ title: "Edit persona — Feniksi" });
+  useSeoMeta({ title: "Edit persona — Zuka" });
   const { user } = useCurrentUser();
   const personaQ = usePersona(npub);
 
@@ -158,6 +158,14 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   const [bio, setBio] = useState("");
   const [bioHydrated, setBioHydrated] = useState(false);
   const [originalBio, setOriginalBio] = useState("");
+  // Cross-posting (V1.5 — webhook-to-aggregator default per
+  // derek-plan.md "Cross-post + video composer").
+  const [webhookUrl, setWebhookUrl] = useState(
+    original.cross_post?.webhook_url ?? ""
+  );
+  const [webhookPlatformsInput, setWebhookPlatformsInput] = useState(
+    (original.cross_post?.webhook_platforms ?? []).join(", ")
+  );
   const [saving, setSaving] = useState(false);
 
   // Bio + picture come from the persona's public kind 0 — fetched
@@ -229,6 +237,20 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
     try {
       // Build the updated persona — identity fields are immutable
       // (pubkey, nsec, created_at, dTag).
+      // Cross-post block — only emit if a webhook URL is set, so we
+      // don't bloat the encrypted payload with empty fields. Empty
+      // string clears the configuration entirely.
+      const trimmedWebhook = webhookUrl.trim();
+      const webhookPlatforms = parseList(webhookPlatformsInput, []);
+      const cross_post = trimmedWebhook
+        ? {
+            webhook_url: trimmedWebhook,
+            ...(webhookPlatforms.length > 0
+              ? { webhook_platforms: webhookPlatforms }
+              : {}),
+          }
+        : undefined;
+
       const updated: Persona = {
         ...original,
         // Promote the resolved d-tag into the plaintext payload so
@@ -240,6 +262,7 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
         languages: parseList(languagesInput, original.languages),
         tags: parseList(tagsInput, []),
         reference_image_url: pictureUrl || undefined,
+        cross_post,
       };
 
       const signer = user.signer as unknown as Nip44Signer;
@@ -407,6 +430,46 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
             onChange={(e) => setVoiceId(e.target.value)}
             placeholder="alloy"
           />
+        </div>
+
+        {/* Cross-posting (V1.5 — webhook to a third-party aggregator) */}
+        <div className="space-y-3 pt-2 border-t border-border">
+          <div className="space-y-1">
+            <Label htmlFor="edit-cross-post-url">
+              Cross-posting webhook (optional)
+            </Label>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Paste a webhook URL from your social-media aggregator
+              (Buffer, Zapier, Make.com, n8n, etc.). On every persona
+              publish, Zuka POSTs the event payload there so the
+              aggregator can fan it out to X / Facebook / Instagram /
+              TikTok / wherever you've connected. Leave blank to
+              disable.
+            </p>
+          </div>
+          <Input
+            id="edit-cross-post-url"
+            type="url"
+            value={webhookUrl}
+            onChange={(e) => setWebhookUrl(e.target.value)}
+            placeholder="https://hooks.zapier.com/hooks/catch/..."
+            autoComplete="off"
+          />
+          <div className="space-y-1">
+            <Label htmlFor="edit-cross-post-platforms" className="text-xs">
+              Platforms hint (comma separated, optional)
+            </Label>
+            <Input
+              id="edit-cross-post-platforms"
+              value={webhookPlatformsInput}
+              onChange={(e) => setWebhookPlatformsInput(e.target.value)}
+              placeholder="x, facebook, instagram"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Passed to your webhook as a `platforms` array — your
+              aggregator decides what to honor.
+            </p>
+          </div>
         </div>
 
         <div className="flex justify-between gap-2 pt-2">

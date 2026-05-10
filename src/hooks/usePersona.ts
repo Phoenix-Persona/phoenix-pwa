@@ -194,6 +194,74 @@ export function useMyPersonas() {
   });
 }
 
+export interface PersonaActivityStats {
+  /** Total kind 1 events authored by this persona that we've seen. */
+  postCount: number;
+  /** Unix-second timestamp of the most recent post, or null if none. */
+  lastActive: number | null;
+}
+
+/**
+ * Batch-query post activity for many personas at once.
+ *
+ * Used by directory pages (MyPersonas grid, Settings persona list)
+ * that want a small "X posts · last active 3d ago" caption per card
+ * without firing N separate queries. One filter, one round-trip,
+ * group by author client-side. Pubkeys are sorted before the
+ * queryKey serialises so card-order churn doesn't blow the cache.
+ */
+export function usePersonaActivityStats(pubkeys: string[] | undefined) {
+  const { nostr } = useNostr();
+  const sorted = (pubkeys ?? []).slice().sort();
+
+  return useQuery({
+    queryKey: ["phoenix-persona-activity", sorted.join(",")],
+    enabled: sorted.length > 0,
+    queryFn: async (c): Promise<Map<string, PersonaActivityStats>> => {
+      const stats = new Map<string, PersonaActivityStats>();
+      if (sorted.length === 0) return stats;
+
+      // Cap the query to a reasonable budget. 100 events × N personas
+      // is plenty for a directory caption — richer feeds use the
+      // dedicated usePersonaPosts query.
+      const events = await nostr.query(
+        [
+          {
+            kinds: [1],
+            authors: sorted,
+            limit: Math.min(500, sorted.length * 100),
+          },
+        ],
+        { signal: c.signal }
+      );
+
+      for (const ev of events) {
+        const cur = stats.get(ev.pubkey);
+        if (!cur) {
+          stats.set(ev.pubkey, {
+            postCount: 1,
+            lastActive: ev.created_at,
+          });
+        } else {
+          cur.postCount++;
+          if (ev.created_at > (cur.lastActive ?? 0)) {
+            cur.lastActive = ev.created_at;
+          }
+        }
+      }
+
+      // Ensure every requested pubkey has an entry, even with zero
+      // posts — callers can skip a has-key check.
+      for (const pk of sorted) {
+        if (!stats.has(pk)) {
+          stats.set(pk, { postCount: 0, lastActive: null });
+        }
+      }
+      return stats;
+    },
+  });
+}
+
 /**
  * Fetch posts authored by a persona (PUBLIC kind 1 events).
  * Anyone can view a persona's feed — it looks like any other Nostr account.

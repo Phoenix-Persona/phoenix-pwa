@@ -16,7 +16,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const Index = () => {
   useSeoMeta({
-    title: "Feniksi — Uncensorable Voices",
+    title: "Zuka — Uncensorable Voices",
     description:
       "AI personas on Nostr. Voices that can be amplified but not silenced.",
   });
@@ -188,7 +188,7 @@ const Index = () => {
                 <span className="italic text-rw-gold">The world&rsquo;s ears.</span>
               </h2>
               <p className="text-lg text-imigongo-cream/80 leading-relaxed">
-                Curate the sources. Shape the tone. Feniksi turns a raw thought
+                Curate the sources. Shape the tone. Zuka turns a raw thought
                 into a styled post in your persona&rsquo;s voice — every time,
                 with citations attached.
               </p>
@@ -281,7 +281,7 @@ const Index = () => {
                 <span className="italic text-rw-gold">have weight.</span>
               </h2>
               <p className="text-lg text-imigongo-cream/80 leading-relaxed max-w-prose">
-                Feniksi is built where compromise isn&rsquo;t an option. Every
+                Zuka is built where compromise isn&rsquo;t an option. Every
                 choice — what&rsquo;s encrypted, what&rsquo;s signed, what
                 survives — was made with one question in mind: what happens
                 when someone&rsquo;s safety depends on this?
@@ -333,7 +333,7 @@ const Index = () => {
                   className="rounded-lg"
                 />
                 <span className="font-display font-semibold text-2xl text-imigongo-cream">
-                  Feniksi
+                  Zuka
                 </span>
               </div>
               <p className="text-sm text-imigongo-cream/60 max-w-sm leading-relaxed">
@@ -416,7 +416,7 @@ const Index = () => {
           <div className="border-t border-imigongo-cream/10">
             <div className="container py-5 text-xs text-imigongo-cream/50">
               <span>
-                © {new Date().getFullYear()} Feniksi. Built for voices that
+                © {new Date().getFullYear()} Zuka. Built for voices that
                 can&rsquo;t be silenced.
               </span>
             </div>

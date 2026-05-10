@@ -2,7 +2,7 @@
  * Settings — account, relays, media servers, and persona management.
  *
  * Logged-in only. Four sections on a single scrollable page:
- *   - Account: Feniksi-managed user nsec, lock / forget device,
+ *   - Account: Zuka-managed user nsec, lock / forget device,
  *     change passphrase, download key backup
  *   - Relays: NIP-65 inbox/outbox via RelayListManager
  *   - Media: BUD-03 Blossom server list via BlossomServerListManager
@@ -31,6 +31,7 @@ import { BlossomServerListManager } from "@/components/BlossomServerListManager"
 import { ChangePassphraseDialog } from "@/components/ChangePassphraseDialog";
 import { DownloadBackupDialog } from "@/components/DownloadBackupDialog";
 import { FlagStripe } from "@/components/ImigongoBand";
+import { PersonaStatsBadge } from "@/components/PersonaStatsBadge";
 import { RelayListManager } from "@/components/RelayListManager";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLoggedInAccounts } from "@/hooks/useLoggedInAccounts";
-import { useMyPersonas } from "@/hooks/usePersona";
+import { useMyPersonas, usePersonaActivityStats } from "@/hooks/usePersona";
 import { useDeletePersona } from "@/hooks/useDeletePersona";
 import { useToast } from "@/hooks/useToast";
 import {
@@ -57,12 +58,14 @@ import {
 } from "@/lib/nip49Storage";
 
 const Settings = () => {
-  useSeoMeta({ title: "Settings — Feniksi" });
+  useSeoMeta({ title: "Settings — Zuka" });
   const navigate = useNavigate();
   const { user } = useCurrentUser();
   const { logins, removeLogin } = useNostrLogin();
   const { currentUser } = useLoggedInAccounts();
   const personas = useMyPersonas();
+  const personaPubkeys = personas.data?.map((p) => p.envelope.persona.pubkey);
+  const personaStats = usePersonaActivityStats(personaPubkeys);
   const deletePersona = useDeletePersona();
   const { toast } = useToast();
 
@@ -71,7 +74,7 @@ const Settings = () => {
 
   // Pull the current login's nsec for the export-backup flow. Only
   // available for nsec-type logins; bunker / extension users hold
-  // their key in an external signer that Feniksi never sees.
+  // their key in an external signer that Zuka never sees.
   const currentLogin = logins[0];
   const exportableNsec =
     currentLogin && currentLogin.type === "nsec"
@@ -143,7 +146,7 @@ const Settings = () => {
               <SectionHeader
                 eyebrow="Account"
                 title="Your Nostr identity"
-                description="The keypair Feniksi signs your encrypted persona backups with."
+                description="The keypair Zuka signs your encrypted persona backups with."
               />
               <Card className="border-imigongo-clay/20 overflow-hidden">
                 <CardContent className="p-6 space-y-5">
@@ -239,7 +242,7 @@ const Settings = () => {
               <SectionHeader
                 eyebrow="Relays"
                 title="Where your events live"
-                description="Feniksi reads from your inbox relays and writes to your outbox relays. Changes publish a new NIP-65 list automatically."
+                description="Zuka reads from your inbox relays and writes to your outbox relays. Changes publish a new NIP-65 list automatically."
               />
               <Card className="border-imigongo-clay/20 overflow-hidden">
                 <CardContent className="p-6">
@@ -253,7 +256,7 @@ const Settings = () => {
               <SectionHeader
                 eyebrow="Media"
                 title="Where your images and videos live"
-                description="Persona pictures, post images, and generated videos are uploaded to Blossom servers. Add your own to control where the media is hosted; Feniksi's defaults stay in the rotation if you keep that toggle on."
+                description="Persona pictures, post images, and generated videos are uploaded to Blossom servers. Add your own to control where the media is hosted; Zuka's defaults stay in the rotation if you keep that toggle on."
               />
               <Card className="border-imigongo-clay/20 overflow-hidden">
                 <CardContent className="p-6">
@@ -297,11 +300,15 @@ const Settings = () => {
                       <li key={event.id}>
                         <Card className="border-imigongo-clay/20 overflow-hidden">
                           <CardContent className="p-5 flex items-center gap-4 flex-wrap">
-                            <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex-1 min-w-0 space-y-1.5">
                               <p className="font-display text-lg font-medium tracking-tight">
                                 {persona.name}
                               </p>
-                              <div className="flex flex-wrap gap-1.5">
+                              <PersonaStatsBadge
+                                stats={personaStats.data?.get(persona.pubkey)}
+                                loading={personaStats.isLoading}
+                              />
+                              <div className="flex flex-wrap gap-1.5 pt-0.5">
                                 {persona.tags.slice(0, 3).map((t) => (
                                   <Badge
                                     key={t}
@@ -347,7 +354,7 @@ const Settings = () => {
                                       Delete {persona.name}?
                                     </AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      Feniksi will publish a deletion request
+                                      Zuka will publish a deletion request
                                       for this persona's encrypted backup. The
                                       persona keypair becomes inaccessible to
                                       you afterwards. Posts already published

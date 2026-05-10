@@ -5,7 +5,7 @@
  * Mirrors `RelayListManager` in structure but simpler — Blossom
  * servers don't have read/write semantics, just a URL list. Adds
  * one extra control: a toggle for `useAppBlossomServers`, which
- * decides whether Feniksi's defaults are merged with the user's
+ * decides whether Zuka's defaults are merged with the user's
  * list (per `getEffectiveBlossomServers` in `appBlossom.ts`).
  *
  * On every change we update local AppContext (so uploads use the
@@ -172,7 +172,7 @@ export function BlossomServerListManager() {
           <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
             No Blossom servers configured.
             {config.useAppBlossomServers
-              ? " Feniksi's defaults are still in use for uploads."
+              ? " Zuka's defaults are still in use for uploads."
               : " Add at least one to enable uploads."}
           </div>
         ) : (
@@ -240,10 +240,10 @@ export function BlossomServerListManager() {
             htmlFor="use-app-blossom-defaults"
             className="text-sm font-medium cursor-pointer"
           >
-            Include Feniksi's default servers
+            Include Zuka's default servers
           </Label>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Mirrors uploads to Feniksi's vetted servers (Ditto, Dreamith,
+            Mirrors uploads to Zuka's vetted servers (Ditto, Dreamith,
             Primal) alongside your own. Recommended for redundancy.
           </p>
         </div>

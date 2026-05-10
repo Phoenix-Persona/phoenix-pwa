@@ -99,7 +99,7 @@ export function HowItWorks() {
         body={
           <>
             Choose the cause. Curate the sources it speaks from. Shape the
-            tone, the cadence, the conviction. Feniksi mints the persona&rsquo;s
+            tone, the cadence, the conviction. Zuka mints the persona&rsquo;s
             own keypair on creation — a fresh identity, cryptographically
             separate from yours.
           </>
@@ -125,7 +125,7 @@ export function HowItWorks() {
         }
         body={
           <>
-            Drop in your idea, your sources, a few style hints. Feniksi
+            Drop in your idea, your sources, a few style hints. Zuka
             generates the video in the persona&rsquo;s likeness and voice,
             posts it to Nostr signed by the persona&rsquo;s key, and
             cross-posts it to X, Facebook, and Instagram in the same

@@ -10,9 +10,9 @@ const NotFound = () => {
   const location = useLocation();
 
   useSeoMeta({
-    title: "Not found — Feniksi",
+    title: "Not found — Zuka",
     description:
-      "The page you are looking for could not be found. Return to Feniksi to continue.",
+      "The page you are looking for could not be found. Return to Zuka to continue.",
   });
 
   useEffect(() => {

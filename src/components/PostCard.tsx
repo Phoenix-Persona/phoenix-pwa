@@ -5,6 +5,7 @@ import { PostBody } from "./PostBody";
 import { Badge } from "@/components/ui/badge";
 import {
   extractImetaImages,
+  extractImetaVideos,
   extractSourceDomains,
 } from "@/lib/personaPost";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ function relativeTime(unixSec: number): string {
 export function PostCard({ event, className }: PostCardProps) {
   const domains = useMemo(() => extractSourceDomains(event.tags), [event.tags]);
   const images = useMemo(() => extractImetaImages(event.tags), [event.tags]);
+  const videos = useMemo(() => extractImetaVideos(event.tags), [event.tags]);
   const absoluteTime = useMemo(
     () => new Date(event.created_at * 1000).toLocaleString(),
     [event.created_at]
@@ -57,6 +59,24 @@ export function PostCard({ event, className }: PostCardProps) {
       )}
     >
       <PostBody content={event.content} />
+
+      {videos.length > 0 && (
+        <div className="mt-4 space-y-1.5">
+          {videos.slice(0, 2).map((v, idx) => (
+            <video
+              key={`${v.url}-${idx}`}
+              src={v.url}
+              poster={v.poster}
+              controls
+              preload="metadata"
+              playsInline
+              crossOrigin="anonymous"
+              aria-label={v.alt}
+              className="w-full max-h-[28rem] rounded-lg bg-imigongo-charcoal"
+            />
+          ))}
+        </div>
+      )}
 
       {images.length > 0 && (
         <div className={cn("mt-4 overflow-hidden rounded-lg", imageGridClass)}>

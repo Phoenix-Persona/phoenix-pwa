@@ -540,7 +540,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
             {getTitle()}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Sign in or create a Nostr account to use Feniksi.
+            Sign in or create a Nostr account to use Zuka.
           </DialogDescription>
         </DialogHeader>
 
@@ -666,7 +666,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
               </div>
 
               <p className="text-sm text-muted-foreground text-center leading-relaxed">
-                Set a passphrase. Feniksi will use it to encrypt your key
+                Set a passphrase. Zuka will use it to encrypt your key
                 on this device, and ask for it once per browser session.
               </p>
 
@@ -712,7 +712,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
               )}
 
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                At least 12 characters. Feniksi can't recover this for you —
+                At least 12 characters. Zuka can't recover this for you —
                 write it down somewhere offline. Losing the passphrase means
                 you must restore from your nsec backup file.
               </p>
@@ -915,7 +915,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
 
               <p className="text-sm text-muted-foreground text-center leading-relaxed">
                 Enter the passphrase you set when you saved this backup.
-                Feniksi will decrypt your key and use the same encrypted
+                Zuka will decrypt your key and use the same encrypted
                 file as the at-rest backup on this device.
               </p>
 
