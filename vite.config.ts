@@ -5,14 +5,46 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import wasm from "vite-plugin-wasm";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
+import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 
+const REPO_ROOT = path.resolve(__dirname);
+
+/**
+ * Merge `VITE_`-prefixed keys from BOTH `<root>/.env` and
+ * `<root>/dev/.env`, root-wins. Mirrors the Node test loader at
+ * `tests/_shared/loadEnv.ts`, so a `VITE_PPQ_API_KEY` in the project
+ * root works for the browser bundle and the integration tests alike.
+ *
+ * Returned map gets injected via Vite's `define` as a global
+ * `__PHOENIX_ENV__` object so `src/lib/env.ts:readEnv()` can do
+ * dynamic key access against it. (Vite's `define` only does literal
+ * replacement, which is why we can't just remap `import.meta.env.X`
+ * — our readEnv uses `import.meta.env[name]` and that doesn't get
+ * text-substituted.)
+ */
+function loadMergedViteEnv(mode: string): Record<string, string> {
+  const rootEnv = loadEnv(mode, REPO_ROOT, "");
+  const devEnv = loadEnv(mode, path.join(REPO_ROOT, "dev"), "");
+  const merged: Record<string, string> = {};
+  // Dev first, root second — root wins for any key present in both.
+  for (const [k, v] of Object.entries(devEnv)) {
+    if (k.startsWith("VITE_")) merged[k] = v;
+  }
+  for (const [k, v] of Object.entries(rootEnv)) {
+    if (k.startsWith("VITE_")) merged[k] = v;
+  }
+  return merged;
+}
+
 // https://vitejs.dev/config/
-export default defineConfig(() => ({
-  // Look for `.env`, `.env.local`, `.env.development`, … inside `dev/`. The
-  // Phoenix repo keeps developer-only config there (master plan, spike notes,
-  // .env) — gitignored where it should be.
-  envDir: "dev",
+export default defineConfig(({ mode }) => ({
+  // envDir not set → Vite auto-loads root `.env` into `import.meta.env`.
+  // dev/.env is layered in via __PHOENIX_ENV__ (see define below) so
+  // both locations work without forcing a key-migration on teammates.
+  define: {
+    __PHOENIX_ENV__: JSON.stringify(loadMergedViteEnv(mode)),
+  },
   server: {
     host: "::",
     port: 8080,
