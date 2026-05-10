@@ -24,8 +24,6 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
-import { NSecSigner } from "@nostrify/nostrify";
-import { hexToBytes } from "@noble/hashes/utils.js";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
@@ -46,6 +44,7 @@ import { useCreatePersona } from "@/hooks/useCreatePersona";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 
 import { generatePersonaKeypair } from "@/lib/personaKey";
+import { createPersonaSigner } from "@/lib/personaSigner";
 import {
   slugifyForUsername,
   isValidLightningUsername,
@@ -94,8 +93,8 @@ const Onboard = () => {
   // to useCreatePersona via the `keypair` field.
   const [personaKeypair] = useState(() => generatePersonaKeypair());
   const personaSigner = useMemo(
-    () => new NSecSigner(hexToBytes(personaKeypair.hex.sk)),
-    [personaKeypair.hex.sk],
+    () => createPersonaSigner(personaKeypair.nsec),
+    [personaKeypair.nsec],
   );
 
   const publishing = createPersona.isPending;

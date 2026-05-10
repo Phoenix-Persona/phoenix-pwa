@@ -24,15 +24,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import type { NostrEvent } from "@nostrify/nostrify";
-import { NSecSigner } from "@nostrify/nostrify";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe } from "@/components/ImigongoBand";
 import { EditPersonaCrossPostFields } from "@/components/persona/EditPersonaCrossPostFields";
 import { EditPersonaIdentityFields } from "@/components/persona/EditPersonaIdentityFields";
 import { EditPersonaPublicProfileFields } from "@/components/persona/EditPersonaPublicProfileFields";
-import { decodePersonaNsec } from "@/lib/personaKey";
-import { hexToBytes } from "@noble/hashes/utils.js";
+import { createPersonaSigner } from "@/lib/personaSigner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -148,8 +146,7 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   // Memoised by persona pubkey: the parent re-mounts on persona change, but
   // we still memoise to be explicit about the dependency.
   const personaSigner = useMemo(() => {
-    const kp = decodePersonaNsec(original.nsec);
-    return new NSecSigner(hexToBytes(kp.hex.sk));
+    return createPersonaSigner(original.nsec);
   }, [original.nsec]);
 
   // Initialize directly from props — the parent passes a `key` of the
