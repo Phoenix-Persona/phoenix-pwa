@@ -41,7 +41,7 @@ interface AuthDialogProps {
   onClose: () => void;
 }
 
-type Step = 'welcome' | 'generate' | 'secure' | 'passphrase' | 'profile' | 'login' | 'connect' | 'import-backup';
+type Step = 'welcome' | 'generate' | 'secure' | 'passphrase' | 'profile' | 'login' | 'login-passphrase' | 'connect' | 'import-backup';
 
 const validateNsec = (nsec: string) => /^nsec1[a-zA-Z0-9]{58}$/.test(nsec);
 const validateBunkerUri = (uri: string) => uri.startsWith('bunker://');
@@ -353,7 +353,11 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  // Login: submit the entered nsec.
+  // Login: validate the entered nsec, then route through the
+  // optional at-rest-encryption step. The user can either wrap the
+  // pasted nsec with a passphrase (gets the same UnlockGate
+  // experience as fresh-Phoenix-generated accounts) or skip and
+  // log in with the nsec sitting in plaintext localStorage.
   const handleLogin = () => {
     if (!loginNsec.trim()) {
       setLoginError('Enter your secret key.');
@@ -364,16 +368,62 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
       return;
     }
 
-    setIsLoggingIn(true);
     setLoginError('');
-    // Timeout gives the UI a chance to repaint before the synchronous login.
+    setPassphrase('');
+    setPassphraseConfirm('');
+    setPassphraseError('');
+    setStep('login-passphrase');
+  };
+
+  // Login → optional passphrase: encrypt the pasted nsec at rest with
+  // the chosen passphrase, install the ncryptsec, log in. Mirrors the
+  // signup-passphrase path; the only difference is the nsec source.
+  const handleLoginPassphraseSubmit = async () => {
+    setPassphraseError('');
+    if (passphrase.length < 12) {
+      setPassphraseError('Use at least 12 characters.');
+      return;
+    }
+    if (passphrase !== passphraseConfirm) {
+      setPassphraseError('Passphrases do not match.');
+      return;
+    }
+    setEncryptingPassphrase(true);
+    await new Promise((r) => setTimeout(r, 0));
+    try {
+      const decoded = nip19.decode(loginNsec);
+      if (decoded.type !== 'nsec') throw new Error('Invalid nsec');
+      const ncryptsec = encryptNsec(decoded.data, passphrase);
+      storeUserNcryptsec(ncryptsec);
+      login.nsec(loginNsec);
+      markSessionUnlocked();
+      setPassphrase('');
+      setPassphraseConfirm('');
+      setLoginNsec('');
+      onClose();
+    } catch (e) {
+      setPassphraseError(
+        e instanceof Error ? e.message : 'Encryption failed. Please try again.'
+      );
+    } finally {
+      setEncryptingPassphrase(false);
+    }
+  };
+
+  // Login → skip: log in without wrapping. Same as the original
+  // handleLogin behaviour. The user opted out of at-rest encryption.
+  const handleLoginSkipPassphrase = () => {
+    setIsLoggingIn(true);
+    // Yield so the spinner paints before the synchronous login.
     setTimeout(() => {
       try {
         login.nsec(loginNsec);
+        setLoginNsec('');
         onClose();
       } catch {
         setLoginError("Couldn't log in with this key.");
         setIsLoggingIn(false);
+        setStep('login');
       }
     }, 50);
   };
@@ -519,6 +569,8 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
         return 'Your profile';
       case 'login':
         return 'Log in';
+      case 'login-passphrase':
+        return 'Encrypt this key on this device?';
       case 'connect':
         return 'Connect signer';
       case 'import-backup':
@@ -905,6 +957,116 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
 
               <button
                 onClick={() => setStep('welcome')}
+                className="w-full text-sm text-muted-foreground hover:text-foreground"
+              >
+                Back
+              </button>
+            </div>
+          )}
+
+          {/* Login-passphrase step — optional at-rest encryption for a
+              pasted nsec. User can either set a passphrase (gets the
+              same UnlockGate experience as fresh-Phoenix-generated
+              accounts) or skip and log in with the nsec sitting in
+              plaintext localStorage (BYO behavior). */}
+          {step === 'login-passphrase' && (
+            <div className="space-y-4">
+              <div className="flex size-14 bg-primary/10 rounded-full items-center justify-center mx-auto">
+                <Lock className="w-7 h-7 text-primary" />
+              </div>
+
+              <p className="text-sm text-muted-foreground text-center leading-relaxed">
+                Optional: set a passphrase and Zuka will encrypt your
+                key on this device. You'll re-enter the passphrase
+                once per browser session. Skip if you'd rather keep
+                the key accessible without one.
+              </p>
+
+              <div className="space-y-1.5">
+                <label htmlFor="login-passphrase" className="text-sm font-medium">
+                  Passphrase
+                </label>
+                <Input
+                  id="login-passphrase"
+                  type="password"
+                  value={passphrase}
+                  onChange={(e) => setPassphrase(e.target.value)}
+                  autoComplete="new-password"
+                  disabled={encryptingPassphrase || isLoggingIn}
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="login-passphrase-confirm" className="text-sm font-medium">
+                  Confirm passphrase
+                </label>
+                <Input
+                  id="login-passphrase-confirm"
+                  type="password"
+                  value={passphraseConfirm}
+                  onChange={(e) => setPassphraseConfirm(e.target.value)}
+                  autoComplete="new-password"
+                  disabled={encryptingPassphrase || isLoggingIn}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !encryptingPassphrase && !isLoggingIn) {
+                      e.preventDefault();
+                      handleLoginPassphraseSubmit();
+                    }
+                  }}
+                />
+              </div>
+
+              {passphraseError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{passphraseError}</AlertDescription>
+                </Alert>
+              )}
+
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                At least 12 characters. Zuka can't recover this for
+                you — write it down somewhere offline.
+              </p>
+
+              <Button
+                onClick={handleLoginPassphraseSubmit}
+                disabled={encryptingPassphrase || isLoggingIn}
+                className="w-full h-12"
+              >
+                {encryptingPassphrase ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Encrypting…
+                  </>
+                ) : (
+                  'Encrypt &amp; continue'
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                onClick={handleLoginSkipPassphrase}
+                disabled={encryptingPassphrase || isLoggingIn}
+                className="w-full"
+              >
+                {isLoggingIn ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Logging in…
+                  </>
+                ) : (
+                  'Skip — keep my key accessible without a passphrase'
+                )}
+              </Button>
+
+              <button
+                onClick={() => {
+                  setStep('login');
+                  setPassphrase('');
+                  setPassphraseConfirm('');
+                  setPassphraseError('');
+                }}
+                disabled={encryptingPassphrase || isLoggingIn}
                 className="w-full text-sm text-muted-foreground hover:text-foreground"
               >
                 Back
