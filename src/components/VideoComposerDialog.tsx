@@ -45,6 +45,7 @@ import {
 } from "@/lib/video/chainStore";
 import { postToTwitterIntent } from "@/lib/twitter/intent";
 import type { Persona } from "@/lib/persona";
+import { BrandedVideo } from "@/components/BrandedVideo";
 import { XLogo } from "@/components/icons/XLogo";
 
 const DURATION_MIN_SECS = 10;
@@ -626,12 +627,7 @@ function ReadyToPostStep(props: {
           the caption — that's the text people see in their feeds.
         </p>
       </div>
-      <video
-        src={stitchedUrl}
-        controls
-        playsInline
-        className="w-full max-h-[55vh] rounded-lg bg-black"
-      />
+      <BrandedVideo src={stitchedUrl} maxHeightClass="max-h-[55vh]" />
       <div className="space-y-1.5">
         <label
           htmlFor="vc-caption"
@@ -704,12 +700,7 @@ function DoneStep(props: {
           </p>
         </div>
       </div>
-      <video
-        src={stitchedUrl}
-        controls
-        playsInline
-        className="w-full max-h-[40vh] rounded-lg bg-black"
-      />
+      <BrandedVideo src={stitchedUrl} maxHeightClass="max-h-[40vh]" />
       <div className="flex flex-wrap gap-2 items-center">
         <Badge
           variant="secondary"
