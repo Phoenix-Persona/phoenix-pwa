@@ -42,6 +42,7 @@ import { publishWithTimeout } from "@/lib/nostrPublish";
 import { generateMnemonic } from "@/lib/wallet/client";
 import {
   DEFAULT_AUTO_TOPUP_CONFIG,
+  autoTopupConfigToPersisted,
   type AutoTopupConfig,
 } from "@/lib/wallet/types";
 import type { PersonaWallet } from "@/lib/persona";
@@ -93,11 +94,7 @@ async function buildFreshWallet(): Promise<PersonaWallet> {
   return {
     kind: "spark",
     seed,
-    auto_topup: {
-      enabled: cfg.enabled,
-      threshold_usd: cfg.thresholdUsd,
-      target_usd: cfg.targetUsd,
-    },
+    auto_topup: autoTopupConfigToPersisted(cfg),
   };
 }
 

@@ -28,11 +28,15 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { QRCodeCanvas } from "@/components/ui/qrcode";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/useToast";
 import type { UseWalletResult } from "@/hooks/useWallet";
+import type { AutoTopupConfig } from "@/lib/wallet/types";
 import { ReceiveDialog } from "./ReceiveDialog";
 import { SendDialog } from "./SendDialog";
 
@@ -45,6 +49,7 @@ interface WalletPanelProps {
    * the dev harness (no persona context).
    */
   editPersonaHref?: string;
+  onAutoTopupSave?: (config: AutoTopupConfig) => void | Promise<void>;
 }
 
 function fmtSats(n: number | undefined): string {
@@ -57,18 +62,48 @@ function fmtMoney(n: number | undefined): string {
   return `$${n.toFixed(2)}`;
 }
 
+function fmtPreciseMoney(n: number | undefined): string {
+  if (typeof n !== "number" || !Number.isFinite(n)) return "—";
+  return n > 0 && n < 0.1 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
+}
+
 function fmtTime(ts: number | undefined): string {
   if (typeof ts !== "number") return "";
   const d = new Date(ts * 1000);
   return d.toLocaleString();
 }
 
-export function WalletPanel({ wallet, editPersonaHref }: WalletPanelProps) {
+function fmtHistoryTime(ts: string | undefined): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return Number.isNaN(d.getTime()) ? ts : d.toLocaleString();
+}
+
+export function WalletPanel({
+  wallet,
+  editPersonaHref,
+  onAutoTopupSave,
+}: WalletPanelProps) {
   const { toast } = useToast();
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const [showPpqChargeId, setShowPpqChargeId] = useState(false);
   const [showPpqApiKey, setShowPpqApiKey] = useState(false);
+  const [autoTopupEnabled, setAutoTopupEnabled] = useState(
+    wallet.autoTopup.enabled,
+  );
+  const [thresholdInput, setThresholdInput] = useState(
+    String(wallet.autoTopup.thresholdUsd),
+  );
+  const [topupAmountInput, setTopupAmountInput] = useState(
+    String(wallet.autoTopup.topupAmountUsd),
+  );
+  const [manualTopupInput, setManualTopupInput] = useState(
+    String(wallet.autoTopup.topupAmountUsd),
+  );
+  const [autoTopupError, setAutoTopupError] = useState<string | null>(null);
+  const [manualTopupError, setManualTopupError] = useState<string | null>(null);
+  const [isSavingAutoTopup, setIsSavingAutoTopup] = useState(false);
 
   const balanceSats = wallet.info?.balanceSats;
   const lightningAddress = wallet.info?.lightningAddress;
@@ -78,6 +113,67 @@ export function WalletPanel({ wallet, editPersonaHref }: WalletPanelProps) {
     if (!lightningAddress) return;
     navigator.clipboard.writeText(lightningAddress);
     toast({ title: "Lightning Address copied" });
+  }
+
+  async function saveAutoTopup() {
+    const thresholdUsd = Number(thresholdInput);
+    const topupAmountUsd = Number(topupAmountInput);
+    if (!Number.isFinite(thresholdUsd) || thresholdUsd <= 0) {
+      setAutoTopupError("Enter a threshold greater than $0.");
+      return;
+    }
+    if (!Number.isFinite(topupAmountUsd) || topupAmountUsd <= 0) {
+      setAutoTopupError("Enter a top-up amount greater than $0.");
+      return;
+    }
+    const next: AutoTopupConfig = {
+      enabled: autoTopupEnabled,
+      thresholdUsd,
+      topupAmountUsd,
+    };
+    setAutoTopupError(null);
+    setIsSavingAutoTopup(true);
+    try {
+      wallet.setAutoTopup(next);
+      await onAutoTopupSave?.(next);
+      toast({ title: "Auto top-up updated" });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not save auto top-up.";
+      setAutoTopupError(message);
+      toast({
+        title: "Auto top-up save failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingAutoTopup(false);
+    }
+  }
+
+  async function runManualTopup() {
+    const amountUsd = Number(manualTopupInput);
+    if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
+      setManualTopupError("Enter an amount greater than $0.");
+      return;
+    }
+    setManualTopupError(null);
+    try {
+      const result = await wallet.manualTopup(amountUsd);
+      toast({
+        title: "PPQ top-up sent",
+        description: `${fmtMoney(result.toppedUpUsd)} top-up is ${result.status}.`,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not top up PPQ credits.";
+      setManualTopupError(message);
+      toast({
+        title: "PPQ top-up failed",
+        description: message,
+        variant: "destructive",
+      });
+    }
   }
 
   if (!wallet.handle) {
@@ -221,7 +317,7 @@ export function WalletPanel({ wallet, editPersonaHref }: WalletPanelProps) {
               </p>
               <p className="text-xs text-muted-foreground">
                 {wallet.autoTopup.enabled
-                  ? `auto-topup at $${wallet.autoTopup.thresholdUsd} → $${wallet.autoTopup.targetUsd}`
+                  ? `auto top-up below $${wallet.autoTopup.thresholdUsd}`
                   : "auto-topup off"}
               </p>
             </div>
@@ -234,6 +330,111 @@ export function WalletPanel({ wallet, editPersonaHref }: WalletPanelProps) {
             {wallet.autoTopupRun.lastError ? (
               <p className="text-xs text-destructive mt-1">
                 Auto-topup error: {wallet.autoTopupRun.lastError.message}
+              </p>
+            ) : null}
+          </section>
+
+          <section className="space-y-3 rounded-md border bg-muted/20 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">Auto top-up</p>
+                <p className="text-xs text-muted-foreground">
+                  Buy PPQ credits from this persona's Lightning wallet when the
+                  balance gets low.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="ppq-auto-topup-enabled"
+                  checked={autoTopupEnabled}
+                  onCheckedChange={(checked) =>
+                    setAutoTopupEnabled(checked === true)
+                  }
+                />
+                <Label htmlFor="ppq-auto-topup-enabled" className="text-sm">
+                  Enabled
+                </Label>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="ppq-auto-threshold">Threshold USD</Label>
+                <Input
+                  id="ppq-auto-threshold"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={thresholdInput}
+                  onChange={(event) => setThresholdInput(event.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ppq-auto-amount">Top-up amount USD</Label>
+                <Input
+                  id="ppq-auto-amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={topupAmountInput}
+                  onChange={(event) => setTopupAmountInput(event.target.value)}
+                />
+              </div>
+            </div>
+            {autoTopupError ? (
+              <p className="text-xs text-destructive">{autoTopupError}</p>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              onClick={saveAutoTopup}
+              disabled={isSavingAutoTopup}
+            >
+              {isSavingAutoTopup ? "Saving..." : "Save auto top-up"}
+            </Button>
+          </section>
+
+          <section className="space-y-3 rounded-md border bg-muted/20 p-3">
+            <div>
+              <p className="text-sm font-medium">Manual top-up</p>
+              <p className="text-xs text-muted-foreground">
+                Buy a specific amount of PPQ credits now.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Label htmlFor="ppq-manual-amount">
+                  Manual top-up amount
+                </Label>
+                <Input
+                  id="ppq-manual-amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={manualTopupInput}
+                  onChange={(event) => setManualTopupInput(event.target.value)}
+                />
+              </div>
+              <Button
+                type="button"
+                className="self-end"
+                onClick={runManualTopup}
+                disabled={wallet.isManualTopupRunning}
+              >
+                {wallet.isManualTopupRunning ? "Topping up..." : "Top up now"}
+              </Button>
+            </div>
+            {manualTopupError || wallet.manualTopupError ? (
+              <p className="text-xs text-destructive">
+                {manualTopupError ?? wallet.manualTopupError?.message}
+              </p>
+            ) : null}
+            {wallet.manualTopupResult ? (
+              <p className="text-xs text-muted-foreground">
+                Last manual top-up: {fmtMoney(wallet.manualTopupResult.toppedUpUsd)} ·{" "}
+                {wallet.manualTopupResult.status}
               </p>
             ) : null}
           </section>
@@ -257,7 +458,11 @@ export function WalletPanel({ wallet, editPersonaHref }: WalletPanelProps) {
             />
           </section>
 
-          <RecentActivity payments={wallet.payments} />
+          <PpqUsageActivity
+            items={wallet.ppqQueryHistory}
+            isLoading={wallet.isPpqQueryHistoryLoading}
+            error={wallet.ppqQueryHistoryError}
+          />
         </TabsContent>
       </Tabs>
 
@@ -311,6 +516,74 @@ function SecretRow({
       </code>
     </div>
   );
+}
+
+function PpqUsageActivity({
+  items,
+  isLoading,
+  error,
+}: {
+  items: UseWalletResult["ppqQueryHistory"];
+  isLoading: boolean;
+  error: Error | undefined;
+}) {
+  return (
+    <section>
+      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+        Recent PPQ usage
+      </p>
+      {isLoading && !items ? (
+        <Skeleton className="h-12 w-full" />
+      ) : error ? (
+        <p className="text-sm text-destructive">
+          Could not load PPQ usage: {error.message}
+        </p>
+      ) : !items || items.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No PPQ usage yet.</p>
+      ) : (
+        <ul className="space-y-1.5 text-sm">
+          {items.slice(0, 6).map((item, index) => (
+            <li
+              key={`${item.timestamp ?? "unknown"}:${item.model ?? "model"}:${index}`}
+              className="flex items-start justify-between gap-3 border-b pb-1.5 last:border-b-0 last:pb-0"
+            >
+              <span className="min-w-0">
+                <span className="block truncate font-medium">
+                  {item.model ?? item.query_type ?? "PPQ query"}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {tokenSummary(item.input_count, item.output_count)}
+                </span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className="block font-mono">
+                  {fmtPreciseMoney(item.price_in_usd)}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {fmtHistoryTime(item.timestamp)}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function tokenSummary(
+  input: number | undefined,
+  output: number | undefined,
+): string {
+  const inputLabel =
+    typeof input === "number" && Number.isFinite(input)
+      ? `${input.toLocaleString()} in`
+      : null;
+  const outputLabel =
+    typeof output === "number" && Number.isFinite(output)
+      ? `${output.toLocaleString()} out`
+      : null;
+  return [inputLabel, outputLabel].filter(Boolean).join(" · ") || "Usage";
 }
 
 function RecentActivity({

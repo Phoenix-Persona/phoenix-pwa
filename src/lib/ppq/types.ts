@@ -36,6 +36,29 @@ export interface PpqBalance {
   raw?: unknown;
 }
 
+export interface PpqQueryHistoryItem {
+  timestamp?: string;
+  model?: string;
+  input_count?: number;
+  output_count?: number;
+  price_in_usd?: number;
+  query_type?: string;
+  query_source?: string;
+  api_key_id?: string;
+  [extra: string]: unknown;
+}
+
+export interface PpqQueryHistoryResponse {
+  status?: string;
+  data: PpqQueryHistoryItem[];
+  pagination?: {
+    page?: number;
+    page_count?: number;
+    total?: number;
+    total_pages?: number;
+  };
+}
+
 /* ---------- Chat / inference ---------- */
 
 export type PpqChatRole = "system" | "user" | "assistant";

@@ -21,6 +21,7 @@ import {
   type PpqNwcConnectRequest,
   type PpqNwcSettings,
   type PpqPaymentMethod,
+  type PpqQueryHistoryResponse,
   type PpqTopupCurrency,
   type PpqTopupInvoice,
   type PpqTopupMethod,
@@ -168,6 +169,40 @@ export async function getBalance(
   return {
     balance_usd: extractBalanceUsd(data),
     raw: data,
+  };
+}
+
+export interface PpqQueryHistoryOptions extends PpqRequestOptions {
+  page?: number;
+  pageCount?: number;
+  allKeys?: boolean;
+}
+
+export async function getQueryHistory(
+  apiKey: string,
+  options: PpqQueryHistoryOptions = {},
+): Promise<PpqQueryHistoryResponse> {
+  const page = options.page ?? 1;
+  const pageCount = options.pageCount ?? 20;
+  const allKeys = options.allKeys ?? true;
+  const params = new URLSearchParams({
+    page: String(page),
+    page_count: String(pageCount),
+  });
+  if (allKeys) params.set("all_keys", "true");
+
+  const { data } = await request<PpqQueryHistoryResponse>(
+    `/queries/history?${params.toString()}`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      baseUrl: options.baseUrl,
+      signal: options.signal,
+    },
+  );
+  return {
+    ...data,
+    data: Array.isArray(data?.data) ? data.data : [],
   };
 }
 

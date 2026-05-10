@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -68,7 +69,7 @@ function makeWallet(
     autoTopup: {
       enabled: true,
       thresholdUsd: 5,
-      targetUsd: 10,
+      topupAmountUsd: 10,
     },
     setAutoTopup: vi.fn(),
     autoTopupRun: {
@@ -81,14 +82,41 @@ function makeWallet(
       },
     },
     triggerAutoTopup: vi.fn(),
+    manualTopup: vi.fn().mockResolvedValue({
+      toppedUpUsd: 15,
+      invoiceId: "invoice_manual",
+      paymentRequest: "lnbc1manual",
+      status: "Settled",
+    }),
+    isManualTopupRunning: false,
+    manualTopupError: undefined,
+    manualTopupResult: undefined,
+    ppqQueryHistory: [
+      {
+        timestamp: "2026-05-10T12:00:00.000Z",
+        model: "claude-sonnet-4.5",
+        input_count: 100,
+        output_count: 50,
+        price_in_usd: 0.0123,
+        query_type: "chat",
+        query_source: "api",
+        api_key_id: "key_123",
+      },
+    ],
+    isPpqQueryHistoryLoading: false,
+    ppqQueryHistoryError: undefined,
+    refreshPpqQueryHistory: vi.fn(),
     ...overrides,
   };
 }
 
-function renderWallet(wallet = makeWallet()) {
+function renderWallet(
+  wallet = makeWallet(),
+  props: Partial<ComponentProps<typeof WalletPanel>> = {},
+) {
   render(
     <MemoryRouter>
-      <WalletPanel wallet={wallet} editPersonaHref="/edit" />
+      <WalletPanel wallet={wallet} editPersonaHref="/edit" {...props} />
     </MemoryRouter>,
   );
 }
@@ -140,5 +168,57 @@ describe("WalletPanel", () => {
 
     expect(screen.getByText("credit_active_123")).toBeInTheDocument();
     expect(screen.getByText("ppq_live_secret_key")).toBeInTheDocument();
+  });
+
+  it("saves edited auto top-up threshold and amount", async () => {
+    const wallet = makeWallet();
+    const onAutoTopupSave = vi.fn().mockResolvedValue(undefined);
+    renderWallet(wallet, { onAutoTopupSave });
+
+    activateTab(/ai credits/i);
+    fireEvent.change(screen.getByLabelText(/threshold usd/i), {
+      target: { value: "7" },
+    });
+    fireEvent.change(screen.getByLabelText(/top-up amount usd/i), {
+      target: { value: "15" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save auto top-up/i }));
+
+    await waitFor(() =>
+      expect(wallet.setAutoTopup).toHaveBeenCalledWith({
+        enabled: true,
+        thresholdUsd: 7,
+        topupAmountUsd: 15,
+      }),
+    );
+    expect(onAutoTopupSave).toHaveBeenCalledWith({
+      enabled: true,
+      thresholdUsd: 7,
+      topupAmountUsd: 15,
+    });
+  });
+
+  it("manually tops up PPQ credits with a specific USD amount", async () => {
+    const wallet = makeWallet();
+    renderWallet(wallet);
+
+    activateTab(/ai credits/i);
+    fireEvent.change(screen.getByLabelText(/manual top-up amount/i), {
+      target: { value: "20" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /top up now/i }));
+
+    await waitFor(() => expect(wallet.manualTopup).toHaveBeenCalledWith(20));
+  });
+
+  it("shows PPQ usage activity instead of Lightning activity on the PPQ tab", () => {
+    renderWallet();
+
+    activateTab(/ai credits/i);
+
+    expect(screen.getByText("Recent PPQ usage")).toBeInTheDocument();
+    expect(screen.getByText("claude-sonnet-4.5")).toBeInTheDocument();
+    expect(screen.getByText("$0.0123")).toBeInTheDocument();
+    expect(screen.queryByText(/1,500 sats/i)).not.toBeInTheDocument();
   });
 });

@@ -31,9 +31,11 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePersonaComposer } from "@/hooks/usePersonaComposer";
 import { usePersona, usePersonaPosts } from "@/hooks/usePersona";
 import { useWallet } from "@/hooks/useWallet";
+import { useUpdateWalletAutoTopup } from "@/hooks/useUpdateWalletAutoTopup";
 import { featureFlags } from "@/lib/features";
 import { npubToHex } from "@/lib/nostrIds";
 import { sanitizeHttpUrl } from "@/lib/url";
+import { autoTopupConfigFromPersisted } from "@/lib/wallet/types";
 
 const Dashboard = () => {
   const { npub = "" } = useParams();
@@ -44,6 +46,7 @@ const Dashboard = () => {
   const { toast } = useToast();
   const persona = usePersona(npub);
   const posts = usePersonaPosts(npub, 20);
+  const updateWalletAutoTopup = useUpdateWalletAutoTopup();
 
   // Composer fields. `raw` is the idea/draft body (legacy name kept
   // for git-blame continuity); the new V1.5 composer also collects
@@ -82,12 +85,17 @@ const Dashboard = () => {
   // pin only applies to the header (operator) wallet badge. PPQ env
   // overrides still apply globally for inference (PROJECT.md §6).
   const walletSeed = envelope?.wallet?.seed;
+  const walletAutoTopup = useMemo(
+    () => autoTopupConfigFromPersisted(envelope?.wallet?.auto_topup),
+    [envelope?.wallet?.auto_topup],
+  );
   const stylingModel =
     envelope?.model_prefs?.agent ?? "anthropic/claude-sonnet-4.5";
 
   const wallet = useWallet({
     walletId: personaConfig ? `persona:${personaConfig.pubkey}` : undefined,
     mnemonic: walletSeed,
+    autoTopup: walletAutoTopup,
   });
   const showDonateHandleNudge =
     Boolean(personaConfig && walletSeed) &&
@@ -409,13 +417,21 @@ const Dashboard = () => {
           }}
         />
       ) : null}
-      {walletSeed && personaConfig ? (
+      {walletSeed && personaConfig && envelope ? (
         <WalletDialog
           wallet={wallet}
           open={walletOpen}
           onOpenChange={setWalletOpen}
           personaName={personaConfig.name}
           editPersonaHref={`/dashboard/${npub}/edit`}
+          onAutoTopupSave={(autoTopup) =>
+            updateWalletAutoTopup.mutateAsync({
+              npub,
+              backupEvent: persona.data!.event,
+              envelope,
+              autoTopup,
+            })
+          }
         />
       ) : null}
     </div>
