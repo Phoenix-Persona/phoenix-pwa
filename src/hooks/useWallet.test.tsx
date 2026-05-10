@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   getQueryHistory: vi.fn(),
   runAutoTopupOnce: vi.fn(),
   runManualTopupOnce: vi.fn(),
+  refreshOperatorInfo: vi.fn(),
+  refreshOperatorPayments: vi.fn(),
   refreshBalance: vi.fn(),
   ppq: {
     account: null as { api_key: string; credit_id: string } | null,
@@ -81,6 +83,8 @@ describe("useWallet", () => {
       paymentRequest: "lnbc1manual",
       status: "Settled",
     });
+    mocks.refreshOperatorInfo.mockReset();
+    mocks.refreshOperatorPayments.mockReset();
     mocks.refreshBalance.mockReset();
     mocks.ppq.account = null;
     mocks.ppq.balance = undefined;
@@ -154,6 +158,82 @@ describe("useWallet", () => {
     expect(mocks.refreshBalance).toHaveBeenCalled();
     await waitFor(() =>
       expect(mocks.listRecentPayments.mock.calls.length).toBeGreaterThanOrEqual(2),
+    );
+  });
+
+  it("funds PPQ auto-topups from the operator wallet when selected", async () => {
+    mocks.ppq.account = {
+      api_key: "ppq_api_key",
+      credit_id: "credit_123",
+    };
+    mocks.ppq.balance = { balance_usd: 1 };
+
+    renderHook(
+      () =>
+        useWallet({
+          walletId: "persona:abc",
+          mnemonic:
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+          autoTopup: {
+            enabled: true,
+            thresholdUsd: 5,
+            topupAmountUsd: 12,
+            fundingSource: "operator",
+          },
+          operatorFundingWallet: {
+            handle: { id: "operator-wallet" } as never,
+            walletId: "operator:abc",
+            label: "Operator",
+            refreshInfo: mocks.refreshOperatorInfo,
+            refreshPayments: mocks.refreshOperatorPayments,
+          },
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() =>
+      expect(mocks.runAutoTopupOnce).toHaveBeenCalledWith(
+        expect.objectContaining({
+          wallet: { id: "operator-wallet" },
+          config: expect.objectContaining({ fundingSource: "operator" }),
+        }),
+      ),
+    );
+    await waitFor(() => expect(mocks.refreshOperatorInfo).toHaveBeenCalled());
+    expect(mocks.refreshOperatorPayments).toHaveBeenCalled();
+  });
+
+  it("manual PPQ top-up can use an explicit operator funding source", async () => {
+    mocks.ppq.account = {
+      api_key: "ppq_api_key",
+      credit_id: "credit_123",
+    };
+    mocks.ppq.balance = { balance_usd: 8 };
+    const { result } = renderHook(
+      () =>
+        useWallet({
+          walletId: "persona:abc",
+          mnemonic:
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+          operatorFundingWallet: {
+            handle: { id: "operator-wallet" } as never,
+            walletId: "operator:abc",
+            label: "Operator",
+            refreshInfo: mocks.refreshOperatorInfo,
+            refreshPayments: mocks.refreshOperatorPayments,
+          },
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.handle).toBeDefined());
+    await result.current.manualTopup(12, "operator");
+
+    expect(mocks.runManualTopupOnce).toHaveBeenCalledWith(
+      expect.objectContaining({
+        wallet: { id: "operator-wallet" },
+        amountUsd: 12,
+      }),
     );
   });
 });

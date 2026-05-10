@@ -36,7 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/useToast";
 import type { UseWalletResult } from "@/hooks/useWallet";
-import type { AutoTopupConfig } from "@/lib/wallet/types";
+import type { AutoTopupConfig, PpqFundingSource } from "@/lib/wallet/types";
 import { ReceiveDialog } from "./ReceiveDialog";
 import { SendDialog } from "./SendDialog";
 
@@ -92,6 +92,9 @@ export function WalletPanel({
   const [autoTopupEnabled, setAutoTopupEnabled] = useState(
     wallet.autoTopup.enabled,
   );
+  const [fundingSource, setFundingSource] = useState<PpqFundingSource>(
+    wallet.autoTopup.fundingSource,
+  );
   const [thresholdInput, setThresholdInput] = useState(
     String(wallet.autoTopup.thresholdUsd),
   );
@@ -130,6 +133,7 @@ export function WalletPanel({
       enabled: autoTopupEnabled,
       thresholdUsd,
       topupAmountUsd,
+      fundingSource,
     };
     setAutoTopupError(null);
     setIsSavingAutoTopup(true);
@@ -159,7 +163,7 @@ export function WalletPanel({
     }
     setManualTopupError(null);
     try {
-      const result = await wallet.manualTopup(amountUsd);
+      const result = await wallet.manualTopup(amountUsd, fundingSource);
       toast({
         title: "PPQ top-up sent",
         description: `${fmtMoney(result.toppedUpUsd)} top-up is ${result.status}.`,
@@ -335,9 +339,32 @@ export function WalletPanel({
           </section>
 
           <section className="space-y-2 rounded-md border bg-muted/20 p-2.5">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-medium">Top-ups</p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                {wallet.fundingSources.length > 1 ? (
+                  <div
+                    className="flex rounded-md bg-muted p-0.5"
+                    aria-label="PPQ funding source"
+                  >
+                    {wallet.fundingSources.map((option) => (
+                      <Button
+                        key={option.source}
+                        type="button"
+                        variant={
+                          fundingSource === option.source ? "secondary" : "ghost"
+                        }
+                        size="sm"
+                        aria-label={`Fund from ${option.label}`}
+                        disabled={!option.isAvailable}
+                        onClick={() => setFundingSource(option.source)}
+                        className="h-7 px-2 text-xs"
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
+                  </div>
+                ) : null}
                 <Checkbox
                   id="ppq-auto-topup-enabled"
                   checked={autoTopupEnabled}

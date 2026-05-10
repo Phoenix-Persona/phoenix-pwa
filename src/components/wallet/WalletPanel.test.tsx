@@ -71,6 +71,7 @@ function makeWallet(
       enabled: true,
       thresholdUsd: 5,
       topupAmountUsd: 10,
+      fundingSource: "persona",
     },
     setAutoTopup: vi.fn(),
     autoTopupRun: {
@@ -83,6 +84,10 @@ function makeWallet(
       },
     },
     triggerAutoTopup: vi.fn(),
+    fundingSources: [
+      { source: "operator", label: "Operator", isAvailable: true },
+      { source: "persona", label: "Persona", isAvailable: true },
+    ],
     manualTopup: vi.fn().mockResolvedValue({
       toppedUpUsd: 15,
       invoiceId: "invoice_manual",
@@ -190,13 +195,34 @@ describe("WalletPanel", () => {
         enabled: true,
         thresholdUsd: 7,
         topupAmountUsd: 15,
+        fundingSource: "persona",
       }),
     );
     expect(onAutoTopupSave).toHaveBeenCalledWith({
       enabled: true,
       thresholdUsd: 7,
       topupAmountUsd: 15,
+      fundingSource: "persona",
     });
+  });
+
+  it("saves the selected PPQ funding source", async () => {
+    const wallet = makeWallet();
+    const onAutoTopupSave = vi.fn().mockResolvedValue(undefined);
+    renderWallet(wallet, { onAutoTopupSave });
+
+    activateTab(/ai credits/i);
+    fireEvent.click(screen.getByRole("button", { name: /fund from operator/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() =>
+      expect(wallet.setAutoTopup).toHaveBeenCalledWith(
+        expect.objectContaining({ fundingSource: "operator" }),
+      ),
+    );
+    expect(onAutoTopupSave).toHaveBeenCalledWith(
+      expect.objectContaining({ fundingSource: "operator" }),
+    );
   });
 
   it("renders compact PPQ top-up controls", () => {
@@ -206,6 +232,9 @@ describe("WalletPanel", () => {
 
     expect(screen.getByLabelText(/auto below/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^buy$/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /fund from persona/i }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByText(/buy ppq credits from this persona's lightning wallet/i),
     ).not.toBeInTheDocument();
@@ -221,7 +250,25 @@ describe("WalletPanel", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /top up now/i }));
 
-    await waitFor(() => expect(wallet.manualTopup).toHaveBeenCalledWith(20));
+    await waitFor(() =>
+      expect(wallet.manualTopup).toHaveBeenCalledWith(20, "persona"),
+    );
+  });
+
+  it("manually tops up PPQ credits from the selected operator source", async () => {
+    const wallet = makeWallet();
+    renderWallet(wallet);
+
+    activateTab(/ai credits/i);
+    fireEvent.click(screen.getByRole("button", { name: /fund from operator/i }));
+    fireEvent.change(screen.getByLabelText(/manual top-up/i), {
+      target: { value: "20" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /top up now/i }));
+
+    await waitFor(() =>
+      expect(wallet.manualTopup).toHaveBeenCalledWith(20, "operator"),
+    );
   });
 
   it("shows PPQ usage activity instead of Lightning activity on the PPQ tab", () => {

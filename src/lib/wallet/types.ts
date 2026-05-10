@@ -107,10 +107,12 @@ export interface SendResult {
 
 /* ---------- Auto-topup ---------- */
 
+export type PpqFundingSource = "operator" | "persona";
+
 /**
  * Default-on policy: when ppq.ai's USD balance dips below `thresholdUsd`,
  * buy `topupAmountUsd` more credits by paying a Lightning invoice issued
- * by ppq.ai out of the Phoenix wallet.
+ * by ppq.ai out of the selected Spark wallet.
  */
 export interface AutoTopupConfig {
   enabled: boolean;
@@ -118,12 +120,15 @@ export interface AutoTopupConfig {
   thresholdUsd: number;
   /** Buy this many USD of PPQ credits when the threshold is crossed. */
   topupAmountUsd: number;
+  /** Which Spark wallet pays PPQ top-up invoices. */
+  fundingSource: PpqFundingSource;
 }
 
 export interface PersistedAutoTopupConfig {
   enabled?: boolean;
   threshold_usd?: number;
   topup_amount_usd?: number;
+  funding_source?: PpqFundingSource;
   /** Legacy field kept for backups published before top-up amount was editable. */
   target_usd?: number;
 }
@@ -136,6 +141,7 @@ export const DEFAULT_AUTO_TOPUP_CONFIG: AutoTopupConfig = {
   enabled: true,
   thresholdUsd: 5,
   topupAmountUsd: 5,
+  fundingSource: "operator",
 };
 
 export function autoTopupConfigFromPersisted(
@@ -154,6 +160,11 @@ export function autoTopupConfigFromPersisted(
       persisted?.topup_amount_usd ?? persisted?.target_usd,
       DEFAULT_AUTO_TOPUP_CONFIG.topupAmountUsd,
     ),
+    fundingSource:
+      persisted?.funding_source === "operator" ||
+      persisted?.funding_source === "persona"
+        ? persisted.funding_source
+        : "persona",
   };
 }
 
@@ -162,13 +173,14 @@ export function autoTopupConfigToPersisted(
 ): Required<
   Pick<
     PersistedAutoTopupConfig,
-    "enabled" | "threshold_usd" | "topup_amount_usd"
+    "enabled" | "threshold_usd" | "topup_amount_usd" | "funding_source"
   >
 > {
   return {
     enabled: config.enabled,
     threshold_usd: config.thresholdUsd,
     topup_amount_usd: config.topupAmountUsd,
+    funding_source: config.fundingSource,
   };
 }
 

@@ -76,6 +76,7 @@ const personaAutoTopupSchema = z.object({
   enabled: z.boolean(),
   threshold_usd: z.number().nonnegative().max(10000),
   topup_amount_usd: z.number().positive().max(10000).optional(),
+  funding_source: z.enum(["operator", "persona"]).optional(),
   target_usd: z.number().positive().max(10000).optional(),
 }).refine(
   (cfg) => cfg.topup_amount_usd !== undefined || cfg.target_usd !== undefined,

@@ -30,6 +30,7 @@ import { useAuthor } from "@/hooks/useAuthor";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePersonaComposer } from "@/hooks/usePersonaComposer";
 import { usePersona, usePersonaPosts } from "@/hooks/usePersona";
+import { useOperatorWallet } from "@/hooks/useOperatorWallet";
 import { useWallet } from "@/hooks/useWallet";
 import { useUpdateWalletAutoTopup } from "@/hooks/useUpdateWalletAutoTopup";
 import { featureFlags } from "@/lib/features";
@@ -47,6 +48,7 @@ const Dashboard = () => {
   const persona = usePersona(npub);
   const posts = usePersonaPosts(npub, 20);
   const updateWalletAutoTopup = useUpdateWalletAutoTopup();
+  const operatorWallet = useOperatorWallet();
 
   // Composer fields. `raw` is the idea/draft body (legacy name kept
   // for git-blame continuity); the new V1.5 composer also collects
@@ -91,11 +93,33 @@ const Dashboard = () => {
   );
   const stylingModel =
     envelope?.model_prefs?.agent ?? "anthropic/claude-sonnet-4.5";
+  const operatorFundingWallet = useMemo(
+    () => ({
+      handle: operatorWallet.wallet.handle,
+      walletId:
+        user?.pubkey && operatorWallet.seed
+          ? `operator:${user.pubkey}`
+          : undefined,
+      label: "Operator",
+      refreshInfo: operatorWallet.wallet.refreshInfo,
+      refreshPayments: operatorWallet.wallet.refreshPayments,
+      isConnecting: operatorWallet.wallet.isConnecting,
+    }),
+    [
+      operatorWallet.wallet.handle,
+      operatorWallet.wallet.refreshInfo,
+      operatorWallet.wallet.refreshPayments,
+      operatorWallet.wallet.isConnecting,
+      operatorWallet.seed,
+      user?.pubkey,
+    ],
+  );
 
   const wallet = useWallet({
     walletId: personaConfig ? `persona:${personaConfig.pubkey}` : undefined,
     mnemonic: walletSeed,
     autoTopup: walletAutoTopup,
+    operatorFundingWallet,
   });
   const showDonateHandleNudge =
     Boolean(personaConfig && walletSeed) &&
