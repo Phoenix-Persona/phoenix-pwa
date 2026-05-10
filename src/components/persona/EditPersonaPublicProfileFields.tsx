@@ -9,6 +9,13 @@ export interface EditPersonaPublicProfileFieldsProps {
   loadingBio: boolean;
   onBioChange: (value: string) => void;
   onPictureUrlChange: (value: string) => void;
+  /**
+   * Passed straight through to `PersonaPictureField`. Set to `true` on
+   * persona-creation surfaces (where the user hasn't funded a wallet
+   * yet) so the picture step falls back to the free Pollinations
+   * endpoint instead of dead-ending on PPQ's "no credits" error.
+   */
+  allowFreeFallback?: boolean;
 }
 
 export function EditPersonaPublicProfileFields({
@@ -18,6 +25,7 @@ export function EditPersonaPublicProfileFields({
   loadingBio,
   onBioChange,
   onPictureUrlChange,
+  allowFreeFallback = false,
 }: EditPersonaPublicProfileFieldsProps) {
   return (
     <>
@@ -42,6 +50,7 @@ export function EditPersonaPublicProfileFields({
               ? `Stylized portrait of ${name}: ${bio.slice(0, 80)}`
               : `Stylized portrait of ${name}`
           }
+          allowFreeFallback={allowFreeFallback}
         />
       </div>
     </>

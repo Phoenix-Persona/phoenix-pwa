@@ -175,10 +175,20 @@ export function PersonaPictureField({
       try {
         blossomUrl = await generateViaPpq(trimmed);
       } catch (e) {
-        // PPQ 402 = out of credits. During onboarding we transparently
-        // fall back to the free Pollinations endpoint so the user
-        // isn't blocked by an empty wallet they haven't funded yet.
-        if (allowFreeFallback && e instanceof PpqError && e.status === 402) {
+        // During onboarding, a brand-new user has no PPQ credit
+        // account, no funded wallet, and possibly no envelope yet —
+        // any of those can make the PPQ path fail with a status that
+        // isn't strictly 402 (e.g. 401 / 403 from account-mint, or a
+        // generic network error). When `allowFreeFallback` is set we
+        // ALWAYS fall back to the free Pollinations endpoint rather
+        // than narrowing on a single status, so the picture step
+        // doesn't dead-end the wizard. The original error is logged
+        // for diagnosis but not surfaced.
+        if (allowFreeFallback) {
+          console.warn(
+            "[PersonaPictureField] PPQ failed; falling back to Pollinations:",
+            e,
+          );
           setGenStage("drafting");
           blossomUrl = await generateViaPollinations(trimmed);
           usedFreeTier = true;
