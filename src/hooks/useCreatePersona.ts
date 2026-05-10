@@ -19,6 +19,7 @@ import {
 import {
   generatePersonaKeypair,
   signWithPersona,
+  type PersonaKeypair,
 } from "@/lib/personaKey";
 import { buildPersonaProfileMetadata } from "@/lib/personaProfile";
 import { publishWithTimeout } from "@/lib/nostrPublish";
@@ -43,6 +44,16 @@ export interface CreatePersonaInput {
   bio: string;
   systemPrompt: string;
   pictureUrl?: string;
+  /**
+   * Optional pre-generated persona keypair. When provided, the hook
+   * uses it instead of generating a fresh one.
+   *
+   * Onboard generates the keypair upfront so the picture-upload step
+   * (which runs BEFORE this mutation) can sign Blossom BUD-01 auth
+   * events with the persona's nsec for privacy. By the time we publish,
+   * the keypair already exists — pass it through.
+   */
+  keypair?: PersonaKeypair;
 }
 
 export interface CreatePersonaResult {
@@ -68,7 +79,7 @@ export function useCreatePersona() {
     mutationFn: async (input) => {
       if (!user) throw new Error("Sign in required");
 
-      const kp = generatePersonaKeypair();
+      const kp = input.keypair ?? generatePersonaKeypair();
       const dTag = generatePersonaDTag();
       const trimmedName = input.name.trim() || "Untitled";
       const baseUsername = (

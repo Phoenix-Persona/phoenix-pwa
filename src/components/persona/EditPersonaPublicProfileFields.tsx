@@ -1,3 +1,5 @@
+import type { NostrSigner } from "@nostrify/types";
+
 import { PersonaPictureField } from "@/components/PersonaPictureField";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +18,14 @@ export interface EditPersonaPublicProfileFieldsProps {
    * endpoint instead of dead-ending on PPQ's "no credits" error.
    */
   allowFreeFallback?: boolean;
+  /**
+   * Persona signer for the Blossom upload (BUD-01 auth event).
+   * Required for privacy — without it, the operator's pubkey appears
+   * on every upload and correlates operator ↔ persona.
+   */
+  pictureSigner?: NostrSigner;
+  /** Optional persona-specific Blossom server override. */
+  pictureBlossomServers?: string[];
 }
 
 export function EditPersonaPublicProfileFields({
@@ -26,6 +36,8 @@ export function EditPersonaPublicProfileFields({
   onBioChange,
   onPictureUrlChange,
   allowFreeFallback = false,
+  pictureSigner,
+  pictureBlossomServers,
 }: EditPersonaPublicProfileFieldsProps) {
   return (
     <>
@@ -51,6 +63,8 @@ export function EditPersonaPublicProfileFields({
               : `Stylized portrait of ${name}`
           }
           allowFreeFallback={allowFreeFallback}
+          signer={pictureSigner}
+          blossomServers={pictureBlossomServers}
         />
       </div>
     </>
