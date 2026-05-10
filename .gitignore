@@ -48,3 +48,5 @@ tests/wallet/.persona.json
 # Breez Spark SDK persistent storage (created by Node tests at storageDir
 # = "phoenix-wallet"; relative to wherever the script ran from)
 phoenix-wallet/
+
+SCRATCH.md

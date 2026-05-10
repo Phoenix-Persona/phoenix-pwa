@@ -11,7 +11,7 @@
 
 ## Locked decisions (carried in from PROJECT.md and STREAMS.md)
 
-- Two-level user/persona identity; user signs encrypted kind 30078 with `d=phoenix-persona:<pubkey>`, `t=phoenix-persona`
+- Two-level user/persona identity; user signs encrypted kind 30078 with a random per-publish d-tag and no app-specific tags (discovery is scan-and-decrypt for stronger anti-fingerprinting)
 - Per-persona Breeze Lightning wallet; seed inside the encrypted backup
 - AI inference via PPQ exclusively, paid in sats; agent harness via `pi-mono`
 - All persistent code lives in main app paths (`src/lib/<feature>`, `src/components/<feature>`); demo surfaces are `/dev/<feature>` routes

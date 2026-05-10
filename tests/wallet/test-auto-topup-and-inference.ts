@@ -104,10 +104,10 @@ async function preconditions(): Promise<{
     );
   }
   const envelope = await loadPersonaOrFail(operator);
-  const mnemonic = envelope.config.wallet?.mnemonic;
+  const mnemonic = envelope.wallet?.seed;
   if (!mnemonic) {
     throw new Error(
-      "Persona envelope has no wallet mnemonic. Re-run bootstrap-spark-wallet-e2e with --reset.",
+      "Persona envelope has no wallet seed. Re-run bootstrap-spark-wallet-e2e with --reset.",
     );
   }
   const ppq = await loadPpqAccount();

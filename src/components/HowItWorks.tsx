@@ -51,14 +51,16 @@ function Chapter({
         <h3 className="font-display text-3xl md:text-5xl font-medium tracking-tight leading-[1.05]">
           {headline}
         </h3>
-        <p className="text-lg text-muted-foreground leading-relaxed max-w-prose">
-          {body}
-        </p>
+        {/* Body sits on a clean white reading surface so the patterned
+            section background doesn't fight the prose. */}
+        <div className="rounded-2xl bg-card border border-imigongo-clay/15 shadow-sm p-6 max-w-prose">
+          <p className="text-lg text-foreground leading-relaxed">{body}</p>
+        </div>
         <ul className="flex flex-wrap gap-1.5 pt-2">
           {pills.map((p) => (
             <li
               key={p}
-              className="inline-flex items-center rounded-full border border-imigongo-clay/20 bg-imigongo-cream/60 px-2.5 py-1 text-[11px] font-medium text-imigongo-charcoal/80"
+              className="inline-flex items-center rounded-full border border-imigongo-clay/20 bg-card px-2.5 py-1 text-[11px] font-medium text-imigongo-charcoal/80 shadow-sm"
             >
               {p}
             </li>

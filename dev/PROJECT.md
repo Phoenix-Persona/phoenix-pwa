@@ -41,7 +41,7 @@ Same product. Two stories.
    - Generate name + bio + system prompt
    - Generate profile picture (canonical reference image)
    - Generate voice sample
-   - Mint Nostr keypair + Spark Lightning wallet
+   - Mint Nostr keypair + Breeze Lightning wallet
    - Publish encrypted backup event
 3. Persona dashboard:
    - Compose: write/dictate raw thoughts → agent styles them into the
@@ -74,19 +74,19 @@ gracefully disable when the wallet is empty.
 
 Phoenix uses a **two-level identity** model.
 
-**User keypair.** A single Nostr keypair owned by the human running the
+**Operator.** A single Nostr keypair owned by the human running the
 app. It never posts publicly under Phoenix. Its only job is to sign
-encrypted backups (kind 30078, §5.2) for the personas this user has
-created. The user keypair can be:
+encrypted backups (kind 30078, §5.2) for the personas this operator
+has created. The operator keypair can be:
 
 - An existing Nostr identity (NIP-07 extension, NIP-46 remote signer, or
-  pasted nsec) — useful for users who already have a Nostr account and
-  want one place to manage everything.
-- A fresh Phoenix-generated keypair — useful for users who want their
-  Phoenix activity unlinkable from any other Nostr identity. In this case
-  Phoenix never publishes a kind 0 profile under the user keypair, so to
-  outside observers the user pubkey is just a publisher of opaque
-  ciphertext.
+  pasted nsec) — useful for operators who already have a Nostr account
+  and want one place to manage everything.
+- A fresh Phoenix-generated keypair — useful for operators who want
+  their Phoenix activity unlinkable from any other Nostr identity. In
+  this case Phoenix never publishes a kind 0 profile under the operator
+  keypair, so to outside observers the operator pubkey is just a
+  publisher of opaque ciphertext.
 
 **Persona keypairs.** Each persona is a separate Nostr keypair generated
 during the character-creator wizard. The persona's nsec publishes kind 0
@@ -94,60 +94,68 @@ during the character-creator wizard. The persona's nsec publishes kind 0
 voices.
 
 **The relationship is encrypted-only.** A persona's nsec is stored only
-inside the user's encrypted kind 30078 backup event (NIP-44'd to the user
-keypair). To outside observers, relays show:
+inside the operator's encrypted kind 30078 backup event (NIP-44'd to the
+operator keypair). To outside observers, relays show:
 
 - N persona pubkeys posting publicly, each independently
-- The user pubkey publishing N opaque ciphertext events
+- The operator pubkey publishing N opaque ciphertext events
 
-Linking a specific persona to its user requires the user's nsec. As long
-as the user keypair is safe, *which* personas are this user's is
-unknowable.
+Linking a specific persona to its operator requires the operator's nsec.
+As long as the operator keypair is safe, *which* personas are this
+operator's is unknowable.
 
-**What does leak: the count.** A relay observer can see that
-`user_pubkey` has authored N kind 30078 phoenix-persona events and
-conclude "this user runs N personas." They cannot tell which public
-personas are those N — but the cardinality is visible.
+**What does leak: the persona count.** A relay observer can see that
+`operator_pubkey` has authored N kind-30078 events with N distinct
+d-tag values, and infer "this operator runs N addressable items."
+Phoenix backup events carry no Phoenix-identifying tags (no `t`, no
+`alt`), so the observer cannot tell those items are Phoenix backups
+specifically — they look identical to any other NIP-78
+application-data event. Phoenix participation is only knowable to
+anyone who already has the operator's nsec.
 
-**Compartmentalization.** All personas under a single user keypair share
-one fate: anyone who compromises that user nsec can decrypt every
-persona's backup and operate every voice. For activists who need persona
-groups that can't fall together, the answer is **separate user keypairs
-per group**. The app supports multiple user accounts via the same
-multi-account flow Nostrify already provides (MKStack's `LoginArea` /
-`useLoggedInAccounts`).
+**Compartmentalization.** All personas under a single operator share
+one fate: anyone who compromises that operator nsec can decrypt every
+persona's backup and operate every voice. For activists who need
+persona groups that can't fall together, the answer is **separate
+operator keypairs per group** — but multi-operator complexity is V2.
+For V1, Phoenix is **one operator per device**.
 
-**Multi-persona UX.** When the user is logged in, the app fetches all
-kind 30078 phoenix-persona events authored by the current user pubkey,
-decrypts them, and presents the persona list. Switching personas swaps
-which persona nsec the composer signs with — no separate "login" per
-persona.
+**Multi-persona UX.** When the operator is logged in, the app fetches
+all kind 30078 events authored by the current operator pubkey,
+attempts NIP-44 self-decryption on each, keeps the ones whose
+plaintext validates as a Phoenix envelope (events from other apps
+fail decryption or schema validation and are discarded), and presents
+the persona list. Switching personas swaps which persona nsec the
+composer signs with — no separate "login" per persona.
 
 **Key custody.**
 
-- *User nsec*. For users bringing an existing Nostr identity, custody is
-  whatever signer they use (NIP-07, NIP-46, etc.). For fresh
-  Phoenix-generated user keypairs, stored locally as NIP-49
-  (passphrase-encrypted).
-- *Persona nsec*. Never written to disk by Phoenix. Lives only inside the
-  user's encrypted kind 30078 backup. When the user opens a persona,
-  Phoenix fetches the event from relays, decrypts it via the user's
-  signer (NIP-44 self-decrypt), holds the persona nsec in memory, and
-  uses it to sign that session's posts.
-- *Recovery on a new device*. User logs in with the user nsec; app
-  re-fetches all kind 30078 phoenix-persona events; every persona is
+- *Operator nsec*. For operators bringing an existing Nostr identity,
+  custody is whatever signer they use (NIP-07, NIP-46, etc.). For
+  fresh Phoenix-generated operator keypairs, stored locally as NIP-49
+  (passphrase-encrypted) — **one passphrase per device**, applied to
+  the operator nsec.
+- *Persona nsec*. Never written to disk by Phoenix. Lives only inside
+  the operator's encrypted kind 30078 backup. When the operator opens
+  a persona, Phoenix fetches the event from relays, decrypts it via
+  the operator's signer (NIP-44 self-decrypt), holds the persona nsec
+  in memory, and uses it to sign that session's posts.
+- *Recovery on a new device*. Operator logs in with the operator nsec;
+  app re-fetches all kind 30078 events authored by them, decrypts
+  each, filters to valid Phoenix envelopes; every persona is
   re-hydrated in one step.
-- *Loss of user nsec*. Every persona under that user is unrecoverable.
-  The wizard surfaces a one-time "download user backup" affordance.
+- *Loss of operator nsec*. Every persona under that operator is
+  unrecoverable. The wizard surfaces a one-time "download operator
+  backup" affordance.
 
 **Why two-level rather than persona-only.** A persona-only model would
-mean each persona has its own root nsec the user must safeguard
+mean each persona has its own root nsec the operator must safeguard
 separately, multi-device sync requires copying every persona's nsec to
-every device, and losing one persona's nsec loses that persona's wallet
-entirely. The two-level model collapses safekeeping to one root secret
-while preserving the public unlinkability of personas. The trade-off is
-shared fate among personas under the same user keypair; mitigated with
-separate user keypairs per unlinkable group.
+every device, and losing one persona's nsec loses that persona's
+wallet entirely. The two-level model collapses safekeeping to one
+root secret while preserving the public unlinkability of personas.
+The trade-off is shared fate among personas under the same operator;
+mitigated (V2) with separate operator keypairs per unlinkable group.
 
 ---
 
@@ -193,7 +201,7 @@ separate user keypairs per unlinkable group.
 | Agent chat UI    | `pi-web-ui`                          | Drop-in components for the wizard chat surface               |
 | Nostr            | `@nostrify/nostrify`, `@nostrify/react` | Already in `package.json`                                 |
 | Encryption       | `nostr-tools` (NIP-44, NIP-49)       | Already pulled in                                            |
-| Lightning wallet | `@breeztech/breez-sdk-spark` (Breez SDK — Nodeless / Spark variant) | Per-persona wallet, BIP-39 seed backup. WASM in browser; needs `await init()` before any SDK call. Native Lightning Addresses (no self-hosted LNURL-pay endpoint). API key via `VITE_BREEZ_API_KEY`. |
+| Lightning wallet | `@breeztech/breez-sdk-spark` (Breez SDK — Spark / Nodeless variant) | Per-persona wallet, BIP-39 seed inside the encrypted backup. WASM in browser; needs `await init()` before any SDK call. Native Lightning Address (no self-hosted LNURL endpoint). API key via `VITE_BREEZ_API_KEY`. |
 | Media            | Blossom upload (`useUploadFile`)     | Already in scaffold                                          |
 
 There is no Phoenix-owned backend. Everything runs in the PWA against
@@ -232,23 +240,34 @@ generic Nostr clients without breaking them.
 `phoenix.*` is a Phoenix-specific namespace clients can ignore. Everything
 above it is standard.
 
-### 5.2 kind 30078 — encrypted persona backup (signed by *user*, one per persona)
+### 5.2 kind 30078 — encrypted persona backup (signed by *operator*, one per persona)
 
-Addressable replaceable event published by the **user keypair** (not the
-persona). One event per persona; updates to one persona republish only
-its own event.
+Addressable replaceable event published by the **operator** (the human
+keypair, see §3). One event per persona; updates to a persona republish
+its event with the **same** `d` tag, so addressable-event semantics
+apply and relays keep only the latest version.
 
 Tags:
 
-- `["d", "phoenix-persona:<persona-pubkey-hex>"]` — uniquely addresses
-  this persona's backup.
-- `["t", "phoenix-persona"]` — discovery tag. Lets the app fetch every
-  persona for a user with one filter.
-- `["alt", "Phoenix persona backup (encrypted)"]` — NIP-31 human-readable
-  description.
+- `["d", "<random opaque uuid>"]` — **stable per persona**, generated
+  once at persona creation, stored inside the encrypted plaintext as
+  `persona.dTag`, and reused on every update. The `d` tag is required
+  by NIP-01 for kind 30078 (addressable range 30000–39999); its value
+  here is **opaque** — it carries no Phoenix-identifying signal and
+  no link to the persona pubkey. Each persona under an operator gets
+  its own d-tag, so the relay sees N distinct addressable items
+  (= the operator's persona count); this count leak is acknowledged
+  in §3.
 
-Content: NIP-44 ciphertext encrypted to the **user's own pubkey** (self-
-encryption: author and conversation key derive from the same keypair).
+**No other tags.** A `t` tag would advertise Phoenix usage; an `alt`
+tag would advertise "encrypted backup"; both would help observers
+fingerprint Phoenix events. Externally a Phoenix kind-30078 event is
+indistinguishable from any other NIP-78 application-data event
+(Coracle settings, Damus prefs, etc.).
+
+Content: NIP-44 ciphertext encrypted to the **operator's own pubkey**
+(self-encryption: author and conversation key derive from the same
+keypair).
 
 Plaintext payload:
 
@@ -258,9 +277,10 @@ Plaintext payload:
   "persona": {
     "pubkey": "<persona pubkey, hex>",
     "nsec": "<persona private key, hex>",
+    "dTag": "<opaque random uuid; generated once at creation, reused on every update>",
     "name": "Imani Uwase",
     "system_prompt": "...full persona system prompt...",
-    "voice_id": "alloy",
+    "voice_id": "thalia",
     "voice_sample_url": "https://blossom.example/<sha256>.mp3",
     "reference_image_url": "https://blossom.example/<sha256>.png",
     "languages": ["en", "rw"],
@@ -270,12 +290,13 @@ Plaintext payload:
   "wallet": {
     "kind": "spark",
     "seed": "<bip39 mnemonic>",
+    "lightning_address": "imani@spark.money",
     "lnurl": "lnurl1..."
   },
   "model_prefs": {
-    "agent": "claude-sonnet-4-5",
+    "styling": "claude-sonnet-4.5",
     "image": "gpt-image-1",
-    "tts": "tts-1-hd",
+    "tts": "deepgram-aura-2",
     "video": null
   },
   "settings": {
@@ -286,14 +307,29 @@ Plaintext payload:
 
 **Loading personas on a fresh device.**
 
-1. User logs in with their user nsec (NIP-07 / NIP-46 / paste).
-2. App queries `{ kinds: [30078], authors: [user_pubkey], "#t": ["phoenix-persona"] }`.
-3. For each event, decrypt content via the user's signer (NIP-44 self-decrypt).
-4. The decrypted payload yields the persona keypair, wallet seed, voice URL, etc.
-5. Persona nsec is held in memory for the session; never written to disk by Phoenix.
+1. Operator logs in with their operator nsec (NIP-07 / NIP-46 / paste).
+2. App queries `{ kinds: [30078], authors: [operator_pubkey] }` — no
+   Phoenix-specific filter, since adding one would leak app usage. The
+   query may surface kind-30078 events from other apps (Coracle
+   settings, Damus prefs, etc.); they fail decryption (different
+   conversation key) or fail Phoenix's payload schema and are
+   discarded.
+3. For each event, decrypt content via the operator's signer (NIP-44
+   self-decrypt) and validate against Phoenix's payload schema.
+4. Surviving events are already deduplicated by relay (addressable
+   semantics: one event per `(operator_pubkey, kind, d-tag)` triple),
+   so each persona is represented exactly once. Group by
+   `persona.pubkey` from the decrypted plaintext.
+5. The decrypted payload yields the persona keypair, wallet seed,
+   reference image URL, `persona.dTag`, etc.
+6. Persona nsec is held in memory for the session; never written to
+   disk by Phoenix.
 
-**Updating a persona.** Republish the kind 30078 event for that persona's
-d-tag. Relays replace the prior version (addressable-event semantics).
+**Updating a persona.** Republish a kind 30078 event with the **same**
+d-tag as the prior event (read from the decrypted `persona.dTag`) and
+the new ciphertext. Relays replace the prior version per
+addressable-event semantics; only the latest is stored. The d-tag
+never changes for the lifetime of a persona.
 
 **Why one event per persona instead of one event holding all personas.**
 Per-persona events keep updates surgical (changing one persona's wallet
@@ -303,16 +339,21 @@ blocking on a single large payload.
 
 ### 5.3 kind 1 — posts (NIP-01, signed by persona)
 
-Public, signed by the persona keypair. Standard kind-1 with attribution
-tags:
+Public, signed by the persona keypair. **No Phoenix-identifying tags.**
+A Phoenix-published persona post is indistinguishable on the wire from
+any other kind-1 note. Tags are limited to content-discovery and
+attribution:
 
-- `["t", "phoenix"]` — discoverability
-- `["t", "<region or cause>"]` — e.g. `rwanda`, `press-freedom`
-- `["client", "phoenix"]` — client tag (auto-added by `useNostrPublish`)
-- `["alt", "<short summary>"]` — accessibility/preview text
+- `["t", "<region>"]` — e.g. `rwanda` (topical discovery only).
+- `["t", "<cause>"]` — e.g. `press-freedom` (topical discovery only).
+- `["r", "<source-url>"]` (repeatable) — source attribution.
+- `["imeta", ...]` — per-attachment metadata for posts with media
+  (NIP-92, pointing at Blossom URLs).
 
-Posts with images use NIP-92 / NIP-94 `imeta` tags pointing at Blossom
-URLs.
+Deliberately omitted: `t=phoenix`, `client=phoenix`, operator pubkey
+tags, persona name in `alt`, any other Phoenix-fingerprinting tag. The
+persona's kind 0 bio is the right place to disclose AI usage;
+individual posts stay metadata-clean. See `src/lib/personaPost.ts:1-19`.
 
 ### 5.4 Media
 
@@ -332,17 +373,25 @@ encryption is needed on Blossom.
 ## 6. AI capabilities
 
 All inference goes through **PPQ** (`https://api.ppq.ai`, OpenAI-compatible)
-via `pi-ai`. PPQ accepts Lightning payment per request, paid by the
-persona's Spark wallet.
+via `pi-ai`. Phoenix uses PPQ's **credits system**: each persona has
+its own `credit_id` (PPQ account), funded via Lightning from the
+persona's Spark wallet. NIP-47 NWC keeps the credit_id topped up
+hands-off — Phoenix hands PPQ the wallet's NWC URL once at persona
+creation, and PPQ pulls the next chunk of credit whenever the balance
+dips below a threshold. Every API request authenticates with the
+bearer token tied to that credit_id; one auth surface for the whole
+PPQ API. (PPQ also supports L402 per-request, but only on a subset of
+endpoints; credits are simpler and complete.) See
+`docs/guides/ppq.md` for the PPQ surface and `docs/guides/pi-mono.md`
+for how `pi-ai` is configured against it.
 
 | Task                    | Default model    | Notes                                                       |
 | ----------------------- | ---------------- | ----------------------------------------------------------- |
-| Character-creator agent | claude-sonnet-4-5 | Multi-turn tool calling; runs the wizard interview         |
-| Persona text styling    | claude-sonnet-4-5 | Raw thought → polished post in persona's voice             |
-| Profile image           | gpt-image-1      | One-shot during creation; saved as canonical reference     |
+| Persona text styling    | claude-sonnet-4.5 | Raw thought → polished post in persona's voice             |
+| Profile picture         | upload OR `gpt-image-1` | User uploads an image OR generates one via PPQ during the wizard. The chosen image is saved to Blossom and referenced as the canonical likeness for subsequent post-image generation. |
 | Post images             | gpt-image-1      | Always pass the reference image as input for likeness      |
-| Voice sample            | tts-1-hd         | One generation during creation, ~10–20 s, saved to Blossom |
-| Post audio (V1.5)       | tts-1-hd         | TTS each published post in the persona's voice             |
+| Voice sample            | `deepgram-aura-2` (or ElevenLabs) | One-shot during creation, ~10–20 s, saved to Blossom. PPQ exposes DeepGram Aura 2 (named voices: `arcas`, `thalia`, `andromeda`, `helena`, `apollo`, `aries`) and ElevenLabs (`eleven_multilingual_v2`, `eleven_flash_v2_5`) at `/v1/audio/speech`. `tts-1-hd` is no longer the default — PPQ migrated. |
+| Post audio (V1.5)       | `deepgram-aura-2` (or ElevenLabs) | TTS each published post in the persona's voice            |
 | Video (V2 stretch)      | TBD              | Decide once we know what PPQ proxies                       |
 
 **Likeness consistency.** During wizard step 4 we generate the profile
@@ -357,18 +406,20 @@ are persisted in the persona's encrypted kind 30078 event under
 `model_prefs`. The settings page reads the list of available models from
 PPQ's `/v1/models` endpoint at runtime so we don't have to hard-code it.
 
-**Agent harness.** `pi-agent-core` runs the wizard's interview loop with
-a small tool set:
+**Agent harness — deferred to V2.** V1 ships a **form-based**
+character-creator wizard. The operator fills in name, region, cause,
+languages, system prompt, and source URLs through ordinary form
+inputs; Phoenix calls `pi-ai` for sample-post styling and image
+generation, plus `/v1/audio/speech` directly for the one-shot voice
+sample — but does not run an LLM-driven interview.
 
-- `propose_name(name, rationale)` — agent proposes; user approves/edits
-- `propose_bio(bio)` — agent proposes a one-paragraph bio
-- `propose_system_prompt(prompt)` — agent generates the persona's voice spec
-- `generate_profile_image(prompt)` — calls the image model
-- `generate_voice_sample(text, voice_id)` — calls the TTS model
-- `finalize_persona()` — persists everything
-
-`pi-web-ui` chat components render the conversation. The user can interrupt
-at any tool call, edit the proposal, and continue.
+The agent harness below is the V2 design: `pi-agent-core` would run
+the wizard with a small tool set (`propose_name(name, rationale)`,
+`propose_bio(bio)`, `propose_system_prompt(prompt)`,
+`generate_profile_image(prompt)`, `generate_voice_sample(text, voice_id)`,
+`finalize_persona()`), with `pi-web-ui` rendering the conversation
+surface. See `docs/guides/pi-mono.md` for the integration shape when
+we revisit.
 
 ---
 
@@ -376,27 +427,34 @@ at any tool call, edit the proposal, and continue.
 
 ### 7.1 Wallet model
 
-One Spark Lightning wallet **per persona**, via the Breez Spark SDK.
-Wallet seed is a BIP-39 mnemonic generated at persona creation time and
-stored only inside the encrypted kind 30078 backup (and ephemerally in
-memory while the persona is active). The SDK runs in the browser as
-WebAssembly — `await init()` is required once at app boot, after which
-each persona's wallet is reconstituted by passing its seed to the
+One Spark Lightning wallet **per persona**, via the Breez Spark SDK
+(`@breeztech/breez-sdk-spark`). The wallet seed is a BIP-39 mnemonic
+generated at persona creation time and stored only inside the
+encrypted kind 30078 backup (and ephemerally in memory while the
+persona is active). The SDK runs in the browser as WebAssembly —
+`await init()` is required once at app boot, after which each
+persona's wallet is reconstituted by passing its seed to the SDK's
 `SdkBuilder` config.
 
 ### 7.2 Receive
 
 Each persona surfaces:
 
-- A **Lightning Address** — provided natively by the Spark SDK; no
-  self-hosted LNURL-pay endpoint required.
-- An **LNURL** QR for direct invoice generation
-- **NIP-57 zaps** — kind 0 advertises `lud16`, so existing Nostr clients
-  can zap the persona natively
+- A **Lightning Address** (e.g. `imani@spark.money`) — provided
+  natively by the Spark SDK via Breez's hosted LNURL server. **No
+  self-hosted LNURL endpoint required.** Phoenix calls
+  `sdk.registerLightningAddress({ username, description })` at persona
+  creation; the resulting address is published in the persona's kind
+  0 `lud16` field and stored in the encrypted backup under
+  `wallet.lightning_address`.
+- An **LNURL** QR for direct invoice generation, also exposed by the
+  SDK.
+- **NIP-57 zaps** — kind 0 advertises `lud16`, so existing Nostr
+  clients can zap the persona natively.
 
-The public persona feed surfaces zap receipts (NIP-57 kind 9735 events) so
-visitors can see donations as they arrive. This is the headline emotional
-beat of the demo.
+The public persona feed surfaces zap receipts (NIP-57 kind 9735
+events) so visitors can see donations as they arrive. This is the
+headline emotional beat of the demo.
 
 ### 7.3 Spend
 
@@ -432,11 +490,12 @@ by token estimates from `pi-ai`.
 
 ### V1 — must ship for the demo
 
-- [ ] Character-creator wizard with embedded `pi-agent-core` agent
-- [ ] Persona keypair + NIP-49 local storage + relay backup (kind 30078)
-- [ ] Per-persona Spark wallet, BIP-39 seed inside the backup event
-- [ ] Profile image generation with reference image saved
-- [ ] Voice sample generation, stored on Blossom
+- [ ] Form-based character-creator wizard (agent harness deferred to V2)
+- [ ] Operator nsec via NIP-07 / NIP-46 / paste OR fresh local NIP-49 (one passphrase per device)
+- [ ] Persona keypair + kind 30078 backup with stable per-persona d-tag
+- [ ] Per-persona Spark wallet (Breez Spark SDK), BIP-39 seed inside the backup event
+- [ ] Profile picture: user uploads OR generates via PPQ (`gpt-image-1`); saved as canonical reference
+- [ ] Voice sample generation via PPQ (`/v1/audio/speech`, DeepGram Aura 2 or ElevenLabs), stored on Blossom
 - [ ] Multi-persona UX: list, switch, back up, restore
 - [ ] Compose flow: thought → styled → kind 1 publish (text only)
 - [ ] Post-image generation in compose flow (with reference image)
@@ -450,14 +509,15 @@ by token estimates from `pi-ai`.
 ### V1.5 — ship if V1 is solid by hour 24
 
 - [ ] TTS audio rendering of published posts
-- [ ] LNURL-pay endpoint hosted (so Lightning Addresses resolve)
 - [ ] Imigongo-rooted visual polish (palette, pattern, type pairing)
 - [ ] PWA install prompt, service worker, offline shell
 
 ### V2 — stretch
 
+- [ ] Agent-driven character-creator wizard (`pi-agent-core` interview)
 - [ ] Video generation using persona likeness + voice
 - [ ] NIP-46 remote signer support for power users
+- [ ] Multi-operator-per-device (separate operator keypairs per persona group)
 - [ ] Multi-language interview (Kinyarwanda + English at minimum)
 - [ ] Brainstorm-from-sources flow (RSS in, candidate posts out)
 
@@ -501,21 +561,33 @@ constructive, not just resilient.
 
 ## 10. Open research items
 
-These need answers before or during early implementation. Each has a named
-owner; if no name is attached yet, the team should claim one.
+**Already resolved:**
 
-**Already resolved.** Wallet SDK is locked to **`@breeztech/breez-sdk-spark`**
-(Breez SDK — Nodeless / Spark variant). Lightning Addresses are SDK-native,
-so no self-hosted LNURL-pay endpoint is required.
+- *Wallet SDK*: locked to **`@breeztech/breez-sdk-spark`** (Breez SDK
+  Spark / Nodeless variant). Lightning Addresses are SDK-native via
+  Breez's hosted `spark.money` LNURL server — no Phoenix-hosted
+  endpoint required.
+- *PPQ payment*: Phoenix uses PPQ's **credits system** — Lightning
+  top-ups buy credit on a per-persona `credit_id`, and every API
+  request authenticates with the bearer token tied to that credit_id.
+  NWC (NIP-47) auto-topup from the persona's Spark wallet keeps the
+  credit_id funded hands-off. PPQ also supports L402 per-request, but
+  only on a subset of endpoints; the credits system covers the entire
+  API and is what Phoenix uses everywhere.
+- *Image-gen cost at demo scale*: affordable; budget enables ten image
+  generations per persona during the demo without concern.
+- *NIP-49 passphrase UX*: **one passphrase per device**, applied to the
+  operator nsec only. Multi-operator-per-device is a V2 stretch.
+- *Voice generation*: PPQ supports TTS via `/v1/audio/speech` with
+  DeepGram Aura 2 (named voices: `arcas`, `thalia`, `andromeda`,
+  `helena`, `apollo`, `aries`) and ElevenLabs
+  (`eleven_multilingual_v2`, `eleven_flash_v2_5`). `tts-1-hd` is no
+  longer the default — pick one of the above. Voice sample (V1) and
+  post-audio TTS (V1.5) stay in scope.
 
-| # | Question                                                               | Why it matters                                                  |
-| - | ---------------------------------------------------------------------- | --------------------------------------------------------------- |
-| 1 | PPQ payment flow — L402 macaroon, account credit, or per-request invoice? | Determines how `pi-ai` is configured and whether we need a persistent PPQ session. PPQ exposes `/nwc-auto-topup/connect`; if Spark can act as a NWC service this collapses to one wiring call. |
-| 2 | Voice model on PPQ — is `tts-1-hd` available, or do we need an alternative? | Locks the voice generation tool                                |
-| 3 | Image model token costs at hackathon-scale demo traffic                | We need to know if ten image gens/persona is affordable        |
-| 4 | NIP-49 passphrase UX — single passphrase per device or per persona?    | Trade-off between convenience and blast radius                 |
-| 5 | Voice sample format and size budget                                    | MP3 32 kbps × 15 s ≈ 60 KB; OGG/Opus may be smaller and avoids MP3 patent baggage |
-| 6 | Strategy for AI safety / abuse                                         | An anonymous voice with a wallet is also an abuse vector. What's our minimum-viable answer for judges? |
+| # | Question                              | Why it matters                                                                      |
+| - | ------------------------------------- | ----------------------------------------------------------------------------------- |
+| 1 | Strategy for AI safety / abuse        | An anonymous voice with a wallet is also an abuse vector. The judges' question to anticipate: "doesn't this enable mass disinformation / scam personas?" Answer combines (a) cost-throttling — bad actors burn sats; donations sustain real voices, (b) pseudonymous-not-anonymous — relay-level mute / block / labels still apply, (c) upstream LLM safety inherited via PPQ, (d) Verify page surfaces persona age / post count. Owner: Anaïse for demo positioning. |
 
 ---
 
@@ -536,9 +608,13 @@ adaptation, not a full rewrite. Replace what the new stack obsoletes.
 
 **Reuse with adaptation.** Architecture matches §3; update to §5 schema:
 - `src/lib/persona.ts`, `personaCrypto.ts`, `personaKey.ts`, `personaPost.ts`
-  → adapt to per-persona d-tag (`phoenix-persona:<pubkey>`), the
-  `phoenix-persona` t-tag, the embedded Spark wallet seed, and the
-  `model_prefs` section
+  → align the persona Zod schema to the §5.2 plaintext payload (add
+  `persona.dTag` field for the stable per-persona d-tag, switch
+  `wallet.kind` from `breeze` to `spark`, drop voice fields, embed
+  the Spark wallet seed, the `model_prefs` section). The current code
+  uses a fresh random UUID per publish — switch to a stable d-tag
+  stored inside the encrypted plaintext so addressable-event semantics
+  apply on update. The no-other-tags scheme already matches.
 - `src/hooks/usePersona.ts`, `usePersonaPublish.ts`
   → query by user pubkey + t-tag; multi-persona switching surfaces
 - `src/pages/MyPersonas.tsx`, `PersonaFeed.tsx`, `Verify.tsx`
@@ -555,7 +631,7 @@ adaptation, not a full rewrite. Replace what the new stack obsoletes.
   endpoint; persona's wallet pays PPQ directly)
 
 **New.**
-- `src/lib/spark/` (`client.ts`, `init.ts`, `types.ts`), `src/hooks/useWallet.ts` — Breez Spark SDK integration
+- `src/lib/wallet/{client,init,types,autoTopup}.ts`, `src/hooks/useWallet.ts` — Breez Spark SDK integration (already prototyped on `jc/add-spark-wallet`)
 - `src/components/Wallet*.tsx` — wallet UI
 - `src/lib/agent.ts`, `src/components/CharacterCreator.tsx` — `pi-agent-core` wiring
 - `src/pages/Settings.tsx` — model selection per task, relays, danger zone
@@ -572,13 +648,16 @@ that points contributors at this document.
 
 ## 12. Team
 
-Roles from the existing whiteboard, carried forward:
+Roles after the wallet → PPQ stream merge (see `STREAMS.md`):
 
 - **Anaïse** — Captain, product voice, demo lead, persona sign-off
-- **Derek** — Frontend, Nostr integration, PWA shell
-- **Jim** — LLM, agent harness, prompt engineering, model selection
-- **Topher** — Wallet, PPQ payment plumbing, infrastructure (LNURL endpoint,
-  Blossom hosting choice)
+- **Derek** — Frontend, Nostr integration, PWA shell; persona harnesses
+  (operator, persona-crypto, publish, feed) and composite leads
+  (persona-create, persona-restore)
+- **Jim** — PPQ + Wallet + Payments + Settings (Stream A; owns the
+  wallet → PPQ end-to-end demo)
+- **Topher** — Agent (`pi-mono` runtime), LLM consumers (styling,
+  image-gen, voice-gen), donations (LNURL/zaps) — Stream B
 
 Pair up across role boundaries on anything that crosses them — the
 wallet/agent/Nostr/image-gen seams are where bugs will live.
@@ -588,20 +667,26 @@ wallet/agent/Nostr/image-gen seams are where bugs will live.
 ## 13. Glossary
 
 - **Persona** — an AI-driven public identity with its own Nostr keypair,
-  Lightning wallet, profile image, and voice. Owned and operated by one user.
-- **Operator (deprecated)** — earlier scaffold concept of a separate human
-  Nostr identity that signed for the persona. Removed in this plan.
-- **PPQ** — `ppq.ai`. OpenAI-compatible inference API priced in sats over
-  Lightning. The persona's wallet pays it directly.
-- **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit. We use
-  `pi-agent-core` (runtime), `pi-ai` (LLM API), `pi-web-ui` (chat UI).
-- **Breez Spark SDK** (`@breeztech/breez-sdk-spark`) — Lightning wallet
-  SDK published by Breez Technology, built on the Spark protocol
-  ("Nodeless" variant). Per-persona wallets keyed off a BIP-39 mnemonic
-  recoverable from the encrypted kind 30078 backup. Provides native
-  Lightning Addresses, removing the need for a self-hosted LNURL-pay
-  endpoint. Browser usage requires `await init()` once at boot before
-  any other SDK call. API key supplied via `VITE_BREEZ_API_KEY`.
+  Spark Lightning wallet, profile image, and voice. Owned and operated
+  by one operator.
+- **Operator** — the human's Nostr identity. Signs encrypted persona
+  backups (kind 30078); never publishes kind 0 or kind 1 under
+  Phoenix. See §3 for the full two-level identity model.
+- **User keypair** — synonym for "operator" used in some passing prose;
+  prefer "operator."
+- **PPQ** — `ppq.ai`. OpenAI-compatible inference API. Phoenix uses
+  PPQ's **credits system**: a per-persona `credit_id` funded by
+  Lightning from the persona's Spark wallet (NWC auto-topup) auths
+  every API request via a bearer token. (L402 per-request is also
+  supported by PPQ but only on a subset of endpoints; not Phoenix's
+  path.) See `docs/guides/ppq.md`.
+- **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit. V1 uses
+  `pi-ai` (LLM client) only; `pi-agent-core` and `pi-web-ui` are
+  reserved for the V2 agent-driven wizard.
+- **Spark / Breez Spark SDK** — `@breeztech/breez-sdk-spark`,
+  Breez's wrapping of Lightspark's Spark protocol. Provides per-persona
+  Lightning wallets with a hosted Lightning Address at `spark.money`
+  (no self-hosted LNURL endpoint).
 - **NIP-44** — Nostr encrypted-payload spec. Used for the persona's
   encrypted backup event.
 - **NIP-49** — passphrase-encrypted nsec format. Used for at-rest local

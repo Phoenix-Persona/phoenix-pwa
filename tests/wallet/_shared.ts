@@ -29,7 +29,13 @@ import {
   tryDecryptPhoenixEnvelope,
   type Nip44Signer,
 } from "../../src/lib/personaCrypto";
-import type { PersonaConfig, PhoenixEnvelope } from "../../src/lib/persona";
+import type {
+  Persona,
+  PersonaModelPrefs,
+  PersonaSettings,
+  PersonaWallet,
+  PhoenixEnvelope,
+} from "../../src/lib/persona";
 
 /* ---------- Paths ---------- */
 
@@ -116,7 +122,12 @@ export async function saveStoredPersona(data: StoredPersona): Promise<void> {
 }
 
 export async function encryptAndSavePersona(
-  args: { personaPubkey: string; config: PersonaConfig },
+  args: {
+    persona: Persona;
+    wallet?: PersonaWallet;
+    model_prefs?: PersonaModelPrefs;
+    settings?: PersonaSettings;
+  },
   operator: OperatorData,
 ): Promise<void> {
   const signer = buildSigner(operator.nsec);

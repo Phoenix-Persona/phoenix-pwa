@@ -4,6 +4,8 @@
 
 The active hackathon plan against the V1 scope lives in [`tasks/todo.md`](./tasks/todo.md).
 
+**Doc indexes:** [`docs/INDEX.md`](./docs/INDEX.md) (engineering & architecture) · [`dev/INDEX.md`](./dev/INDEX.md) (design plan, parallel build streams).
+
 **Phoenix-specific stack additions** (beyond the MKStack base described below):
 
 - **`pi-mono`** ([github.com/earendil-works/pi](https://github.com/earendil-works/pi)) — agent runtime (`pi-agent-core`), unified LLM API (`pi-ai`), web chat components (`pi-web-ui`)
@@ -11,7 +13,7 @@ The active hackathon plan against the V1 scope lives in [`tasks/todo.md`](./task
 - **Breeze SDK** — per-persona Bitcoin Lightning wallet; seed phrase recoverable from the encrypted kind 30078 backup
 - **NIP-49** for at-rest persona-nsec encryption; **NIP-44** for the encrypted backup event; **NIP-57** for donations
 
-**Reuse with adaptation — don't blindly extend, don't blindly rewrite.** The early `src/lib/persona*` and `src/hooks/usePersona*` sketch matches the user/persona architecture in PROJECT.md §3 closely; adapt it to the §5 schema (per-persona d-tag `phoenix-persona:<pubkey>`, `phoenix-persona` t-tag for discovery, embedded Breeze wallet seed, `model_prefs`) rather than rewriting from scratch. The Vercel `/style` endpoint plan in `src/lib/styleClient.ts` is gone — replace with a `pi-ai` PPQ client (PROJECT.md §6). PROJECT.md §11 lists exactly what to reuse, rewrite, replace, add, and delete.
+**Reuse with adaptation — don't blindly extend, don't blindly rewrite.** The early `src/lib/persona*` and `src/hooks/usePersona*` sketch matches the user/persona architecture in PROJECT.md §3 closely; adapt it to the §5 schema (random per-publish d-tag, no app-specific tags — discovery is scan-and-decrypt for stronger anti-fingerprinting; embedded Breeze wallet seed; `model_prefs`) rather than rewriting from scratch. The Vercel `/style` endpoint plan in `src/lib/styleClient.ts` is gone — replace with a `pi-ai` PPQ client (PROJECT.md §6). PROJECT.md §11 lists exactly what to reuse, rewrite, replace, add, and delete.
 
 ---
 
