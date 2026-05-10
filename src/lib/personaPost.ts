@@ -26,11 +26,15 @@ export interface PersonaPostInput {
   /** Source URLs that informed the post. */
   sources?: string[];
   /**
-   * Optional NIP-92 `imeta` attachment. When provided, we append a
-   *   `["imeta", "url <url>", "m <mimeType>"]`
-   * tag so video-aware Nostr clients (Damus, Iris, Highlighter, etc.)
-   * render the media inline. The URL itself is NOT also embedded in
-   * the content — clients deduplicate from imeta.
+   * Optional NIP-92 `imeta` attachment. When provided we add:
+   *   1. an `["imeta", "url <url>", "m <mimeType>"]` tag — for clients
+   *      that render NIP-92 media inline (Damus, Iris, Highlighter), AND
+   *   2. the URL appended on its own line at the end of `content` —
+   *      for clients that only auto-link URLs found in body text
+   *      (older / simpler clients).
+   *
+   * This double-emit is conventional Nostr practice; clients that
+   * understand imeta deduplicate against the body URL automatically.
    */
   media?: {
     url: string;
@@ -58,19 +62,27 @@ export function buildPersonaPostTemplate(
     if (url) tags.push(["r", url]);
   }
 
+  let content = input.text;
   if (input.media?.url) {
     tags.push([
       "imeta",
       `url ${input.media.url}`,
       `m ${input.media.mimeType}`,
     ]);
+    // Append the URL on its own line if the user's caption doesn't
+    // already mention it. This makes the media visible on clients
+    // that only render auto-linked URLs from body text.
+    if (!content.includes(input.media.url)) {
+      const sep = content.endsWith("\n") || content.length === 0 ? "" : "\n\n";
+      content = `${content}${sep}${input.media.url}`;
+    }
   }
 
   return {
     kind: 1,
     created_at: createdAt,
     tags,
-    content: input.text,
+    content,
   };
 }
 

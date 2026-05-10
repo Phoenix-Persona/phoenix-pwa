@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/useToast";
 import {
   useGenerateVideoPipeline,
@@ -44,7 +45,12 @@ import {
 } from "@/lib/video/chainStore";
 import type { Persona } from "@/lib/persona";
 
-const DURATION_OPTIONS = [15, 30, 45, 60, 75, 90] as const;
+const DURATION_MIN_SECS = 10;
+const DURATION_MAX_SECS = 120;
+const DURATION_STEP_SECS = 10;
+const DURATION_DEFAULT_SECS = 20;
+/** localStorage key for persisting the user's last picked duration. */
+const DURATION_STORAGE_KEY = "phoenix:video:lastDurationSecs";
 const COST_PER_CLIP_USD = 1; // seedance-2-fast 10s clip
 const SEGMENT_SECS = 10;
 
@@ -432,7 +438,11 @@ function PreviewStep(props: {
   onConfirm: (durationSecs: number) => void;
 }) {
   const { previewUrl, avatarUrl, onRegenerate, onConfirm } = props;
-  const [duration, setDuration] = useState<number>(30);
+  // Default to the user's last picked length, snapped to the slider's
+  // step grid. First-time users get DURATION_DEFAULT_SECS (20s).
+  const [duration, setDuration] = useState<number>(() =>
+    loadStoredDuration(),
+  );
 
   const numClips = Math.max(1, Math.ceil(duration / SEGMENT_SECS));
   const estCost = numClips * COST_PER_CLIP_USD;
@@ -475,25 +485,31 @@ function PreviewStep(props: {
       </div>
 
       <div>
-        <h3 className="text-sm font-semibold mb-2">
-          Step 2 · Pick the length
-        </h3>
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          {DURATION_OPTIONS.map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => setDuration(d)}
-              className={
-                "rounded-md border px-3 py-2 text-sm transition-colors " +
-                (d === duration
-                  ? "border-rw-gold bg-rw-gold/15 text-foreground font-medium"
-                  : "border-imigongo-clay/20 hover:border-imigongo-clay/40")
-              }
-            >
-              {d}s
-            </button>
-          ))}
+        <div className="flex items-baseline justify-between mb-2">
+          <h3 className="text-sm font-semibold">Step 2 · Pick the length</h3>
+          <span className="font-display text-2xl font-medium tabular-nums">
+            {duration}s
+          </span>
+        </div>
+        <Slider
+          value={[duration]}
+          min={DURATION_MIN_SECS}
+          max={DURATION_MAX_SECS}
+          step={DURATION_STEP_SECS}
+          onValueChange={(v) => {
+            const next = v[0] ?? DURATION_DEFAULT_SECS;
+            setDuration(next);
+            try {
+              localStorage.setItem(DURATION_STORAGE_KEY, String(next));
+            } catch {
+              /* private mode etc — fine to ignore */
+            }
+          }}
+          className="py-2"
+        />
+        <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums pt-1">
+          <span>{DURATION_MIN_SECS}s</span>
+          <span>{DURATION_MAX_SECS}s</span>
         </div>
         <p className="text-xs text-muted-foreground pt-2">
           {numClips} × {SEGMENT_SECS}s clips · estimated cost{" "}
@@ -857,6 +873,28 @@ function ErrorBlock(props: {
       </div>
     </div>
   );
+}
+
+/**
+ * Read the last picked duration from localStorage, snapping to the
+ * slider's [min, max, step] grid. Falls back to the first-time default
+ * if storage is empty or unreadable.
+ */
+function loadStoredDuration(): number {
+  try {
+    const raw = localStorage.getItem(DURATION_STORAGE_KEY);
+    if (!raw) return DURATION_DEFAULT_SECS;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return DURATION_DEFAULT_SECS;
+    const stepped =
+      Math.round(n / DURATION_STEP_SECS) * DURATION_STEP_SECS;
+    return Math.min(
+      DURATION_MAX_SECS,
+      Math.max(DURATION_MIN_SECS, stepped),
+    );
+  } catch {
+    return DURATION_DEFAULT_SECS;
+  }
 }
 
 function Centered(props: { children: React.ReactNode }) {

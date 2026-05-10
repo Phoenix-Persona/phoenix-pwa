@@ -79,7 +79,11 @@ const WORLD_BLOCK_PREFIX =
   "eye level, medium close-up. 9:16 vertical, soft natural lighting, shallow " +
   "depth of field. The subject speaks directly into the camera in clear " +
   "language with measured conviction. Natural pauses between sentences. " +
-  "Lip movements sync precisely with the spoken audio.";
+  "Lip movements sync precisely with the spoken audio. " +
+  "AUDIO: ONLY the speaker's voice — no background music, no score, no " +
+  "soundtrack, no instruments, no humming, no ambient music of any kind. " +
+  "Faint room tone is acceptable; music is not. Every clip in this series " +
+  "must use the SAME audio treatment so they cut together seamlessly.";
 
 export type GenerationPhase =
   | { type: "idle" }
