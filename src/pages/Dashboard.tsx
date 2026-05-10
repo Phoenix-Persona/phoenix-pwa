@@ -50,6 +50,15 @@ const Dashboard = () => {
   const publish = usePersonaPublish();
   const crossPost = useCrossPost();
 
+  // Composer fields. `raw` is the idea/draft body (legacy name kept
+  // for git-blame continuity); the new V1.5 composer also collects
+  // sources and style hints to ground the eventual AI styling +
+  // video gen — both are wired into the post template now (sources
+  // emit `r` tags) so the kind 1 carries them even before the AI
+  // pipeline is live.
+  const [sourcesInput, setSourcesInput] = useState("");
+  const [hintsInput, setHintsInput] = useState("");
+
   const personaHex = useMemo(() => npubToHex(npub), [npub]);
   const author = useAuthor(personaHex ?? undefined);
   const publicBio = author.data?.metadata?.about ?? "";
@@ -63,11 +72,19 @@ const Dashboard = () => {
   async function onPost() {
     if (!personaConfig || !user || !raw.trim()) return;
     try {
-      // No styling step yet — publish the raw text directly. AI
-      // styling will run between `raw` and `template` once it's wired.
+      // No AI styling yet — publish the raw text directly. The
+      // hints field is captured for the future styling pipeline
+      // but not surfaced in the published event (style is shape,
+      // not content). Sources DO go on the event as `r` tags so
+      // attribution rides the post immediately.
+      const sources = sourcesInput
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
       const template = buildPersonaPostTemplate({
         text: raw,
         tags: personaConfig.tags,
+        sources,
       });
       const signed = await publish.mutateAsync({
         personaNsec: personaConfig.nsec,
@@ -102,6 +119,8 @@ const Dashboard = () => {
       }
 
       setRaw("");
+      setSourcesInput("");
+      setHintsInput("");
       posts.refetch();
     } catch (e) {
       toast({
@@ -252,10 +271,14 @@ const Dashboard = () => {
                 </h2>
               </div>
               <CardContent className="space-y-5 pt-5">
+                {/* Idea — the post body */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label htmlFor="composer-raw" className="text-sm font-medium">
-                      Post body
+                    <label
+                      htmlFor="composer-raw"
+                      className="text-sm font-medium"
+                    >
+                      Idea
                     </label>
                     <span className="text-xs text-muted-foreground tabular-nums">
                       {raw.length} chars
@@ -266,7 +289,7 @@ const Dashboard = () => {
                     rows={5}
                     value={raw}
                     onChange={(e) => setRaw(e.target.value)}
-                    placeholder="Type the raw thought. We'll publish it as-is for now; AI styling will run here once it lands."
+                    placeholder="What does the persona need to say? Drop the rawest version of your thought — AI styling will polish it once that step lands."
                     onKeyDown={(e) => {
                       if (
                         (e.metaKey || e.ctrlKey) &&
@@ -280,42 +303,135 @@ const Dashboard = () => {
                     }}
                     className="resize-y min-h-[8rem] bg-background/60"
                   />
+                </div>
+
+                {/* Sources + style hints */}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="composer-sources"
+                      className="text-sm font-medium"
+                    >
+                      Sources{" "}
+                      <span className="text-xs font-normal text-muted-foreground">
+                        (optional)
+                      </span>
+                    </label>
+                    <Textarea
+                      id="composer-sources"
+                      rows={2}
+                      value={sourcesInput}
+                      onChange={(e) => setSourcesInput(e.target.value)}
+                      placeholder="https://hrw.org/..., https://cpj.org/..."
+                      className="text-sm bg-background/60 resize-none"
+                    />
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Comma-separated URLs. Attached to the post as{" "}
+                      <code className="font-mono">r</code> tags so anyone can
+                      see what informed it.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="composer-hints"
+                      className="text-sm font-medium"
+                    >
+                      Style hints{" "}
+                      <span className="text-xs font-normal text-muted-foreground">
+                        (optional)
+                      </span>
+                    </label>
+                    <Textarea
+                      id="composer-hints"
+                      rows={2}
+                      value={hintsInput}
+                      onChange={(e) => setHintsInput(e.target.value)}
+                      placeholder="measured, first-person, vertical 9:16"
+                      className="text-sm bg-background/60 resize-none"
+                    />
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Will guide the AI styling + video framing once that
+                      step lands. Captured locally for now.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Cross-post indicator (read-only) */}
+                {personaConfig.cross_post?.webhook_url && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-rw-sky/25 bg-rw-sky/5 px-4 py-2.5 text-xs">
+                    <span className="font-medium text-foreground">
+                      Cross-post:
+                    </span>
+                    <span className="text-muted-foreground">
+                      Will dispatch to your webhook
+                    </span>
+                    {(personaConfig.cross_post.webhook_platforms ?? [])
+                      .length > 0 && (
+                      <>
+                        <span className="text-muted-foreground">·</span>
+                        <div className="flex flex-wrap gap-1">
+                          {(
+                            personaConfig.cross_post.webhook_platforms ?? []
+                          ).map((p) => (
+                            <Badge
+                              key={p}
+                              variant="secondary"
+                              className="text-[10px] bg-rw-sky/10 text-rw-sky border border-rw-sky/20"
+                            >
+                              {p}
+                            </Badge>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                   <p className="text-[11px] text-muted-foreground">
                     Press{" "}
                     <kbd className="font-mono px-1 py-0.5 rounded bg-muted border border-border text-[10px]">
                       ⌘ Enter
                     </kbd>{" "}
-                    to publish.
+                    in the idea field to publish.
                   </p>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setRaw("")}
-                    disabled={publish.isPending}
-                  >
-                    Discard
-                  </Button>
-                  <Button
-                    onClick={onPost}
-                    disabled={publish.isPending || !raw.trim()}
-                    className="shadow-lg shadow-primary/20"
-                  >
-                    {publish.isPending ? (
-                      <>
-                        <Loader2
-                          className="mr-2 size-4 animate-spin"
-                          aria-hidden="true"
-                        />
-                        Publishing…
-                      </>
-                    ) : (
-                      <>
-                        <Send className="mr-2 size-4" aria-hidden="true" />
-                        Publish to relays
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setRaw("");
+                        setSourcesInput("");
+                        setHintsInput("");
+                      }}
+                      disabled={publish.isPending || crossPost.isPending}
+                    >
+                      Discard
+                    </Button>
+                    <Button
+                      onClick={onPost}
+                      disabled={
+                        publish.isPending ||
+                        crossPost.isPending ||
+                        !raw.trim()
+                      }
+                      className="shadow-lg shadow-primary/20"
+                    >
+                      {publish.isPending || crossPost.isPending ? (
+                        <>
+                          <Loader2
+                            className="mr-2 size-4 animate-spin"
+                            aria-hidden="true"
+                          />
+                          Publishing…
+                        </>
+                      ) : (
+                        <>
+                          <Send className="mr-2 size-4" aria-hidden="true" />
+                          Publish
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
