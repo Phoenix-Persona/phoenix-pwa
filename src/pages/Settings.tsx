@@ -53,6 +53,7 @@ import { useMyPersonas, usePersonaActivityStats } from "@/hooks/usePersona";
 import { useDeletePersona } from "@/hooks/useDeletePersona";
 import { useToast } from "@/hooks/useToast";
 import {
+  clearSessionUnlocked,
   clearUserNcryptsec,
   hasUserNcryptsec,
 } from "@/lib/nip49Storage";
@@ -82,10 +83,14 @@ const Settings = () => {
       : null;
 
   function handleLockNow() {
-    // Clear the Nostrify session — the next signer use prompts for the
-    // passphrase via <UnlockGate>. Keeps the ncryptsec parked.
+    // Clear the Nostrify session AND the per-tab session flag — next
+    // page load will hit the pre-render hook in main.tsx, see no flag,
+    // clear nostr:login, and the unlock gate fires. Without clearing
+    // the flag, an immediate F5 would skip the prompt because the
+    // tab is still considered "unlocked".
     const current = logins[0];
     if (current) removeLogin(current.id);
+    clearSessionUnlocked();
     toast({
       title: "Locked",
       description: "Re-enter your passphrase to continue.",
@@ -99,6 +104,7 @@ const Settings = () => {
     );
     if (!ok) return;
     clearUserNcryptsec();
+    clearSessionUnlocked();
     const current = logins[0];
     if (current) removeLogin(current.id);
     toast({

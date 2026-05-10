@@ -11,7 +11,7 @@ import {
   Loader2,
   ExternalLink,
 } from 'lucide-react';
-import { decryptNcryptsec, encryptNsec, storeUserNcryptsec } from '@/lib/nip49Storage';
+import { decryptNcryptsec, encryptNsec, markSessionUnlocked, storeUserNcryptsec } from '@/lib/nip49Storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -338,6 +338,9 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
       storeUserNcryptsec(ncryptsec);
       // Now safe to log in — the at-rest backup is in place.
       login.nsec(nsec);
+      // Same tab is now considered "unlocked" — F5 reloads won't
+      // re-prompt, but a new tab will (no sessionStorage flag).
+      markSessionUnlocked();
       setPassphrase('');
       setPassphraseConfirm('');
       setStep('profile');
@@ -430,6 +433,9 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
       // an at-rest backup without re-encrypting.
       storeUserNcryptsec(importedNcryptsec);
       login.nsec(recoveredNsec);
+      // Mark this tab as unlocked so we don't immediately re-prompt
+      // on the next render — the user just typed the passphrase.
+      markSessionUnlocked();
       setImportedNcryptsec('');
       setImportPassphrase('');
       onClose();
