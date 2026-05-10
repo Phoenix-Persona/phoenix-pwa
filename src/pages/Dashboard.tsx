@@ -25,15 +25,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/useToast";
 import { useAuthor } from "@/hooks/useAuthor";
-import { useCrossPost } from "@/hooks/useCrossPost";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { usePersonaComposer } from "@/hooks/usePersonaComposer";
 import { usePersona, usePersonaPosts } from "@/hooks/usePersona";
-import { usePersonaPublish } from "@/hooks/usePersonaPublish";
-import { usePpqInference } from "@/hooks/usePpqInference";
 import { useRegisterPersonaLightningAddress } from "@/hooks/useRegisterPersonaLightningAddress";
 import { useWallet } from "@/hooks/useWallet";
 import { npubToHex } from "@/lib/nostrIds";
-import { buildPersonaPostTemplate } from "@/lib/personaPost";
 
 const Dashboard = () => {
   const { npub = "" } = useParams();
@@ -43,8 +40,6 @@ const Dashboard = () => {
   const { toast } = useToast();
   const persona = usePersona(npub);
   const posts = usePersonaPosts(npub, 20);
-  const publish = usePersonaPublish();
-  const crossPost = useCrossPost();
 
   // Composer fields. `raw` is the idea/draft body (legacy name kept
   // for git-blame continuity); the new V1.5 composer also collects
@@ -81,24 +76,19 @@ const Dashboard = () => {
     walletId: personaConfig ? `persona:${personaConfig.pubkey}` : undefined,
     mnemonic: walletSeed,
   });
-  const styling = usePpqInference();
+  const composer = usePersonaComposer({
+    persona: personaConfig,
+    stylingModel,
+    wallet,
+    onPublished: () => {
+      posts.refetch();
+    },
+  });
 
   async function onStyle() {
-    if (!personaConfig || !raw.trim()) return;
     try {
-      const res = await styling.mutateAsync({
-        model: stylingModel,
-        messages: [
-          { role: "system", content: personaConfig.system_prompt },
-          { role: "user", content: raw },
-        ],
-      });
-      const styled = res.choices?.[0]?.message?.content?.trim();
-      if (styled) {
-        setRaw(styled);
-        wallet.refreshPpqBalance();
-        wallet.refreshInfo();
-      }
+      const styled = await composer.styleInVoice(raw);
+      if (styled) setRaw(styled);
     } catch (e) {
       toast({
         title: "Styling failed",
@@ -109,52 +99,26 @@ const Dashboard = () => {
   }
 
   async function onPost() {
-    if (!personaConfig || !user || !raw.trim()) return;
     try {
-      // The hints field is captured for the future styling pipeline
-      // but not surfaced in the published event (style is shape, not
-      // content). Sources DO go on the event as `r` tags so
-      // attribution rides the post immediately. AI styling is opt-in
-      // via the "Style in voice" button — by the time we get here,
-      // `raw` is whatever the user wants to publish (literal or
-      // styled).
-      const sources = sourcesInput
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const template = buildPersonaPostTemplate({
+      const result = await composer.publishTextOnly({
         text: raw,
-        tags: personaConfig.tags,
-        sources,
+        sourcesInput,
       });
-      const signed = await publish.mutateAsync({
-        personaNsec: personaConfig.nsec,
-        template,
-      });
+      if (!result) return;
 
-      // Successful Nostr publish — try the cross-post webhook if
-      // configured. Failures are non-fatal: the post is already live
-      // on relays, so we surface a non-blocking warning toast.
-      if (personaConfig.cross_post?.webhook_url) {
-        try {
-          await crossPost.mutateAsync({
-            persona: personaConfig,
-            event: signed,
-          });
-          toast({
-            title: "Published",
-            description: "Live on relays and dispatched to your cross-post webhook.",
-          });
-        } catch (e) {
-          toast({
-            title: "Cross-post failed",
-            description:
-              e instanceof Error
-                ? `Posted to relays, but the webhook returned: ${e.message}`
-                : "Posted to relays, but the cross-post webhook didn't accept the event.",
-            variant: "destructive",
-          });
-        }
+      if (result.crossPost === "sent") {
+        toast({
+          title: "Published",
+          description: "Live on relays and dispatched to your cross-post webhook.",
+        });
+      } else if (result.crossPost === "failed") {
+        toast({
+          title: "Cross-post failed",
+          description: `Posted to relays, but the webhook returned: ${
+            result.crossPostError?.message ?? "Unknown error"
+          }`,
+          variant: "destructive",
+        });
       } else {
         toast({ title: "Published", description: "Post is live on relays." });
       }
@@ -162,7 +126,6 @@ const Dashboard = () => {
       setRaw("");
       setSourcesInput("");
       setHintsInput("");
-      posts.refetch();
     } catch (e) {
       toast({
         title: "Publish failed",
@@ -360,7 +323,7 @@ const Dashboard = () => {
                         (e.metaKey || e.ctrlKey) &&
                         e.key === "Enter" &&
                         raw.trim() &&
-                        !publish.isPending
+                        !composer.isPublishing
                       ) {
                         e.preventDefault();
                         onPost();
@@ -469,9 +432,7 @@ const Dashboard = () => {
                         setHintsInput("");
                       }}
                       disabled={
-                        publish.isPending ||
-                        crossPost.isPending ||
-                        styling.isPending
+                        composer.isPublishing || composer.isStyling
                       }
                     >
                       Discard
@@ -481,9 +442,8 @@ const Dashboard = () => {
                         variant="outline"
                         onClick={onStyle}
                         disabled={
-                          styling.isPending ||
-                          publish.isPending ||
-                          crossPost.isPending ||
+                          composer.isStyling ||
+                          composer.isPublishing ||
                           !raw.trim() ||
                           !walletSeed
                         }
@@ -493,7 +453,7 @@ const Dashboard = () => {
                             : "Rewrite the idea in the persona's voice (PPQ chat)"
                         }
                       >
-                        {styling.isPending ? (
+                        {composer.isStyling ? (
                           <>
                             <Loader2
                               className="mr-2 size-4 animate-spin"
@@ -515,14 +475,13 @@ const Dashboard = () => {
                         variant="outline"
                         onClick={onPost}
                         disabled={
-                          publish.isPending ||
-                          crossPost.isPending ||
-                          styling.isPending ||
+                          composer.isPublishing ||
+                          composer.isStyling ||
                           !raw.trim()
                         }
                         title="Publish a text-only kind 1 note (no video)"
                       >
-                        {publish.isPending || crossPost.isPending ? (
+                        {composer.isPublishing ? (
                           <>
                             <Loader2
                               className="mr-2 size-4 animate-spin"
