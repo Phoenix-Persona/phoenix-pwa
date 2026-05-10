@@ -31,6 +31,7 @@ import { BlossomServerListManager } from "@/components/BlossomServerListManager"
 import { ChangePassphraseDialog } from "@/components/ChangePassphraseDialog";
 import { DownloadBackupDialog } from "@/components/DownloadBackupDialog";
 import { FlagStripe } from "@/components/ImigongoBand";
+import { PersonaStatsBadge } from "@/components/PersonaStatsBadge";
 import { RelayListManager } from "@/components/RelayListManager";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLoggedInAccounts } from "@/hooks/useLoggedInAccounts";
-import { useMyPersonas } from "@/hooks/usePersona";
+import { useMyPersonas, usePersonaActivityStats } from "@/hooks/usePersona";
 import { useDeletePersona } from "@/hooks/useDeletePersona";
 import { useToast } from "@/hooks/useToast";
 import {
@@ -63,6 +64,8 @@ const Settings = () => {
   const { logins, removeLogin } = useNostrLogin();
   const { currentUser } = useLoggedInAccounts();
   const personas = useMyPersonas();
+  const personaPubkeys = personas.data?.map((p) => p.envelope.persona.pubkey);
+  const personaStats = usePersonaActivityStats(personaPubkeys);
   const deletePersona = useDeletePersona();
   const { toast } = useToast();
 
@@ -297,11 +300,15 @@ const Settings = () => {
                       <li key={event.id}>
                         <Card className="border-imigongo-clay/20 overflow-hidden">
                           <CardContent className="p-5 flex items-center gap-4 flex-wrap">
-                            <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex-1 min-w-0 space-y-1.5">
                               <p className="font-display text-lg font-medium tracking-tight">
                                 {persona.name}
                               </p>
-                              <div className="flex flex-wrap gap-1.5">
+                              <PersonaStatsBadge
+                                stats={personaStats.data?.get(persona.pubkey)}
+                                loading={personaStats.isLoading}
+                              />
+                              <div className="flex flex-wrap gap-1.5 pt-0.5">
                                 {persona.tags.slice(0, 3).map((t) => (
                                   <Badge
                                     key={t}

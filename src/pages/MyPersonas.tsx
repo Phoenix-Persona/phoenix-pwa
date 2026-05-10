@@ -6,16 +6,21 @@ import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
 import { PersonaActionsMenu } from "@/components/PersonaActionsMenu";
 import { PersonaGridSkeleton } from "@/components/Skeletons";
+import { PersonaStatsBadge } from "@/components/PersonaStatsBadge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useMyPersonas } from "@/hooks/usePersona";
+import { useMyPersonas, usePersonaActivityStats } from "@/hooks/usePersona";
 
 const MyPersonas = () => {
   useSeoMeta({ title: "My personas — Feniksi" });
   const { user } = useCurrentUser();
   const { data, isLoading, isError, error } = useMyPersonas();
+  // Batched activity query keyed on the union of persona pubkeys —
+  // single round-trip covers every card in the grid.
+  const personaPubkeys = data?.map((d) => d.envelope.persona.pubkey);
+  const stats = usePersonaActivityStats(personaPubkeys);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -141,6 +146,10 @@ const MyPersonas = () => {
                       <h3 className="font-display text-2xl font-medium tracking-tight group-hover:text-primary transition-colors leading-tight">
                         {persona.name}
                       </h3>
+                      <PersonaStatsBadge
+                        stats={stats.data?.get(persona.pubkey)}
+                        loading={stats.isLoading}
+                      />
                       <div className="flex flex-wrap gap-1.5 pt-1">
                         {persona.languages.slice(0, 3).map((l) => (
                           <Badge
