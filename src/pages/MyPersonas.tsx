@@ -26,47 +26,40 @@ const MyPersonas = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <AppHeader />
 
-      {/* Cover band — charcoal mat with bold pattern + warm glow */}
-      <section className="relative overflow-hidden hero-mat text-imigongo-cream">
-        <div
-          className="absolute inset-0 imigongo-pattern-bold text-imigongo-cream opacity-[0.05] pointer-events-none"
-          aria-hidden="true"
-        />
-        <div className="container relative py-12 md:py-16 max-w-5xl">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="space-y-3">
-              <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
-                <span className="h-px w-8 bg-rw-gold" />
-                Your voices
-              </p>
-              <h1 className="font-display text-4xl md:text-5xl font-medium tracking-tight">
-                My personas
-              </h1>
-              <p className="text-imigongo-cream/80 max-w-2xl leading-relaxed">
-                Every voice you operate. Persona configurations are encrypted to
-                your Nostr key — only you can operate them. Sign in on any
-                device with the same key to recover them.
-              </p>
-            </div>
-            <Button
-              asChild
-              size="lg"
-              className="rounded-full px-6 bg-rw-gold text-imigongo-charcoal hover:bg-rw-gold/90 shadow-xl shadow-rw-gold/30"
-            >
-              <Link to="/onboard">
-                <Plus className="mr-2 size-4" />
-                New persona
-              </Link>
-            </Button>
+      <main id="main-content" className="flex-1">
+        {/* Cover band — charcoal mat with bold pattern (matches Settings/Verify) */}
+        <section className="relative overflow-hidden hero-mat text-imigongo-cream">
+          <div
+            className="absolute inset-0 imigongo-pattern-bold text-imigongo-cream opacity-[0.05] pointer-events-none"
+            aria-hidden="true"
+          />
+          <div className="container relative py-10 md:py-14 max-w-5xl space-y-2">
+            <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
+              <span className="h-px w-6 bg-rw-gold" />
+              Your voices
+            </p>
+            <h1 className="font-display text-4xl md:text-5xl font-medium tracking-tight">
+              My personas
+            </h1>
           </div>
-        </div>
-        <FlagStripe height={4} />
-      </section>
+          <FlagStripe height={4} />
+        </section>
 
-      <main
-        id="main-content"
-        className="flex-1 container py-10 max-w-5xl space-y-8"
-      >
+        <div className="container py-10 max-w-5xl space-y-8">
+          {user && data && data.length > 0 && (
+            <div className="flex justify-end">
+              <Button
+                asChild
+                size="lg"
+                className="rounded-full px-6 bg-rw-gold text-imigongo-charcoal hover:bg-rw-gold/90 shadow-xl shadow-rw-gold/30"
+              >
+                <Link to="/onboard">
+                  <Plus className="mr-2 size-4" />
+                  New persona
+                </Link>
+              </Button>
+            </div>
+          )}
         {!user ? (
           <Card className="border-dashed border-imigongo-clay/30 bg-imigongo-cream/40">
             <CardContent className="py-12 px-8 text-center text-muted-foreground">
@@ -211,6 +204,7 @@ const MyPersonas = () => {
             </CardContent>
           </Card>
         )}
+        </div>
       </main>
     </div>
   );

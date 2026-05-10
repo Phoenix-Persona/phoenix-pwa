@@ -336,7 +336,7 @@
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
     font-feature-settings: "cv11", "ss01", "ss03";
-    overscroll-behavior-x: none;
+    overscroll-behavior: none;
   }
 
   h1,
@@ -346,6 +346,14 @@
     font-family: var(--font-display);
     font-feature-settings: "ss01", "ss02";
     letter-spacing: -0.015em;
+  }
+
+  /* Clip horizontal overflow from page content without affecting the
+     sticky header (which is outside #main-content). overflow: clip
+     avoids the WebKit overflow-x + sticky-positioning bug because it
+     does NOT create a scroll container. */
+  #main-content {
+    overflow: clip;
   }
 
   /* Brand-colored selection */
@@ -369,7 +377,7 @@
   html {
     scrollbar-width: none;
     -ms-overflow-style: none;
-    overscroll-behavior-x: none;
+    overscroll-behavior: none;
   }
   html::-webkit-scrollbar {
     display: none;
