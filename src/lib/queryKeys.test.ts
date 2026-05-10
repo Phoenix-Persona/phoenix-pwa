@@ -23,4 +23,33 @@ describe("queryKeys", () => {
     expect(queryKeys.nostr.authors()).toEqual(["nostr", "author"]);
     expect(queryKeys.ppq.allBalances()).toEqual(["ppq", "balance"]);
   });
+
+  it("scopes PPQ account cache entries by operator", () => {
+    expect(queryKeys.ppq.account("operator-a")).toEqual([
+      "ppq",
+      "account",
+      "operator-a",
+    ]);
+    expect(queryKeys.ppq.allAccounts()).toEqual(["ppq", "account"]);
+  });
+
+  it("scopes PPQ account-adjacent caches by credit id", () => {
+    expect(queryKeys.ppq.topup("credit-a", "invoice-a")).toEqual([
+      "ppq",
+      "topup",
+      "credit-a",
+      "invoice-a",
+    ]);
+    expect(queryKeys.ppq.nwcAutoTopup("credit-a")).toEqual([
+      "ppq",
+      "nwc-auto-topup",
+      "credit-a",
+    ]);
+    expect(queryKeys.ppq.video("credit-a", "video-a")).toEqual([
+      "ppq",
+      "video",
+      "credit-a",
+      "video-a",
+    ]);
+  });
 });

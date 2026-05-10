@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => {
     envelope: undefined as { ppq?: PpqAccount } | undefined,
     event: undefined as unknown,
     ensureWithPpq: vi.fn(),
+    isLoading: false,
+    refetch: vi.fn(),
   };
 
   return {
@@ -28,6 +30,9 @@ const mocks = vi.hoisted(() => {
     }),
     setStored(account: PpqAccount | null) {
       stored = account;
+    },
+    currentUser: {
+      user: { pubkey: "operator-pubkey" } as { pubkey: string } | undefined,
     },
   };
 });
@@ -53,6 +58,10 @@ vi.mock("./useOperatorEnvelope", () => ({
   useOperatorEnvelope: () => mocks.operator,
 }));
 
+vi.mock("./useCurrentUser", () => ({
+  useCurrentUser: () => mocks.currentUser,
+}));
+
 function wrapper({ children }: PropsWithChildren) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -63,9 +72,12 @@ function wrapper({ children }: PropsWithChildren) {
 describe("usePpqAccount", () => {
   beforeEach(() => {
     mocks.setStored(null);
+    mocks.currentUser.user = { pubkey: "operator-pubkey" };
     mocks.operator.envelope = undefined;
     mocks.operator.event = undefined;
+    mocks.operator.isLoading = false;
     mocks.operator.ensureWithPpq.mockReset().mockResolvedValue(undefined);
+    mocks.operator.refetch.mockReset().mockResolvedValue({ data: null });
     mocks.createAccount.mockReset();
     mocks.getBalance.mockReset().mockResolvedValue({ balance_usd: 0, raw: {} });
     mocks.readEnv.mockReset().mockReturnValue(undefined);
@@ -88,35 +100,60 @@ describe("usePpqAccount", () => {
     expect(mocks.save).toHaveBeenCalledWith(fresh);
   });
 
-  it("clears the local account from query state when signOut is called", async () => {
-    const cached = { api_key: "api-cached", credit_id: "credit-cached" };
-    mocks.setStored(cached);
+  it("clears local PPQ storage without deleting the operator envelope account", async () => {
+    const operatorAccount = {
+      api_key: "api-operator",
+      credit_id: "credit-operator",
+    };
+    mocks.operator.envelope = { ppq: operatorAccount };
 
     const { result } = renderHook(() => usePpqAccount(), { wrapper });
 
-    await waitFor(() => expect(result.current.account).toEqual(cached));
+    await waitFor(() => expect(result.current.account).toEqual(operatorAccount));
 
     act(() => {
       result.current.signOut();
     });
 
-    await waitFor(() => expect(result.current.account).toBeNull());
+    await waitFor(() => expect(result.current.account).toEqual(operatorAccount));
     expect(mocks.clear).toHaveBeenCalled();
   });
 
-  it("lifts a cached account into the operator envelope without blocking reads", async () => {
+  it("does not attach a cached account to a different operator", async () => {
     const cached = { api_key: "api-cached", credit_id: "credit-cached" };
+    const fresh = { api_key: "api-new", credit_id: "credit-new" };
     mocks.setStored(cached);
     mocks.operator.event = { id: "operator-event" };
+    mocks.createAccount.mockResolvedValue(fresh);
 
     const { result } = renderHook(() => usePpqAccount(), { wrapper });
 
-    await waitFor(() => expect(result.current.account).toEqual(cached));
+    await waitFor(() => expect(result.current.account).toBeNull());
 
     await act(async () => {
-      await expect(result.current.ensureAccount()).resolves.toEqual(cached);
+      await expect(result.current.ensureAccount()).resolves.toEqual(fresh);
     });
 
-    expect(mocks.operator.ensureWithPpq).toHaveBeenCalledWith(cached);
+    expect(mocks.operator.ensureWithPpq).toHaveBeenCalledWith(fresh);
+    expect(mocks.operator.ensureWithPpq).not.toHaveBeenCalledWith(cached);
+  });
+
+  it("waits for the operator envelope before minting a PPQ account", async () => {
+    const operatorAccount = {
+      api_key: "api-operator",
+      credit_id: "credit-operator",
+    };
+    mocks.operator.isLoading = true;
+    mocks.operator.refetch.mockResolvedValue({
+      data: { envelope: { ppq: operatorAccount } },
+    });
+
+    const { result } = renderHook(() => usePpqAccount(), { wrapper });
+
+    await act(async () => {
+      await expect(result.current.ensureAccount()).resolves.toEqual(operatorAccount);
+    });
+
+    expect(mocks.createAccount).not.toHaveBeenCalled();
   });
 });

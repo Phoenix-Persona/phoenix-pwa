@@ -34,14 +34,20 @@ export const queryKeys = {
       ["phoenix-operator-envelope", pubkey] as const,
   },
   ppq: {
-    account: () => ["ppq", "account"] as const,
+    account: (operatorPubkey: string | undefined) =>
+      ["ppq", "account", operatorPubkey ?? ""] as const,
+    allAccounts: () => ["ppq", "account"] as const,
     balance: (creditId: string | undefined) => ["ppq", "balance", creditId] as const,
     allBalances: () => ["ppq", "balance"] as const,
     queryHistory: (creditId: string | undefined) =>
       ["ppq", "query-history", creditId ?? ""] as const,
-    topup: (invoiceId: string | null | undefined) =>
-      ["ppq", "topup", invoiceId] as const,
-    nwcAutoTopup: () => ["ppq", "nwc-auto-topup"] as const,
-    video: (id: string | undefined) => ["ppq", "video", id] as const,
+    topup: (
+      creditId: string | undefined,
+      invoiceId: string | null | undefined,
+    ) => ["ppq", "topup", creditId ?? "", invoiceId] as const,
+    nwcAutoTopup: (creditId: string | undefined) =>
+      ["ppq", "nwc-auto-topup", creditId ?? ""] as const,
+    video: (creditId: string | undefined, id: string | undefined) =>
+      ["ppq", "video", creditId ?? "", id] as const,
   },
 } as const;

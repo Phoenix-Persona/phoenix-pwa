@@ -25,7 +25,6 @@ import { useMutation, useQuery, type UseMutationResult } from "@tanstack/react-q
 
 import {
   connectNwcAutoTopup,
-  createAccount,
   createTopupInvoice,
   disconnectNwcAutoTopup,
   extractBolt11,
@@ -35,7 +34,6 @@ import {
   isTopupSettled,
   isTopupExpired,
 } from "@/lib/ppq/client";
-import { ppqAccountStore } from "@/lib/ppq/storage";
 import { queryKeys } from "@/lib/queryKeys";
 import type {
   PpqNwcConnectRequest,
@@ -44,14 +42,7 @@ import type {
   PpqTopupMethod,
   PpqTopupStatusResponse,
 } from "@/lib/ppq/types";
-
-async function ensureAccountForCall() {
-  const existing = ppqAccountStore.load();
-  if (existing) return existing;
-  const fresh = await createAccount();
-  ppqAccountStore.save(fresh);
-  return fresh;
-}
+import { usePpqAccount } from "./usePpqAccount";
 
 export interface PpqTopupVars {
   amount: number;
@@ -71,9 +62,11 @@ export function usePpqLightningTopup(): UseMutationResult<
   Error,
   PpqTopupVars
 > {
+  const { ensureAccount } = usePpqAccount();
+
   return useMutation({
     mutationFn: async ({ amount, currency = "USD", method = "btc-lightning" }) => {
-      const { api_key } = await ensureAccountForCall();
+      const { api_key } = await ensureAccount();
       const invoice = await createTopupInvoice(api_key, method, amount, currency);
       return {
         invoice,
@@ -91,14 +84,15 @@ export function usePpqTopupStatus(
   invoiceId: string | undefined,
   intervalMs = 3_000,
 ) {
+  const { account } = usePpqAccount();
+
   const query = useQuery<PpqTopupStatusResponse>({
-    queryKey: queryKeys.ppq.topup(invoiceId),
-    enabled: Boolean(invoiceId),
+    queryKey: queryKeys.ppq.topup(account?.credit_id, invoiceId),
+    enabled: Boolean(invoiceId && account?.api_key),
     queryFn: async ({ signal }) => {
       if (!invoiceId) throw new Error("missing invoice id");
-      const acct = ppqAccountStore.load();
-      if (!acct) throw new Error("no ppq account");
-      return getTopupStatus(acct.api_key, invoiceId, { signal });
+      if (!account) throw new Error("no ppq account");
+      return getTopupStatus(account.api_key, invoiceId, { signal });
     },
     refetchInterval: (q) => {
       if (isTopupTerminal(q.state.data?.status)) return false;
@@ -118,19 +112,20 @@ export function usePpqTopupStatus(
 /* ---------- NWC (Nostr Wallet Connect) auto-topup ---------- */
 
 export function usePpqNwcAutoTopup() {
+  const { account, ensureAccount } = usePpqAccount();
+
   const settings = useQuery<PpqNwcSettings>({
-    queryKey: queryKeys.ppq.nwcAutoTopup(),
+    queryKey: queryKeys.ppq.nwcAutoTopup(account?.credit_id),
     queryFn: async ({ signal }) => {
-      const acct = ppqAccountStore.load();
-      if (!acct) throw new Error("no ppq account");
-      return getNwcAutoTopup(acct.credit_id, { signal });
+      if (!account) throw new Error("no ppq account");
+      return getNwcAutoTopup(account.credit_id, { signal });
     },
-    enabled: Boolean(ppqAccountStore.load()?.credit_id),
+    enabled: Boolean(account?.credit_id),
   });
 
   const connect = useMutation<PpqNwcSettings, Error, PpqNwcConnectRequest>({
     mutationFn: async (req) => {
-      const { credit_id } = await ensureAccountForCall();
+      const { credit_id } = await ensureAccount();
       return connectNwcAutoTopup(credit_id, req);
     },
     onSuccess: () => settings.refetch(),
@@ -138,9 +133,8 @@ export function usePpqNwcAutoTopup() {
 
   const disconnect = useMutation<void, Error, void>({
     mutationFn: async () => {
-      const acct = ppqAccountStore.load();
-      if (!acct) return;
-      await disconnectNwcAutoTopup(acct.credit_id);
+      if (!account) return;
+      await disconnectNwcAutoTopup(account.credit_id);
     },
     onSuccess: () => settings.refetch(),
   });

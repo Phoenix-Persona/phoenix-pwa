@@ -20,7 +20,7 @@ export function usePpqImage(): UseMutationResult<
   Error,
   PpqImageRequest
 > {
-  // Resolution lives in usePpqAccount: env > operator envelope > cache > mint.
+  // Resolution lives in usePpqAccount: env > operator envelope > mint.
   const { account, ensureAccount } = usePpqAccount();
 
   return useMutation({

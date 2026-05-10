@@ -42,13 +42,13 @@ function isValidNsec(value: string): boolean {
 }
 
 export function DevAutoLogin() {
-  const { authors } = useLoggedInAccounts();
+  const { currentUser } = useLoggedInAccounts();
   const actions = useLoginActions();
   const ran = useRef(false);
 
   useEffect(() => {
     if (ran.current) return;
-    if (authors.length > 0) return;
+    if (currentUser) return;
 
     const candidate = readEnv("VITE_APP_USER_NSEC");
     if (!candidate || !isValidNsec(candidate)) return;
@@ -61,7 +61,7 @@ export function DevAutoLogin() {
       // back to the manual AuthDialog flow.
       console.warn("[DevAutoLogin] auto-login failed:", err);
     }
-  }, [authors, actions]);
+  }, [currentUser, actions]);
 
   return null;
 }
