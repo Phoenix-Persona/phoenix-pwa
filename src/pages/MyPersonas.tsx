@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
-import { Plus, Sparkles } from "lucide-react";
+import { LayoutDashboard, Plus, Radio, Sparkles } from "lucide-react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
@@ -27,7 +27,7 @@ const MyPersonas = () => {
       <AppHeader />
 
       <main id="main-content" className="flex-1">
-        {/* Cover band — charcoal mat with bold pattern (matches Settings/Verify) */}
+        {/* Cover band — charcoal mat with bold pattern (matches Settings) */}
         <section className="relative overflow-hidden hero-mat text-imigongo-cream">
           <div
             className="absolute inset-0 imigongo-pattern-bold text-imigongo-cream opacity-[0.05] pointer-events-none"
@@ -89,11 +89,11 @@ const MyPersonas = () => {
               return (
                 <article
                   key={event.id}
-                  className="group relative rounded-2xl border border-border bg-card hover:border-imigongo-clay/60 hover:shadow-2xl hover:shadow-imigongo-clay/20 transition-all overflow-hidden"
+                  className="group relative flex flex-col rounded-2xl border border-border bg-card hover:border-imigongo-clay/60 hover:shadow-2xl hover:shadow-imigongo-clay/20 transition-all overflow-hidden"
                 >
                   <Link
                     to={`/dashboard/${npub}`}
-                    className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl"
+                    className="block flex-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-t-2xl"
                   >
                     {/* Color cap header */}
                     <div className={`relative h-24 bg-gradient-to-br ${accent} overflow-hidden`}>
@@ -140,6 +140,30 @@ const MyPersonas = () => {
                       />
                     </div>
                   </Link>
+
+                  <div className="grid grid-cols-2 gap-2 border-t border-border/70 bg-muted/20 p-3">
+                    <Button
+                      asChild
+                      size="sm"
+                      className="h-8 rounded-full px-3 text-xs"
+                    >
+                      <Link to={`/dashboard/${npub}`}>
+                        <LayoutDashboard className="mr-1.5 size-3.5" />
+                        Dashboard
+                      </Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-full px-3 text-xs"
+                    >
+                      <Link to={`/p/${npub}`}>
+                        <Radio className="mr-1.5 size-3.5" />
+                        Public feed
+                      </Link>
+                    </Button>
+                  </div>
 
                   {/* Sibling of <Link>, not nested — clicks don't bubble. */}
                   <div className="absolute top-3 right-3 z-10">

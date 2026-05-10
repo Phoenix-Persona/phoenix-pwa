@@ -53,14 +53,14 @@ function buildConfig(
 }
 
 /**
- * The Breez Spark `LnurlInfo.lnurl` field is the static LNURL-pay string.
- * Returns undefined if the SDK didn't populate it (e.g. no Lightning
- * Address registered yet).
+ * The Breez Spark `LnurlInfo.bech32` field is the static LNURL-pay string —
+ * what wallets accept on paste / encode as a QR. Returns undefined if the
+ * SDK didn't populate it (e.g. no Lightning Address registered yet).
  */
 function extractLnurlPay(info: LightningAddressInfo | undefined): string | undefined {
   const lnurl = info?.lnurl as unknown;
   if (lnurl && typeof lnurl === "object") {
-    const value = (lnurl as Record<string, unknown>).lnurl;
+    const value = (lnurl as Record<string, unknown>).bech32;
     if (typeof value === "string" && value.toLowerCase().startsWith("lnurl")) {
       return value;
     }

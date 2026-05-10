@@ -1,7 +1,7 @@
-import { useMemo } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
-import { ShieldCheck } from "lucide-react";
+import { Copy, QrCode, Zap } from "lucide-react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { ImigongoSeal } from "@/components/ImigongoBand";
@@ -9,19 +9,35 @@ import { PersonaHero } from "@/components/persona/PersonaHero";
 import { PostCard } from "@/components/PostCard";
 import { PostListSkeleton } from "@/components/Skeletons";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { QRCodeCanvas } from "@/components/ui/qrcode";
+import { useAppContext } from "@/hooks/useAppContext";
 import { useAuthor } from "@/hooks/useAuthor";
 import { usePersonaPosts } from "@/hooks/usePersona";
+import { useToast } from "@/hooks/useToast";
 import { genUserName } from "@/lib/genUserName";
 import { npubToHex } from "@/lib/nostrIds";
+import { encodePubkeyAsNprofile } from "@/lib/nostrViewer";
 import { sanitizeHttpUrl } from "@/lib/url";
+
+const NPROFILE_RELAY_HINT_LIMIT = 3;
 
 const PersonaFeed = () => {
   const { npub = "" } = useParams();
   const personaHex = useMemo(() => npubToHex(npub), [npub]);
   const author = useAuthor(personaHex ?? undefined);
   const posts = usePersonaPosts(npub, 50);
+  const { toast } = useToast();
+  const { config } = useAppContext();
+  const [donateOpen, setDonateOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
 
   const displayName =
     author.data?.metadata?.display_name ??
@@ -29,6 +45,33 @@ const PersonaFeed = () => {
     (personaHex ? genUserName(personaHex) : "Unknown persona");
   const bio = author.data?.metadata?.about ?? "";
   const picture = sanitizeHttpUrl(author.data?.metadata?.picture);
+  const lud16 = author.data?.metadata?.lud16;
+  const donateUri = lud16 ? `lightning:${lud16}` : null;
+
+  const relayHints = useMemo(
+    () =>
+      config.relayMetadata.relays
+        .filter((r) => r.write)
+        .slice(0, NPROFILE_RELAY_HINT_LIMIT)
+        .map((r) => r.url),
+    [config.relayMetadata.relays],
+  );
+  const nprofile = useMemo(
+    () => (personaHex ? encodePubkeyAsNprofile(personaHex, relayHints) : null),
+    [personaHex, relayHints],
+  );
+
+  function copyLud16() {
+    if (!lud16) return;
+    navigator.clipboard.writeText(lud16);
+    toast({ title: "Lightning Address copied" });
+  }
+
+  function copyNprofile() {
+    if (!nprofile) return;
+    navigator.clipboard.writeText(nprofile);
+    toast({ title: "nprofile copied" });
+  }
 
   useSeoMeta({
     title: `${displayName} — Zuka`,
@@ -60,23 +103,28 @@ const PersonaFeed = () => {
             avatarSize="public"
             badges={
               <div className="flex flex-wrap gap-2 pt-1 items-center">
-                <Badge
-                  variant="secondary"
-                  className="font-mono text-[10px] bg-imigongo-cream/15 text-imigongo-cream border-0"
-                >
-                  {npub.slice(0, 16)}…
-                </Badge>
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="rounded-full border-imigongo-cream/30 text-imigongo-cream bg-transparent hover:bg-imigongo-cream/10 hover:text-imigongo-cream"
-                >
-                  <Link to={`/verify/${npub}`}>
-                    <ShieldCheck className="mr-2 size-4" />
-                    Verify
-                  </Link>
-                </Button>
+                {lud16 ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDonateOpen(true)}
+                    className="rounded-full border-rw-gold/40 text-rw-gold bg-transparent hover:bg-rw-gold/10 hover:text-rw-gold"
+                  >
+                    <Zap className="mr-2 size-4" aria-hidden="true" />
+                    Donate
+                  </Button>
+                ) : null}
+                {nprofile ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setScanOpen(true)}
+                    className="rounded-full border-imigongo-cream/30 text-imigongo-cream bg-transparent hover:bg-imigongo-cream/10 hover:text-imigongo-cream"
+                  >
+                    <QrCode className="mr-2 size-4" aria-hidden="true" />
+                    Scan
+                  </Button>
+                ) : null}
               </div>
             }
           />
@@ -116,6 +164,76 @@ const PersonaFeed = () => {
           )}
         </section>
       </main>
+
+      <Dialog open={donateOpen} onOpenChange={setDonateOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Donate to {displayName}</DialogTitle>
+            <DialogDescription>
+              Scan the QR or copy the Lightning Address into any wallet that
+              supports LNURL-pay.
+            </DialogDescription>
+          </DialogHeader>
+          {donateUri && lud16 ? (
+            <div className="space-y-3 min-w-0">
+              <div className="flex justify-center">
+                <div className="rounded bg-white p-2">
+                  <QRCodeCanvas value={donateUri} size={224} />
+                </div>
+              </div>
+              <div className="flex items-center gap-2 min-w-0">
+                <code className="flex-1 min-w-0 text-sm bg-muted px-2 py-1 rounded truncate">
+                  {lud16}
+                </code>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={copyLud16}
+                  aria-label="Copy Lightning Address"
+                  className="shrink-0"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={scanOpen} onOpenChange={setScanOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Scan {displayName}</DialogTitle>
+            <DialogDescription>
+              Scan the QR or copy the nprofile into any Nostr client to follow
+              this persona.
+            </DialogDescription>
+          </DialogHeader>
+          {nprofile ? (
+            <div className="space-y-3 min-w-0">
+              <div className="flex justify-center">
+                <div className="rounded bg-white p-2">
+                  <QRCodeCanvas value={nprofile} size={224} />
+                </div>
+              </div>
+              <div className="flex items-center gap-2 min-w-0">
+                <code className="flex-1 min-w-0 text-[11px] font-mono bg-muted px-2 py-1 rounded truncate">
+                  {nprofile}
+                </code>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={copyNprofile}
+                  aria-label="Copy nprofile"
+                  className="shrink-0"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -122,13 +122,20 @@ export function WalletPanel({ wallet, editPersonaHref }: WalletPanelProps) {
         </p>
       </section>
 
-      {/* Lightning Address + static LNURL */}
+      {/* LNURL QR + Lightning Address */}
       <section className="space-y-2">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-          Lightning Address
-        </p>
         {lightningAddress ? (
           <>
+            {lnurlPay ? (
+              <div className="flex justify-center">
+                <div className="rounded bg-white p-2">
+                  <QRCodeCanvas value={lnurlPay} size={192} />
+                </div>
+              </div>
+            ) : null}
+            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+              Lightning Address
+            </p>
             <div className="flex items-center gap-2 min-w-0">
               <code className="text-sm bg-muted px-2 py-1 rounded truncate min-w-0">
                 {lightningAddress}
@@ -151,7 +158,7 @@ export function WalletPanel({ wallet, editPersonaHref }: WalletPanelProps) {
                   className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
-                  {showLnurl ? "Hide LNURL / QR" : "Show LNURL / QR"}
+                  {showLnurl ? "Hide LNURL string" : "Show LNURL string"}
                   {showLnurl ? (
                     <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
                   ) : (
@@ -160,11 +167,6 @@ export function WalletPanel({ wallet, editPersonaHref }: WalletPanelProps) {
                 </button>
                 {showLnurl ? (
                   <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
-                    <div className="flex justify-center">
-                      <div className="rounded bg-white p-2">
-                        <QRCodeCanvas value={lnurlPay} size={192} />
-                      </div>
-                    </div>
                     <div className="flex items-center gap-2 min-w-0">
                       <code className="flex-1 min-w-0 text-[10px] font-mono bg-background px-2 py-1 rounded truncate">
                         {lnurlPay}
@@ -180,9 +182,9 @@ export function WalletPanel({ wallet, editPersonaHref }: WalletPanelProps) {
                       </Button>
                     </div>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Scan the QR or paste the bech32 LNURL into any wallet
-                      that supports LNURL-pay — same destination as the
-                      Lightning Address above.
+                      Paste this bech32 string into any wallet that supports
+                      LNURL-pay — same destination as the QR and Lightning
+                      Address above.
                     </p>
                   </div>
                 ) : null}
@@ -190,20 +192,30 @@ export function WalletPanel({ wallet, editPersonaHref }: WalletPanelProps) {
             ) : null}
           </>
         ) : editPersonaHref ? (
-          <p className="text-sm text-muted-foreground">
-            No Lightning Address yet. Set a username on the{" "}
-            <Link
-              to={editPersonaHref}
-              className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
-            >
-              Edit persona
-            </Link>{" "}
-            page to register one.
-          </p>
+          <>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+              Lightning Address
+            </p>
+            <p className="text-sm text-muted-foreground">
+              No Lightning Address yet. Set a username on the{" "}
+              <Link
+                to={editPersonaHref}
+                className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+              >
+                Edit persona
+              </Link>{" "}
+              page to register one.
+            </p>
+          </>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            Not registered yet. Use Receive to generate an invoice instead.
-          </p>
+          <>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+              Lightning Address
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Not registered yet. Use Receive to generate an invoice instead.
+            </p>
+          </>
         )}
       </section>
 

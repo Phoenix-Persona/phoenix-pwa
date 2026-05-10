@@ -5,6 +5,7 @@ import {
   buildEventUrl,
   DEFAULT_NOSTR_VIEWER_URL,
   encodeEventAsNevent,
+  encodePubkeyAsNprofile,
   findPresetByUrl,
   NOSTR_VIEWER_PRESETS,
   truncateNevent,
@@ -69,6 +70,32 @@ describe("encodeEventAsNevent", () => {
     const decoded = nip19.decode(nevent);
     expect(decoded.type).toBe("nevent");
     if (decoded.type === "nevent") {
+      expect(decoded.data.relays).toEqual(relays);
+    }
+  });
+});
+
+describe("encodePubkeyAsNprofile", () => {
+  it("encodes a pubkey into a decodable nprofile", () => {
+    const pubkey = "c".repeat(64);
+    const nprofile = encodePubkeyAsNprofile(pubkey);
+
+    expect(nprofile.startsWith("nprofile1")).toBe(true);
+    const decoded = nip19.decode(nprofile);
+    expect(decoded.type).toBe("nprofile");
+    if (decoded.type === "nprofile") {
+      expect(decoded.data.pubkey).toBe(pubkey);
+    }
+  });
+
+  it("includes relay hints when provided", () => {
+    const pubkey = "c".repeat(64);
+    const relays = ["wss://relay.damus.io", "wss://nos.lol"];
+    const nprofile = encodePubkeyAsNprofile(pubkey, relays);
+
+    const decoded = nip19.decode(nprofile);
+    expect(decoded.type).toBe("nprofile");
+    if (decoded.type === "nprofile") {
       expect(decoded.data.relays).toEqual(relays);
     }
   });
