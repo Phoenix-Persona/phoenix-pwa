@@ -209,6 +209,7 @@ export function AppHeader() {
       {operatorWallet.seed ? (
         <WalletDialog
           wallet={operatorWallet.wallet}
+          walletScope="operator"
           open={walletOpen}
           onOpenChange={setWalletOpen}
           personaName="Operator"

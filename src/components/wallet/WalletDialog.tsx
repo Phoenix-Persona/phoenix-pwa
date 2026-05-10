@@ -18,6 +18,7 @@ interface WalletDialogProps {
   wallet: UseWalletResult;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  walletScope?: "persona" | "operator";
   personaName?: string;
   /** Forwarded to WalletPanel — see its prop docs. */
   editPersonaHref?: string;
@@ -28,10 +29,16 @@ export function WalletDialog({
   wallet,
   open,
   onOpenChange,
+  walletScope = "persona",
   personaName,
   editPersonaHref,
   onAutoTopupSave,
 }: WalletDialogProps) {
+  const description =
+    walletScope === "operator"
+      ? "Operator Spark Lightning wallet. Use it to fund AI credits and send or receive sats."
+      : "This persona's Spark Lightning wallet. Donations land here; AI inference is paid from here automatically.";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="grid max-h-[min(90vh,760px)] max-w-lg grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
@@ -39,10 +46,7 @@ export function WalletDialog({
           <DialogTitle>
             {personaName ? `${personaName}'s wallet` : "Wallet"}
           </DialogTitle>
-          <DialogDescription>
-            This persona's Spark Lightning wallet. Donations land here; AI
-            inference is paid from here automatically.
-          </DialogDescription>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <div
           data-testid="wallet-dialog-body"
@@ -50,6 +54,7 @@ export function WalletDialog({
         >
           <WalletPanel
             wallet={wallet}
+            walletScope={walletScope}
             editPersonaHref={editPersonaHref}
             onAutoTopupSave={onAutoTopupSave}
           />

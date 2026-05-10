@@ -281,9 +281,37 @@ describe("WalletPanel", () => {
     expect(screen.getByText("$0.0123")).toBeInTheDocument();
     expect(screen.queryByText(/1,500 sats/i)).not.toBeInTheDocument();
   });
+
+  it("hides Lightning Address details for the operator wallet", () => {
+    renderWallet(makeWallet(), { walletScope: "operator" });
+
+    expect(screen.getByText("12,345 sats")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /receive/i })).toBeInTheDocument();
+    expect(screen.queryByText("Lightning Address")).not.toBeInTheDocument();
+    expect(screen.queryByText("voice@breez.tips")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("qr-code")).not.toBeInTheDocument();
+  });
 });
 
 describe("WalletDialog", () => {
+  it("uses operator-specific description copy for the operator wallet", () => {
+    render(
+      <MemoryRouter>
+        <WalletDialog
+          wallet={makeWallet()}
+          walletScope="operator"
+          open
+          onOpenChange={vi.fn()}
+          personaName="Operator"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Operator's wallet")).toBeInTheDocument();
+    expect(screen.getByText(/operator Spark Lightning wallet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/donations land here/i)).not.toBeInTheDocument();
+  });
+
   it("bounds wallet content to a scrollable dialog body", () => {
     render(
       <MemoryRouter>

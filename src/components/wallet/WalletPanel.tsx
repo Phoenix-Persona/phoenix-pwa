@@ -5,7 +5,7 @@
  *
  * Sections:
  *   - Balance (sats + USD where available)
- *   - Lightning Address (copy + LNURL/QR toggle)
+ *   - Lightning Address for persona wallets (copy + LNURL/QR toggle)
  *   - Receive / Send buttons (open child dialogs)
  *   - PPQ credits + auto-topup state
  *   - Recent payments
@@ -42,6 +42,7 @@ import { SendDialog } from "./SendDialog";
 
 interface WalletPanelProps {
   wallet: UseWalletResult;
+  walletScope?: "persona" | "operator";
   /**
    * When provided AND the wallet has no Lightning Address registered,
    * the missing-address state renders a hint linking here so the user
@@ -81,6 +82,7 @@ function fmtHistoryTime(ts: string | undefined): string {
 
 export function WalletPanel({
   wallet,
+  walletScope = "persona",
   editPersonaHref,
   onAutoTopupSave,
 }: WalletPanelProps) {
@@ -109,6 +111,7 @@ export function WalletPanel({
   const [isSavingAutoTopup, setIsSavingAutoTopup] = useState(false);
 
   const balanceSats = wallet.info?.balanceSats;
+  const showLightningAddress = walletScope === "persona";
   const lightningAddress = wallet.info?.lightningAddress;
   const lnurlPay = wallet.info?.lnurlPay;
 
@@ -224,62 +227,14 @@ export function WalletPanel({
             </p>
           </section>
 
-          {/* LNURL QR + Lightning Address */}
-          <section className="space-y-2">
-            {lightningAddress ? (
-              <>
-                {lnurlPay ? (
-                  <div className="flex justify-center">
-                    <div className="rounded bg-white p-2">
-                      <QRCodeCanvas value={lnurlPay} size={192} />
-                    </div>
-                  </div>
-                ) : null}
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                  Lightning Address
-                </p>
-                <div className="flex items-center gap-2 min-w-0">
-                  <code className="text-sm bg-muted px-2 py-1 rounded truncate min-w-0">
-                    {lightningAddress}
-                  </code>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={copyAddress}
-                    aria-label="Copy Lightning Address"
-                    className="shrink-0"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </>
-            ) : editPersonaHref ? (
-              <>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                  Lightning Address
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  No Lightning Address yet. Set a username on the{" "}
-                  <Link
-                    to={editPersonaHref}
-                    className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
-                  >
-                    Edit persona
-                  </Link>{" "}
-                  page to register one.
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                  Lightning Address
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Not registered yet. Use Receive to generate an invoice instead.
-                </p>
-              </>
-            )}
-          </section>
+          {showLightningAddress ? (
+            <LightningAddressSection
+              lightningAddress={lightningAddress}
+              lnurlPay={lnurlPay}
+              editPersonaHref={editPersonaHref}
+              onCopy={copyAddress}
+            />
+          ) : null}
 
           {/* Actions */}
           <section className="grid grid-cols-2 gap-2">
@@ -494,6 +449,76 @@ export function WalletPanel({
       />
       <SendDialog wallet={wallet} open={sendOpen} onOpenChange={setSendOpen} />
     </div>
+  );
+}
+
+function LightningAddressSection({
+  lightningAddress,
+  lnurlPay,
+  editPersonaHref,
+  onCopy,
+}: {
+  lightningAddress: string | undefined;
+  lnurlPay: string | undefined;
+  editPersonaHref: string | undefined;
+  onCopy: () => void;
+}) {
+  return (
+    <section className="space-y-2">
+      {lightningAddress ? (
+        <>
+          {lnurlPay ? (
+            <div className="flex justify-center">
+              <div className="rounded bg-white p-2">
+                <QRCodeCanvas value={lnurlPay} size={192} />
+              </div>
+            </div>
+          ) : null}
+          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+            Lightning Address
+          </p>
+          <div className="flex items-center gap-2 min-w-0">
+            <code className="text-sm bg-muted px-2 py-1 rounded truncate min-w-0">
+              {lightningAddress}
+            </code>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onCopy}
+              aria-label="Copy Lightning Address"
+              className="shrink-0"
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+        </>
+      ) : editPersonaHref ? (
+        <>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+            Lightning Address
+          </p>
+          <p className="text-sm text-muted-foreground">
+            No Lightning Address yet. Set a username on the{" "}
+            <Link
+              to={editPersonaHref}
+              className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+            >
+              Edit persona
+            </Link>{" "}
+            page to register one.
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+            Lightning Address
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Not registered yet. Use Receive to generate an invoice instead.
+          </p>
+        </>
+      )}
+    </section>
   );
 }
 
