@@ -51,6 +51,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLoggedInAccounts } from "@/hooks/useLoggedInAccounts";
 import { useMyPersonas, usePersonaActivityStats } from "@/hooks/usePersona";
 import { useDeletePersona } from "@/hooks/useDeletePersona";
+import { impactHeavy, notificationWarning } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
 import {
   clearSessionUnlocked,
@@ -84,6 +85,7 @@ const Settings = () => {
       : null;
 
   function handleLockNow() {
+    notificationWarning();
     // Clear the Nostrify session AND the per-tab session flag. The
     // <UnlockGate> reactively computes its `needsUnlock` state from
     // `logins.length` so removing the login here causes the modal
@@ -105,6 +107,7 @@ const Settings = () => {
       "Forget this device? You'll need your nsec backup to sign in again on this browser. Personas survive — they're stored on relays."
     );
     if (!ok) return;
+    impactHeavy();
 
     // Clear synchronously, then hard-reload to root. Hard reload is
     // intentional — it drops Nostrify's in-memory login state, the

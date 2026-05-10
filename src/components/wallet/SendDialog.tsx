@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { notificationError, notificationSuccess } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
 import type { UseWalletResult } from "@/hooks/useWallet";
 
@@ -42,10 +43,12 @@ export function SendDialog({ wallet, open, onOpenChange }: SendDialogProps) {
     }
     try {
       await wallet.send({ paymentRequest: trimmed });
+      notificationSuccess();
       toast({ title: "Payment sent" });
       setInvoice("");
       onOpenChange(false);
     } catch (e) {
+      notificationError();
       toast({
         title: "Payment failed",
         description: e instanceof Error ? e.message : "unknown error",
