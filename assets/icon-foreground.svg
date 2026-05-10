@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+  <!-- Foreground only: rising flame inside Imigongo diamond, transparent bg.
+       Padded so the icon sits inside Android adaptive icon's 66dp safe zone. -->
+  <g transform="translate(128 128) scale(0.62) translate(-128 -128)">
+    <!-- Imigongo diamond outline -->
+    <path d="M128 28 L228 128 L128 228 L28 128 Z" stroke="#d97a2c" stroke-width="3" fill="none" opacity="0.5"/>
+    <path d="M128 60 L196 128 L128 196 L60 128 Z" stroke="#a8431b" stroke-width="2" fill="none" opacity="0.55"/>
+    <!-- Rising phoenix flame -->
+    <path d="M128 70
+             C 108 100, 96 124, 108 148
+             C 96 144, 88 132, 88 116
+             C 80 140, 84 168, 108 184
+             C 100 184, 92 178, 88 172
+             C 92 196, 112 210, 128 210
+             C 144 210, 164 196, 168 172
+             C 164 178, 156 184, 148 184
+             C 172 168, 176 140, 168 116
+             C 168 132, 160 144, 148 148
+             C 160 124, 148 100, 128 70 Z"
+          fill="url(#flame)"/>
+  </g>
+  <defs>
+    <linearGradient id="flame" x1="128" y1="70" x2="128" y2="210" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f0c060"/>
+      <stop offset="0.5" stop-color="#d97a2c"/>
+      <stop offset="1" stop-color="#a8431b"/>
+    </linearGradient>
+  </defs>
+</svg>
