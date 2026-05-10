@@ -25,6 +25,12 @@ export interface PersonaPostInput {
   tags?: string[];
   /** Source URLs that informed the post. */
   sources?: string[];
+  /**
+   * Extra raw tags to append verbatim (e.g. NIP-92 `imeta` tags from a
+   * Blossom upload). These are merged in after `t` and `r` tags so they
+   * never override topical/source attribution.
+   */
+  extraTags?: string[][];
 }
 
 export function buildPersonaPostTemplate(
@@ -44,6 +50,10 @@ export function buildPersonaPostTemplate(
 
   for (const url of input.sources ?? []) {
     if (url) tags.push(["r", url]);
+  }
+
+  for (const tag of input.extraTags ?? []) {
+    if (tag.length > 0) tags.push(tag);
   }
 
   return {

@@ -1,15 +1,33 @@
 /**
  * Dashboard — the active persona's composer + recent feed.
  *
- * The composer publishes raw text directly. AI styling (PPQ), image
- * generation, and the wallet/cost layer are Jim's surface area and
- * land separately on this page when they're ready.
+ * Compose workflow (Zuka pitch — "Step 02: Speak"):
+ *   1. User drops in an Idea + optional Sources + optional Style hints.
+ *   2. "Style in voice"  → PPQ chat rewrites the idea in the persona's voice.
+ *   3. "Generate video"  → builds a video prompt from the styled brief, submits
+ *      to PPQ (Veo 3 / Kling / Runway via usePpqVideo), polls until done, fetches
+ *      the MP4, re-uploads to Blossom, then publishes a kind 1 with NIP-92
+ *      imeta tags + source `r` tags + cross-post webhook dispatch.
+ *   4. "Publish text-only" → fallback that ships the kind 1 immediately without
+ *      video (used when wallet is empty or video gen is too slow).
+ *
+ * Ownership: Derek owns the composer shell; Jim owns the PPQ video pipeline
+ * wiring (see tasks/derek-plan.md §"Video generation"). This file merges both
+ * seams so the button is live for the first time.
  */
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
-import { FileText, Film, Loader2, Sparkles, Wand2 } from "lucide-react";
+import {
+  CheckCircle2,
+  FileText,
+  Film,
+  Loader2,
+  Sparkles,
+  Wand2,
+  XCircle,
+} from "lucide-react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
@@ -22,13 +40,16 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/useToast";
 import { useAuthor } from "@/hooks/useAuthor";
 import { useCrossPost } from "@/hooks/useCrossPost";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePersona, usePersonaPosts } from "@/hooks/usePersona";
 import { usePersonaPublish } from "@/hooks/usePersonaPublish";
-import { usePpqInference } from "@/hooks/usePpqInference";
+import { usePpqInference, getInferenceText } from "@/hooks/usePpqInference";
+import { usePpqVideoSubmit, usePpqVideoJob } from "@/hooks/usePpqVideo";
+import { useUploadFile } from "@/hooks/useUploadFile";
 import { useWallet } from "@/hooks/useWallet";
 import { buildPersonaPostTemplate } from "@/lib/personaPost";
 import { nip19 } from "nostr-tools";
@@ -43,6 +64,40 @@ function npubToHex(npub: string): string | null {
   }
 }
 
+/** Video generation progress phases shown to the user. */
+type VideoPhase =
+  | "idle"
+  | "scripting"   // PPQ chat: turning the brief into a video prompt
+  | "submitting"  // POST /v1/videos
+  | "generating"  // polling until status === "completed"
+  | "uploading"   // fetch MP4 → re-upload to Blossom
+  | "publishing"  // usePersonaPublish + optional cross-post
+  | "done"
+  | "error";
+
+const VIDEO_PHASE_LABELS: Record<VideoPhase, string> = {
+  idle: "",
+  scripting: "Writing video script…",
+  submitting: "Submitting to AI video engine…",
+  generating: "Generating video — this takes 1–3 minutes…",
+  uploading: "Uploading to decentralised storage…",
+  publishing: "Publishing to relays…",
+  done: "Video published!",
+  error: "Video generation failed",
+};
+
+/** Rough progress % per phase (for the progress bar). */
+const VIDEO_PHASE_PCT: Record<VideoPhase, number> = {
+  idle: 0,
+  scripting: 10,
+  submitting: 20,
+  generating: 60,
+  uploading: 80,
+  publishing: 90,
+  done: 100,
+  error: 0,
+};
+
 const Dashboard = () => {
   const { npub = "" } = useParams();
   useSeoMeta({ title: "Dashboard — Zuka" });
@@ -53,37 +108,157 @@ const Dashboard = () => {
   const posts = usePersonaPosts(npub, 20);
   const publish = usePersonaPublish();
   const crossPost = useCrossPost();
+  const uploadFile = useUploadFile();
 
-  // Composer fields. `raw` is the idea/draft body (legacy name kept
-  // for git-blame continuity); the new V1.5 composer also collects
-  // sources and style hints to ground the eventual AI styling +
-  // video gen — both are wired into the post template now (sources
-  // emit `r` tags) so the kind 1 carries them even before the AI
-  // pipeline is live.
+  // Composer fields.
+  const [raw, setRaw] = useState("");
   const [sourcesInput, setSourcesInput] = useState("");
   const [hintsInput, setHintsInput] = useState("");
+  const [walletOpen, setWalletOpen] = useState(false);
+
+  // Video generation state machine.
+  const [videoPhase, setVideoPhase] = useState<VideoPhase>("idle");
+  const [videoError, setVideoError] = useState<string | null>(null);
+  // The PPQ job id we're polling.
+  const [videoJobId, setVideoJobId] = useState<string | undefined>(undefined);
+  // Abort controller so the user can cancel mid-flight.
+  const abortRef = useRef<AbortController | null>(null);
 
   const personaHex = useMemo(() => npubToHex(npub), [npub]);
   const author = useAuthor(personaHex ?? undefined);
   const publicBio = author.data?.metadata?.about ?? "";
   const picture = author.data?.metadata?.picture;
 
-  const [raw, setRaw] = useState("");
-  const [walletOpen, setWalletOpen] = useState(false);
-
   const envelope = persona.data?.envelope ?? null;
   const personaConfig = envelope?.persona ?? null;
-  // Persona wallets are NOT subject to env override — donations go to
-  // each persona's own wallet, always. The operator's `VITE_WALLET_SEED`
-  // pin only applies to the header (operator) wallet badge. PPQ env
-  // overrides still apply globally for inference (PROJECT.md §6).
   const walletSeed = envelope?.wallet?.seed;
   const stylingModel =
     envelope?.model_prefs?.agent ?? "anthropic/claude-sonnet-4.5";
 
   const wallet = useWallet({ mnemonic: walletSeed });
   const styling = usePpqInference();
+  const videoSubmit = usePpqVideoSubmit();
 
+  // Poll the video job while videoJobId is set and we're still generating.
+  const videoJob = usePpqVideoJob(
+    videoPhase === "generating" ? videoJobId : undefined,
+  );
+
+  // When the video job completes, advance the pipeline.
+  const handleVideoJobDone = useCallback(async () => {
+    if (!videoJob.data || videoJob.data.status !== "completed") return;
+    const videoUrl = videoJob.data.data?.url;
+    if (!videoUrl) {
+      setVideoPhase("error");
+      setVideoError("Video job completed but returned no URL.");
+      return;
+    }
+
+    try {
+      setVideoPhase("uploading");
+
+      // Fetch the MP4 from PPQ's signed URL and re-upload to Blossom so it
+      // lives on the decentralised network (no PPQ URL in the final event).
+      const mp4Res = await fetch(videoUrl, {
+        signal: abortRef.current?.signal,
+      });
+      if (!mp4Res.ok) throw new Error(`Fetch MP4 failed (${mp4Res.status})`);
+      const blob = await mp4Res.blob();
+      const file = new File([blob], "video.mp4", { type: "video/mp4" });
+
+      // useUploadFile returns NIP-92 imeta tags straight from Blossom.
+      const imetaTags = await uploadFile.mutateAsync(file);
+
+      setVideoPhase("publishing");
+
+      const sources = sourcesInput
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const template = buildPersonaPostTemplate({
+        text: raw,
+        tags: personaConfig!.tags,
+        sources,
+        // Merge in the imeta tags that came back from Blossom.
+        extraTags: imetaTags,
+      });
+
+      const signed = await publish.mutateAsync({
+        personaNsec: personaConfig!.nsec,
+        template,
+      });
+
+      // Cross-post (non-fatal).
+      if (personaConfig!.cross_post?.webhook_url) {
+        try {
+          await crossPost.mutateAsync({
+            persona: personaConfig!,
+            event: signed,
+          });
+          toast({
+            title: "Video published",
+            description:
+              "Live on relays and dispatched to your cross-post webhook.",
+          });
+        } catch (e) {
+          toast({
+            title: "Cross-post failed",
+            description:
+              e instanceof Error
+                ? `Video on relays, but the webhook returned: ${e.message}`
+                : "Video on relays, but the cross-post webhook didn't accept the event.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Video published",
+          description: "Live on relays.",
+        });
+      }
+
+      setVideoPhase("done");
+      setRaw("");
+      setSourcesInput("");
+      setHintsInput("");
+      setVideoJobId(undefined);
+      posts.refetch();
+      wallet.refreshPpqBalance();
+      wallet.refreshInfo();
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      setVideoPhase("error");
+      setVideoError(e instanceof Error ? e.message : "Unknown error");
+    }
+  }, [
+    videoJob.data,
+    sourcesInput,
+    raw,
+    personaConfig,
+    publish,
+    crossPost,
+    uploadFile,
+    toast,
+    posts,
+    wallet,
+  ]);
+
+  // React to job completion.
+  useMemo(() => {
+    if (videoJob.isTerminal && videoJob.data?.status === "completed") {
+      handleVideoJobDone();
+    }
+    if (videoJob.isTerminal && videoJob.data?.status === "failed") {
+      setVideoPhase("error");
+      setVideoError(
+        videoJob.data?.error ?? "Video generation failed on the AI engine.",
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoJob.isTerminal, videoJob.data?.status]);
+
+  /** Rewrite the idea textarea in the persona's voice via PPQ chat. */
   async function onStyle() {
     if (!personaConfig || !raw.trim()) return;
     try {
@@ -94,7 +269,7 @@ const Dashboard = () => {
           { role: "user", content: raw },
         ],
       });
-      const styled = res.choices?.[0]?.message?.content?.trim();
+      const styled = getInferenceText(res);
       if (styled) {
         setRaw(styled);
         wallet.refreshPpqBalance();
@@ -109,16 +284,10 @@ const Dashboard = () => {
     }
   }
 
+  /** Publish text-only (no video). Sources ride as `r` tags. */
   async function onPost() {
     if (!personaConfig || !user || !raw.trim()) return;
     try {
-      // The hints field is captured for the future styling pipeline
-      // but not surfaced in the published event (style is shape, not
-      // content). Sources DO go on the event as `r` tags so
-      // attribution rides the post immediately. AI styling is opt-in
-      // via the "Style in voice" button — by the time we get here,
-      // `raw` is whatever the user wants to publish (literal or
-      // styled).
       const sources = sourcesInput
         .split(",")
         .map((s) => s.trim())
@@ -133,15 +302,9 @@ const Dashboard = () => {
         template,
       });
 
-      // Successful Nostr publish — try the cross-post webhook if
-      // configured. Failures are non-fatal: the post is already live
-      // on relays, so we surface a non-blocking warning toast.
       if (personaConfig.cross_post?.webhook_url) {
         try {
-          await crossPost.mutateAsync({
-            persona: personaConfig,
-            event: signed,
-          });
+          await crossPost.mutateAsync({ persona: personaConfig, event: signed });
           toast({
             title: "Published",
             description: "Live on relays and dispatched to your cross-post webhook.",
@@ -173,12 +336,128 @@ const Dashboard = () => {
     }
   }
 
+  /**
+   * Full video pipeline:
+   *   brief → PPQ chat script → PPQ video submit → poll → fetch → Blossom →
+   *   kind 1 with imeta → cross-post.
+   */
+  async function onGenerateVideo() {
+    if (!personaConfig || !user || !raw.trim() || !walletSeed) return;
+    abortRef.current = new AbortController();
+
+    try {
+      // ── Step 1: Turn the brief into a focused video prompt ──────────
+      setVideoPhase("scripting");
+      setVideoError(null);
+
+      const hints = hintsInput.trim();
+      const sources = sourcesInput
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const scriptSystemPrompt = [
+        personaConfig.system_prompt,
+        "You are writing a short-form video script (30–60 seconds, spoken first-person).",
+        hints ? `Style guidance: ${hints}` : "",
+        sources.length
+          ? `Draw on these sources: ${sources.join(", ")}`
+          : "",
+        "Return only the final narration script — no scene directions, no labels.",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const scriptRes = await styling.mutateAsync({
+        model: stylingModel,
+        messages: [
+          { role: "system", content: scriptSystemPrompt },
+          { role: "user", content: raw },
+        ],
+      });
+      const videoScript = getInferenceText(scriptRes).trim() || raw;
+
+      // ── Step 2: Build the video generation prompt ────────────────────
+      //   We give the AI engine the narration + persona visual identity.
+      const referenceImage =
+        author.data?.metadata?.picture ?? personaConfig.picture;
+      const videoPrompt = [
+        videoScript,
+        referenceImage
+          ? `Persona reference image: ${referenceImage}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
+      // Derive aspect ratio from hints (default portrait for social).
+      const aspectRatio: "9:16" | "16:9" | "1:1" =
+        /16:9/.test(hints)
+          ? "16:9"
+          : /1:1/.test(hints)
+          ? "1:1"
+          : "9:16";
+
+      // ── Step 3: Submit the video job to PPQ ──────────────────────────
+      setVideoPhase("submitting");
+
+      const job = await videoSubmit.mutateAsync({
+        model: "veo3-fast",
+        prompt: videoPrompt,
+        aspect_ratio: aspectRatio,
+      });
+
+      setVideoJobId(job.id);
+      setVideoPhase("generating");
+      // usePpqVideoJob polls automatically from here; handleVideoJobDone
+      // picks up when the job terminates.
+    } catch (e) {
+      if ((e as Error).name === "AbortError") {
+        setVideoPhase("idle");
+        return;
+      }
+      setVideoPhase("error");
+      setVideoError(e instanceof Error ? e.message : "Unknown error");
+      toast({
+        title: "Video generation failed",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function onCancelVideo() {
+    abortRef.current?.abort();
+    setVideoPhase("idle");
+    setVideoError(null);
+    setVideoJobId(undefined);
+  }
+
+  function onResetAfterError() {
+    setVideoPhase("idle");
+    setVideoError(null);
+    setVideoJobId(undefined);
+  }
+
+  const isVideoRunning =
+    videoPhase === "scripting" ||
+    videoPhase === "submitting" ||
+    videoPhase === "generating" ||
+    videoPhase === "uploading" ||
+    videoPhase === "publishing";
+
+  const anyPending =
+    publish.isPending ||
+    crossPost.isPending ||
+    styling.isPending ||
+    isVideoRunning;
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <AppHeader />
 
       <main id="main-content" className="flex-1">
-        {/* Persona cover header — charcoal mat with avatar + tags */}
+        {/* Persona cover header */}
         {!user ? (
           <section className="cream-wash py-20">
             <div className="container max-w-3xl">
@@ -315,7 +594,7 @@ const Dashboard = () => {
             <Card className="border-dashed border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20">
               <CardContent className="py-4 px-6 text-sm text-amber-900 dark:text-amber-200">
                 This persona was created before wallets were wired. AI styling
-                and image generation are disabled. Mint a new persona from the
+                and video generation are disabled. Mint a new persona from the
                 onboard wizard to enable them.
               </CardContent>
             </Card>
@@ -330,14 +609,14 @@ const Dashboard = () => {
                     Compose a video
                   </h2>
                   <p className="text-xs text-muted-foreground">
-                    Idea + sources + hints feed the AI prompt that
-                    generates the persona's video. Text-only posting
-                    is available as a fallback.
+                    Drop in your brief — Zuka writes the script, generates a
+                    persona-signed video, and publishes everywhere at once.
                   </p>
                 </div>
               </div>
+
               <CardContent className="space-y-5 pt-5">
-                {/* Idea — drives both the video script and the text fallback */}
+                {/* ── Idea ─────────────────────────────────────────── */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label
@@ -361,17 +640,18 @@ const Dashboard = () => {
                         (e.metaKey || e.ctrlKey) &&
                         e.key === "Enter" &&
                         raw.trim() &&
-                        !publish.isPending
+                        !anyPending
                       ) {
                         e.preventDefault();
                         onPost();
                       }
                     }}
                     className="resize-y min-h-[8rem] bg-background/60"
+                    disabled={anyPending}
                   />
                 </div>
 
-                {/* Sources + style hints — feed the AI prompt */}
+                {/* ── Sources + Style hints ─────────────────────────── */}
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label
@@ -390,12 +670,12 @@ const Dashboard = () => {
                       onChange={(e) => setSourcesInput(e.target.value)}
                       placeholder="https://hrw.org/..., https://cpj.org/..."
                       className="text-sm bg-background/60 resize-none"
+                      disabled={anyPending}
                     />
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Comma-separated URLs. Grounds the video script
-                      and rides the published post as{" "}
-                      <code className="font-mono">r</code> tags for
-                      attribution.
+                      Comma-separated URLs. Grounds the script and rides the
+                      published post as{" "}
+                      <code className="font-mono">r</code> tags.
                     </p>
                   </div>
                   <div className="space-y-2">
@@ -415,15 +695,16 @@ const Dashboard = () => {
                       onChange={(e) => setHintsInput(e.target.value)}
                       placeholder="measured, first-person, vertical 9:16"
                       className="text-sm bg-background/60 resize-none"
+                      disabled={anyPending}
                     />
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Tone, framing, length. Steers the AI prompt for
-                      both video script and visual direction.
+                      Tone, framing, aspect ratio (16:9 / 9:16 / 1:1). Steers
+                      both the script and the video generation prompt.
                     </p>
                   </div>
                 </div>
 
-                {/* Cross-post indicator (read-only) */}
+                {/* ── Cross-post indicator ──────────────────────────── */}
                 {personaConfig.cross_post?.webhook_url && (
                   <div className="flex flex-wrap items-center gap-2 rounded-lg border border-rw-sky/25 bg-rw-sky/5 px-4 py-2.5 text-xs">
                     <span className="font-medium text-foreground">
@@ -432,8 +713,8 @@ const Dashboard = () => {
                     <span className="text-muted-foreground">
                       Will dispatch to your webhook
                     </span>
-                    {(personaConfig.cross_post.webhook_platforms ?? [])
-                      .length > 0 && (
+                    {(personaConfig.cross_post.webhook_platforms ?? []).length >
+                      0 && (
                       <>
                         <span className="text-muted-foreground">·</span>
                         <div className="flex flex-wrap gap-1">
@@ -454,12 +735,60 @@ const Dashboard = () => {
                   </div>
                 )}
 
-                {/* Action row — primary 'Generate video' (disabled until
-                    Jim's PPQ video → Blossom seam lands), secondary
-                    'Publish text-only' fallback that ships the kind 1
-                    immediately. "Style in voice" rewrites the idea
-                    text using the persona's system prompt before
-                    publish (PPQ chat completion). */}
+                {/* ── Video pipeline progress ───────────────────────── */}
+                {videoPhase !== "idle" && (
+                  <div
+                    className={`rounded-lg border px-4 py-3 space-y-2 text-sm ${
+                      videoPhase === "error"
+                        ? "border-destructive/40 bg-destructive/5"
+                        : videoPhase === "done"
+                        ? "border-rw-green/40 bg-rw-green/5"
+                        : "border-rw-gold/30 bg-rw-gold/5"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {videoPhase === "done" ? (
+                        <CheckCircle2 className="size-4 text-rw-green flex-shrink-0" />
+                      ) : videoPhase === "error" ? (
+                        <XCircle className="size-4 text-destructive flex-shrink-0" />
+                      ) : (
+                        <Loader2 className="size-4 animate-spin text-rw-gold flex-shrink-0" />
+                      )}
+                      <span
+                        className={
+                          videoPhase === "error"
+                            ? "text-destructive"
+                            : videoPhase === "done"
+                            ? "text-rw-green font-medium"
+                            : "text-foreground"
+                        }
+                      >
+                        {VIDEO_PHASE_LABELS[videoPhase]}
+                      </span>
+                      {isVideoRunning && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="ml-auto h-6 px-2 text-xs text-muted-foreground"
+                          onClick={onCancelVideo}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
+                    {isVideoRunning && (
+                      <Progress
+                        value={VIDEO_PHASE_PCT[videoPhase]}
+                        className="h-1"
+                      />
+                    )}
+                    {videoPhase === "error" && videoError && (
+                      <p className="text-xs text-destructive/80">{videoError}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Action row ────────────────────────────────────── */}
                 <div className="space-y-3 pt-1">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <Button
@@ -468,23 +797,22 @@ const Dashboard = () => {
                         setRaw("");
                         setSourcesInput("");
                         setHintsInput("");
+                        if (videoPhase === "error" || videoPhase === "done") {
+                          onResetAfterError();
+                        }
                       }}
-                      disabled={
-                        publish.isPending ||
-                        crossPost.isPending ||
-                        styling.isPending
-                      }
+                      disabled={anyPending}
                     >
                       Discard
                     </Button>
                     <div className="flex flex-wrap gap-2">
+                      {/* Style in voice */}
                       <Button
                         variant="outline"
                         onClick={onStyle}
                         disabled={
                           styling.isPending ||
-                          publish.isPending ||
-                          crossPost.isPending ||
+                          anyPending ||
                           !raw.trim() ||
                           !walletSeed
                         }
@@ -512,15 +840,12 @@ const Dashboard = () => {
                           </>
                         )}
                       </Button>
+
+                      {/* Publish text-only */}
                       <Button
                         variant="outline"
                         onClick={onPost}
-                        disabled={
-                          publish.isPending ||
-                          crossPost.isPending ||
-                          styling.isPending ||
-                          !raw.trim()
-                        }
+                        disabled={anyPending || !raw.trim()}
                         title="Publish a text-only kind 1 note (no video)"
                       >
                         {publish.isPending || crossPost.isPending ? (
@@ -541,24 +866,73 @@ const Dashboard = () => {
                           </>
                         )}
                       </Button>
-                      <Button
-                        disabled
-                        className="shadow-lg shadow-primary/20"
-                        title="Video generation lands once the PPQ video pipeline + Blossom upload seam ships"
-                      >
-                        <Sparkles
-                          className="mr-2 size-4"
-                          aria-hidden="true"
-                        />
-                        Generate video
-                      </Button>
+
+                      {/* Generate video — primary CTA, now live */}
+                      {videoPhase === "error" ? (
+                        <Button
+                          variant="outline"
+                          onClick={onResetAfterError}
+                          className="border-destructive/40 text-destructive"
+                        >
+                          <XCircle className="mr-2 size-4" aria-hidden="true" />
+                          Try again
+                        </Button>
+                      ) : videoPhase === "done" ? (
+                        <Button
+                          variant="outline"
+                          onClick={onResetAfterError}
+                          className="border-rw-green/40 text-rw-green"
+                        >
+                          <CheckCircle2
+                            className="mr-2 size-4"
+                            aria-hidden="true"
+                          />
+                          New post
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={onGenerateVideo}
+                          disabled={
+                            anyPending ||
+                            !raw.trim() ||
+                            !walletSeed
+                          }
+                          className="shadow-lg shadow-primary/20"
+                          title={
+                            !walletSeed
+                              ? "Mint a new persona (with a wallet) to enable video generation"
+                              : "Generate a persona-signed video and publish everywhere"
+                          }
+                        >
+                          {isVideoRunning ? (
+                            <>
+                              <Loader2
+                                className="mr-2 size-4 animate-spin"
+                                aria-hidden="true"
+                              />
+                              Generating…
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles
+                                className="mr-2 size-4"
+                                aria-hidden="true"
+                              />
+                              Generate video
+                            </>
+                          )}
+                        </Button>
+                      )}
                     </div>
                   </div>
                   <p className="text-[11px] text-muted-foreground text-right">
-                    <span className="opacity-80">
-                      Video generation arrives in the next build —
-                      until then, the text-only fallback publishes
-                      a clean kind 1 note grounded by your sources.
+                    <kbd className="font-mono px-1 py-0.5 rounded bg-muted border border-border text-[10px]">
+                      ⌘ Enter
+                    </kbd>{" "}
+                    publishes text-only.{" "}
+                    <span className="opacity-70">
+                      Video gen uses Veo 3 via PPQ — ~1–3 min, ~$0.50–$2 per
+                      clip.
                     </span>
                   </p>
                 </div>
