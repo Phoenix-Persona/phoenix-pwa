@@ -56,6 +56,7 @@ import {
   clearSessionUnlocked,
   clearUserNcryptsec,
   hasUserNcryptsec,
+  NOSTR_LOGIN_STORAGE_KEY,
 } from "@/lib/nip49Storage";
 
 const Settings = () => {
@@ -104,15 +105,25 @@ const Settings = () => {
       "Forget this device? You'll need your nsec backup to sign in again on this browser. Personas survive — they're stored on relays."
     );
     if (!ok) return;
+
+    // Clear synchronously, then hard-reload to root. Hard reload is
+    // intentional — it drops Nostrify's in-memory login state, the
+    // React Query cache (keyed on the prior user pubkey), the Spark
+    // SDK handle, and all React state, leaving a clean slate for
+    // the next sign-in. Soft navigate would leak prior-user data
+    // through caches.
+    //
+    // We bypass Nostrify's removeLogin and write to nostr:login
+    // directly — removeLogin's localStorage flush is async via a
+    // useEffect, which races the page reload.
     clearUserNcryptsec();
     clearSessionUnlocked();
-    const current = logins[0];
-    if (current) removeLogin(current.id);
-    toast({
-      title: "Device forgotten",
-      description: "The encrypted key has been cleared from this browser.",
-    });
-    navigate("/");
+    try {
+      window.localStorage.removeItem(NOSTR_LOGIN_STORAGE_KEY);
+    } catch {
+      /* best effort */
+    }
+    window.location.assign("/");
   }
 
   return (

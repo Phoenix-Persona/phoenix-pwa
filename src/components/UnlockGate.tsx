@@ -43,6 +43,7 @@ import {
   hasUserNcryptsec,
   loadUserNcryptsec,
   markSessionUnlocked,
+  NOSTR_LOGIN_STORAGE_KEY,
 } from "@/lib/nip49Storage";
 
 interface UnlockGateProps {
@@ -106,10 +107,26 @@ export function UnlockGate({ children }: UnlockGateProps) {
       "Forget this device? You'll need your nsec backup to use Zuka on this browser again. Personas survive — they're stored on relays."
     );
     if (!ok) return;
+
+    // Clear all the zuka- and nostr-side state for the active user
+    // synchronously, THEN hard-reload to root. Hard reload because:
+    //   1. Drops Nostrify's in-memory login state (otherwise stale
+    //      until next state cycle).
+    //   2. Drops React Query caches keyed on the prior user.
+    //   3. Drops the Spark SDK handle / wallet runtime tied to the
+    //      prior mnemonic.
+    //   4. Drops React state across the whole app.
+    // localStorage we deliberately keep: AppContext config (theme,
+    // relay list, blossom servers), the install-banner dismissal —
+    // those are app preferences, not personal data.
     clearUserNcryptsec();
     clearSessionUnlocked();
-    // hasUserNcryptsec() now returns false → needsUnlock flips on
-    // the next render. No explicit state to clear here.
+    try {
+      window.localStorage.removeItem(NOSTR_LOGIN_STORAGE_KEY);
+    } catch {
+      /* best effort */
+    }
+    window.location.assign("/");
   }
 
   return (
