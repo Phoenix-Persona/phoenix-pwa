@@ -37,6 +37,13 @@ import { generateImage } from "@/lib/ppq/client";
 import type { Persona } from "@/lib/persona";
 import { buildPersonaPostTemplate } from "@/lib/personaPost";
 
+import {
+  deleteChain,
+  loadChain,
+  newChainId,
+  saveChain,
+  type ChainRecord,
+} from "@/lib/video/chainStore";
 import { generateCaption } from "@/lib/video/generateCaption";
 import {
   generateMonologueScript,
@@ -113,7 +120,16 @@ export type GenerationPhase =
     }
   | { type: "publishing"; stitchedUrl: string }
   | { type: "done"; stitchedUrl: string; eventId: string }
-  | { type: "error"; message: string; cause?: unknown };
+  | {
+      type: "error";
+      message: string;
+      cause?: unknown;
+      /** If set, a checkpoint exists in IndexedDB and `resume()` will pick up from it. */
+      resumableChainId?: string;
+      /** Number of clips already paid for, for the resume button label. */
+      resumableCompletedClips?: number;
+      resumableTotalClips?: number;
+    };
 
 export interface UseGenerateVideoPipelineArgs {
   persona: Persona;
@@ -138,10 +154,14 @@ export interface UseGenerateVideoPipelineResult {
   confirmAndGenerate: (totalDurationSecs: number) => Promise<void>;
   /** Step 4: publish the kind 1 with the user-edited caption. */
   publish: (editedCaption: string) => Promise<void>;
+  /** Resume a previously-checkpointed chain by id. */
+  resume: (chainId: string) => Promise<void>;
   /** Cancel any in-flight async; safe to call from "X" button. */
   cancel: () => void;
   /** Reset to idle (also revokes any preview blob URL we own). */
   reset: () => void;
+  /** Discard a checkpointed chain (e.g. user clicked "Start fresh"). */
+  discardCheckpoint: (chainId: string) => Promise<void>;
 }
 
 export function useGenerateVideoPipeline(
@@ -164,6 +184,8 @@ export function useGenerateVideoPipeline(
   }, [phase]);
 
   const abortRef = useRef<AbortController | null>(null);
+  /** Active chain id for checkpoint persistence; null while idle/preview. */
+  const chainIdRef = useRef<string | null>(null);
   /** Object URLs we own and must revoke on cleanup. */
   const ownedObjectUrls = useRef<Set<string>>(new Set());
 
@@ -190,7 +212,7 @@ export function useGenerateVideoPipeline(
   }, [cancel, cleanupObjectUrls]);
 
   const fail = useCallback(
-    (err: unknown) => {
+    async (err: unknown) => {
       if (
         err instanceof DOMException &&
         err.name === "AbortError"
@@ -202,7 +224,27 @@ export function useGenerateVideoPipeline(
       }
       const message = err instanceof Error ? err.message : String(err);
       verror("pipeline", "FAILED:", message, err);
-      setPhase({ type: "error", message, cause: err });
+
+      // If a checkpoint exists, surface the resume affordance.
+      const chainId = chainIdRef.current;
+      let resumable:
+        | {
+            resumableChainId: string;
+            resumableCompletedClips: number;
+            resumableTotalClips: number;
+          }
+        | undefined;
+      if (chainId) {
+        const rec = await loadChain(chainId);
+        if (rec && rec.segments && rec.segments.length > 0) {
+          resumable = {
+            resumableChainId: chainId,
+            resumableCompletedClips: rec.clips.length,
+            resumableTotalClips: rec.segments.length,
+          };
+        }
+      }
+      setPhase({ type: "error", message, cause: err, ...(resumable ?? {}) });
     },
     [],
   );
@@ -250,7 +292,7 @@ export function useGenerateVideoPipeline(
       );
       setPhase({ type: "preview-ready", previewUrl });
     } catch (err) {
-      fail(err);
+      await fail(err);
     }
   }, [
     account,
@@ -264,6 +306,215 @@ export function useGenerateVideoPipeline(
     personaAvatarUrl,
   ]);
 
+  const runFromRecord = useCallback(
+    async (record: ChainRecord, signal: AbortSignal): Promise<void> => {
+      const tStart = Date.now();
+      const acct = account ?? (await ensureAccount());
+      const segments = record.segments;
+      if (!segments) {
+        throw new Error("runFromRecord: record has no segments");
+      }
+      const seedImageUrl = record.inputs.seedImageUrl;
+      if (!seedImageUrl) {
+        throw new Error("runFromRecord: record has no seedImageUrl");
+      }
+      const previewUrl = record.inputs.previewUrl ?? seedImageUrl;
+
+      const uploadFrameFn = async (blob: Blob, filename?: string) => {
+        const file = new File([blob], filename ?? "frame.png", {
+          type: blob.type || "image/png",
+        });
+        const tags = await upload.mutateAsync(file);
+        const url = extractUrlFromTags(tags);
+        if (!url) throw new Error("Blossom returned tags without a URL");
+        return url;
+      };
+
+      // 3. Chain — resume-aware. If `record.clips.length === segments.length`
+      // we skip straight to stitching.
+      let completedClips = record.clips;
+      if (completedClips.length < segments.length) {
+        vlog("pipeline", "phase → clip-generating", {
+          model: record.inputs.model,
+          numClips: segments.length,
+          alreadyDone: completedClips.length,
+          hasNextImageUrl: Boolean(record.nextImageUrl),
+        });
+        setPhase({
+          type: "clip-generating",
+          previewUrl,
+          seedImageUrl,
+          segments,
+          currentIndex: completedClips.length,
+          completedClips,
+        });
+        const tChain = Date.now();
+        completedClips = await runChain({
+          apiKey: acct.api_key,
+          model: record.inputs.model,
+          seedImageUrl,
+          segments,
+          aspect: record.inputs.aspect,
+          quality: record.inputs.quality,
+          worldBlock: record.inputs.worldBlock,
+          uploadFrame: uploadFrameFn,
+          resumeFrom: {
+            clips: record.clips,
+            nextImageUrl: record.nextImageUrl,
+          },
+          onPhase: (event) => {
+            setPhase((prev) => {
+              if (prev.type !== "clip-generating") return prev;
+              if (event.type === "clip-submit") {
+                return { ...prev, currentIndex: event.index, currentStatus: "submitted" };
+              }
+              if (event.type === "clip-poll") {
+                return { ...prev, currentIndex: event.index, currentStatus: event.status };
+              }
+              if (event.type === "clip-done") {
+                return {
+                  ...prev,
+                  currentIndex: event.index,
+                  currentStatus: "completed",
+                  completedClips: [...prev.completedClips, event.clip],
+                };
+              }
+              if (event.type === "frame-extract") {
+                return { ...prev, currentStatus: "extracting last frame" };
+              }
+              if (event.type === "frame-upload") {
+                return { ...prev, currentStatus: "uploading frame to Blossom" };
+              }
+              return prev;
+            });
+          },
+          onCheckpoint: async (cp) => {
+            if (cp.kind === "clip-done") {
+              record.clips = cp.clips;
+              record.nextImageUrl = undefined;
+            } else {
+              record.clips = cp.clips;
+              record.nextImageUrl = cp.nextImageUrl;
+            }
+            await saveChain(record);
+          },
+          signal,
+        });
+        vlog(
+          "pipeline",
+          `chain done (${completedClips.length} clips) in ${fmtMs(Date.now() - tChain)}`,
+          completedClips.map((c, i) => ({
+            i,
+            url: c.url,
+            blobBytes: fmtBytes(c.blob.size),
+            cost: c.costUsd,
+          })),
+        );
+        record.clips = completedClips;
+        record.nextImageUrl = undefined;
+        await saveChain(record);
+      } else {
+        vlog("pipeline", "resume: all clips already done, skipping chain");
+      }
+
+      // 4. Stitch — skip if we already have a stitched blob.
+      let stitchedBlob = record.stitchedBlob;
+      if (!stitchedBlob && !record.stitchedUrl) {
+        const totalInputBytes = completedClips.reduce(
+          (sum, c) => sum + c.blob.size,
+          0,
+        );
+        vlog("pipeline", "phase → stitching", {
+          numClips: completedClips.length,
+          totalInputSize: fmtBytes(totalInputBytes),
+        });
+        setPhase({ type: "stitching", segments, completedClips });
+        const tStitch = Date.now();
+        stitchedBlob = await stitchClips({
+          clips: completedClips.map((c) => c.blob),
+          onProgress: (p: StitchProgress) =>
+            setPhase((prev) =>
+              prev.type === "stitching" ? { ...prev, ratio: p.ratio } : prev,
+            ),
+          signal,
+        });
+        vlog(
+          "pipeline",
+          `stitched in ${fmtMs(Date.now() - tStitch)}`,
+          { outputSize: fmtBytes(stitchedBlob.size) },
+        );
+        record.stitchedBlob = stitchedBlob;
+        await saveChain(record);
+      }
+
+      // 5. Upload stitched MP4 — skip if already uploaded.
+      let stitchedUrl = record.stitchedUrl;
+      if (!stitchedUrl) {
+        if (!stitchedBlob) {
+          throw new Error("runFromRecord: stitched blob missing before upload");
+        }
+        vlog("pipeline", "phase → uploading-stitched");
+        setPhase({ type: "uploading-stitched", segments, completedClips });
+        const stitchedFile = new File([stitchedBlob], "stitched.mp4", {
+          type: "video/mp4",
+        });
+        const tUploadStitched = Date.now();
+        const stitchedTags = await upload.mutateAsync(stitchedFile);
+        stitchedUrl = extractUrlFromTags(stitchedTags);
+        if (!stitchedUrl) {
+          verror("pipeline", "blossom returned no url tag", { stitchedTags });
+          throw new Error(
+            "Blossom upload of stitched MP4 returned tags without a URL",
+          );
+        }
+        vlog(
+          "pipeline",
+          `stitched uploaded in ${fmtMs(Date.now() - tUploadStitched)}`,
+          { stitchedUrl },
+        );
+        record.stitchedUrl = stitchedUrl;
+        // We have a permanent URL now — drop the heavy blob from the
+        // checkpoint so IDB doesn't carry it around indefinitely.
+        record.stitchedBlob = undefined;
+        await saveChain(record);
+      }
+
+      // 6. Caption — skip if already drafted.
+      let captionDraft = record.captionDraft;
+      if (!captionDraft) {
+        vlog("pipeline", "phase → captioning");
+        setPhase({ type: "captioning", segments, stitchedUrl });
+        const tCaption = Date.now();
+        captionDraft = await generateCaption({
+          apiKey: acct.api_key,
+          persona,
+          idea: record.inputs.idea,
+          sources: record.inputs.sources,
+          segments,
+          signal,
+        });
+        vlog(
+          "pipeline",
+          `caption draft (${captionDraft.length} chars) in ${fmtMs(Date.now() - tCaption)}`,
+        );
+        record.captionDraft = captionDraft;
+        await saveChain(record);
+      }
+
+      vlog(
+        "pipeline",
+        `phase → ready-to-post · total elapsed ${fmtMs(Date.now() - tStart)}`,
+      );
+      setPhase({
+        type: "ready-to-post",
+        segments,
+        stitchedUrl,
+        captionDraft,
+      });
+    },
+    [account, ensureAccount, persona, upload],
+  );
+
   const confirmAndGenerate = useCallback(
     async (totalDurationSecs: number): Promise<void> => {
       const current = phaseRef.current;
@@ -273,7 +524,7 @@ export function useGenerateVideoPipeline(
       const previewUrl = current.previewUrl;
 
       if (!user) {
-        fail(new Error("Sign in before generating video — Blossom uploads need your signer."));
+        await fail(new Error("Sign in before generating video — Blossom uploads need your signer."));
         return;
       }
 
@@ -281,8 +532,11 @@ export function useGenerateVideoPipeline(
       abortRef.current = new AbortController();
       const { signal } = abortRef.current;
 
+      const chainId = newChainId();
+      chainIdRef.current = chainId;
       const tStart = Date.now();
       vlog("pipeline", "phase → uploading-seed", {
+        chainId,
         totalDurationSecs,
         segmentSecs: SEGMENT_SECS,
         previewUrl,
@@ -291,10 +545,7 @@ export function useGenerateVideoPipeline(
         const acct = account ?? (await ensureAccount());
 
         // 1. Push the preview onto Blossom so ppq.ai can fetch it as
-        // the seed conditioning image. The preview URL we have right
-        // now is a ppq.ai signed URL — we re-upload to (a) make it
-        // permanent for the chain and (b) own a stable URL we can
-        // also use as the visible thumbnail.
+        // the seed conditioning image.
         setPhase({ type: "uploading-seed", previewUrl });
         const tUpload = Date.now();
         const seedImageUrl = await fetchAndUploadAsBlossom({
@@ -333,167 +584,41 @@ export function useGenerateVideoPipeline(
           segments.map((s) => ({ label: s.label, words: s.dialog.split(/\s+/).length })),
         );
 
-        // 3. Chain — submit clip, poll, extract last frame, upload,
-        // feed into next clip's image_url. Each completed clip's MP4
-        // is also kept in-memory for ffmpeg stitching at the end.
-        vlog("pipeline", "phase → clip-generating (chain start)", {
-          model: SEEDANCE_MODEL,
-          numClips: segments.length,
-        });
-        setPhase({
-          type: "clip-generating",
-          previewUrl,
-          seedImageUrl,
-          segments,
-          currentIndex: 0,
-          completedClips: [],
-        });
-        const tChain = Date.now();
-        const completedClips = await runChain({
-          apiKey: acct.api_key,
-          model: SEEDANCE_MODEL,
-          seedImageUrl,
-          segments,
-          aspect: SEEDANCE_ASPECT,
-          quality: SEEDANCE_QUALITY,
-          worldBlock: WORLD_BLOCK_PREFIX,
-          uploadFrame: async (blob, filename) => {
-            const file = new File([blob], filename ?? "frame.png", {
-              type: blob.type || "image/png",
-            });
-            const tags = await upload.mutateAsync(file);
-            const url = extractUrlFromTags(tags);
-            if (!url) {
-              throw new Error("Blossom returned tags without a URL");
-            }
-            return url;
+        // Persist the initial checkpoint now that we know enough to
+        // resume even if the very next clip dies.
+        const record: ChainRecord = {
+          chainId,
+          createdAt: tStart,
+          updatedAt: tStart,
+          inputs: {
+            idea,
+            hints,
+            sources,
+            totalDurationSecs,
+            segmentSecs: SEGMENT_SECS,
+            model: SEEDANCE_MODEL,
+            aspect: SEEDANCE_ASPECT,
+            quality: SEEDANCE_QUALITY,
+            worldBlock: WORLD_BLOCK_PREFIX,
+            personaPubkey: persona.pubkey,
+            personaName: persona.name,
+            previewUrl,
+            seedImageUrl,
           },
-          onPhase: (event) => {
-            // Update the React state with each clip's progress.
-            setPhase((prev) => {
-              if (prev.type !== "clip-generating") return prev;
-              if (event.type === "clip-submit") {
-                return { ...prev, currentIndex: event.index, currentStatus: "submitted" };
-              }
-              if (event.type === "clip-poll") {
-                return { ...prev, currentIndex: event.index, currentStatus: event.status };
-              }
-              if (event.type === "clip-done") {
-                return {
-                  ...prev,
-                  currentIndex: event.index,
-                  currentStatus: "completed",
-                  completedClips: [...prev.completedClips, event.clip],
-                };
-              }
-              if (event.type === "frame-extract") {
-                return { ...prev, currentStatus: "extracting last frame" };
-              }
-              if (event.type === "frame-upload") {
-                return { ...prev, currentStatus: "uploading frame to Blossom" };
-              }
-              return prev;
-            });
-          },
-          signal,
-        });
-
-        vlog(
-          "pipeline",
-          `chain done (${completedClips.length} clips) in ${fmtMs(Date.now() - tChain)}`,
-          completedClips.map((c, i) => ({
-            i,
-            url: c.url,
-            blobBytes: fmtBytes(c.blob.size),
-            cost: c.costUsd,
-          })),
-        );
-
-        // 4. Stitch all clips into one MP4 via ffmpeg.wasm.
-        const totalInputBytes = completedClips.reduce(
-          (sum, c) => sum + c.blob.size,
-          0,
-        );
-        vlog("pipeline", "phase → stitching", {
-          numClips: completedClips.length,
-          totalInputSize: fmtBytes(totalInputBytes),
-        });
-        setPhase({
-          type: "stitching",
           segments,
-          completedClips,
-        });
-        const tStitch = Date.now();
-        const stitchedBlob = await stitchClips({
-          clips: completedClips.map((c) => c.blob),
-          onProgress: (p: StitchProgress) =>
-            setPhase((prev) =>
-              prev.type === "stitching"
-                ? { ...prev, ratio: p.ratio }
-                : prev,
-            ),
-          signal,
-        });
-        vlog(
-          "pipeline",
-          `stitched in ${fmtMs(Date.now() - tStitch)}`,
-          { outputSize: fmtBytes(stitchedBlob.size) },
-        );
+          clips: [],
+        };
+        await saveChain(record);
 
-        // 5. Upload the stitched MP4 to Blossom.
-        vlog("pipeline", "phase → uploading-stitched");
-        setPhase({
-          type: "uploading-stitched",
-          segments,
-          completedClips,
-        });
-        const stitchedFile = new File([stitchedBlob], "stitched.mp4", {
-          type: "video/mp4",
-        });
-        const tUploadStitched = Date.now();
-        const stitchedTags = await upload.mutateAsync(stitchedFile);
-        const stitchedUrl = extractUrlFromTags(stitchedTags);
-        if (!stitchedUrl) {
-          verror("pipeline", "blossom returned no url tag", { stitchedTags });
-          throw new Error(
-            "Blossom upload of stitched MP4 returned tags without a URL",
-          );
-        }
-        vlog(
-          "pipeline",
-          `stitched uploaded in ${fmtMs(Date.now() - tUploadStitched)}`,
-          { stitchedUrl },
-        );
+        // 3+. Chain → stitch → upload → caption.
+        await runFromRecord(record, signal);
 
-        // 6. Draft a caption.
-        vlog("pipeline", "phase → captioning");
-        setPhase({ type: "captioning", segments, stitchedUrl });
-        const tCaption = Date.now();
-        const captionDraft = await generateCaption({
-          apiKey: acct.api_key,
-          persona,
-          idea,
-          sources,
-          segments,
-          signal,
-        });
-        vlog(
-          "pipeline",
-          `caption draft (${captionDraft.length} chars) in ${fmtMs(Date.now() - tCaption)}`,
-        );
-
-        vlog(
-          "pipeline",
-          `phase → ready-to-post · total elapsed ${fmtMs(Date.now() - tStart)}`,
-        );
-        setPhase({
-          type: "ready-to-post",
-          segments,
-          stitchedUrl,
-          captionDraft,
-        });
+        // Successful end state: drop the checkpoint. The user still
+        // has to publish, but everything from here is cheap to redo.
+        await deleteChain(chainId);
+        chainIdRef.current = null;
       } catch (err) {
-        fail(err);
+        await fail(err);
       }
     },
     [
@@ -504,10 +629,55 @@ export function useGenerateVideoPipeline(
       hints,
       idea,
       persona,
+      runFromRecord,
       sources,
       upload,
       user,
     ],
+  );
+
+  const resume = useCallback(
+    async (chainId: string): Promise<void> => {
+      cancel();
+      abortRef.current = new AbortController();
+      const { signal } = abortRef.current;
+
+      vlog("pipeline", "resume requested", { chainId });
+      try {
+        const record = await loadChain(chainId);
+        if (!record) {
+          throw new Error(
+            "No saved chain found for this id — it may have been cleared.",
+          );
+        }
+        if (!record.segments || !record.inputs.seedImageUrl) {
+          throw new Error(
+            "Saved chain is incomplete (no script or seed) — start a new one.",
+          );
+        }
+        chainIdRef.current = chainId;
+        await runFromRecord(record, signal);
+        await deleteChain(chainId);
+        chainIdRef.current = null;
+      } catch (err) {
+        await fail(err);
+      }
+    },
+    [cancel, fail, runFromRecord],
+  );
+
+  const discardCheckpoint = useCallback(
+    async (chainId: string): Promise<void> => {
+      await deleteChain(chainId);
+      if (chainIdRef.current === chainId) chainIdRef.current = null;
+      // If we're on the error screen for this chain, clear the resume affordance.
+      setPhase((prev) =>
+        prev.type === "error" && prev.resumableChainId === chainId
+          ? { type: "error", message: prev.message, cause: prev.cause }
+          : prev,
+      );
+    },
+    [],
   );
 
   const publish = useCallback(
@@ -549,7 +719,7 @@ export function useGenerateVideoPipeline(
             "…",
         });
       } catch (err) {
-        fail(err);
+        await fail(err);
       }
     },
     [fail, persona, personaPublish, sources, toast],
@@ -561,10 +731,21 @@ export function useGenerateVideoPipeline(
       generatePreview,
       confirmAndGenerate,
       publish,
+      resume,
       cancel,
       reset,
+      discardCheckpoint,
     }),
-    [phase, generatePreview, confirmAndGenerate, publish, cancel, reset],
+    [
+      phase,
+      generatePreview,
+      confirmAndGenerate,
+      publish,
+      resume,
+      cancel,
+      reset,
+      discardCheckpoint,
+    ],
   );
 }
 

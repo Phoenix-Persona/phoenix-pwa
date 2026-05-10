@@ -59,9 +59,26 @@ export interface RunChainArgs {
   extractFrame?: (videoUrl: string, signal?: AbortSignal) => Promise<Blob>;
   /** Phase emitter for the React progress UI. */
   onPhase?: (phase: ChainPhase) => void;
+  /**
+   * Persistence hook. Fired after every clip completes AND after every
+   * frame upload — the two natural checkpoints where work would be
+   * lost on a crash. The caller writes to IndexedDB.
+   */
+  onCheckpoint?: (cp: ChainCheckpoint) => void | Promise<void>;
+  /**
+   * Resume from a prior run. `clips` are the already-completed clip
+   * results to skip; `nextImageUrl` is the uploaded frame URL to feed
+   * into the *next* clip. If `nextImageUrl` is unset but clips exist,
+   * we re-extract from the last clip's blob.
+   */
+  resumeFrom?: { clips: ClipResult[]; nextImageUrl?: string };
   /** Cancel the chain at the next safe boundary. */
   signal?: AbortSignal;
 }
+
+export type ChainCheckpoint =
+  | { kind: "clip-done"; clips: ClipResult[] }
+  | { kind: "frame-uploaded"; clips: ClipResult[]; nextImageUrl: string };
 
 /** Defaults proven on ppq.ai's seedance-2-fast route. */
 const DEFAULT_DURATION = 10;
@@ -78,20 +95,70 @@ export async function runChain(args: RunChainArgs): Promise<ClipResult[]> {
     worldBlock,
     uploadFrame,
     onPhase,
+    onCheckpoint,
+    resumeFrom,
     signal,
   } = args;
   const extract = args.extractFrame ?? defaultExtractFrame;
 
-  const results: ClipResult[] = [];
+  const results: ClipResult[] = resumeFrom?.clips ? [...resumeFrom.clips] : [];
+  const startIndex = results.length;
   let currentImageUrl = args.seedImageUrl;
 
   vlog("chain", `start: ${segments.length} clips on ${model}`, {
     aspect,
     quality,
     seedImageUrl: args.seedImageUrl,
+    resumeFromIndex: startIndex,
+    hasNextImageUrl: Boolean(resumeFrom?.nextImageUrl),
   });
 
-  for (let i = 0; i < segments.length; i++) {
+  // Re-emit done events for already-completed clips so the UI catches
+  // up on its progress markers when resuming.
+  for (let j = 0; j < startIndex; j++) {
+    onPhase?.({
+      type: "clip-done",
+      index: j,
+      total: segments.length,
+      clip: results[j],
+    });
+  }
+
+  // If resuming and we already have the next-clip's image URL from a
+  // prior frame upload, use it. Otherwise if we have clips but no
+  // uploaded frame (chain crashed *during* frame extract/upload),
+  // re-extract from the last clip's blob below.
+  if (resumeFrom?.nextImageUrl) {
+    currentImageUrl = resumeFrom.nextImageUrl;
+  } else if (startIndex > 0 && startIndex < segments.length) {
+    const lastClip = results[startIndex - 1];
+    vlog("chain", `resume: re-extracting frame from clip ${startIndex}/${segments.length}`);
+    onPhase?.({
+      type: "frame-extract",
+      index: startIndex - 1,
+      total: segments.length,
+    });
+    const objectUrl = URL.createObjectURL(lastClip.blob);
+    try {
+      const frameBlob = await extract(objectUrl, signal);
+      onPhase?.({
+        type: "frame-upload",
+        index: startIndex - 1,
+        total: segments.length,
+      });
+      currentImageUrl = await uploadFrame(frameBlob, `frame-${startIndex}.png`);
+      vlog("chain", `resume: frame re-uploaded`, { url: currentImageUrl });
+      await onCheckpoint?.({
+        kind: "frame-uploaded",
+        clips: [...results],
+        nextImageUrl: currentImageUrl,
+      });
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }
+
+  for (let i = startIndex; i < segments.length; i++) {
     if (signal?.aborted) throw abortError();
     const segment = segments[i];
     const clipNum = `${i + 1}/${segments.length}`;
@@ -174,6 +241,7 @@ export async function runChain(args: RunChainArgs): Promise<ClipResult[]> {
       total: segments.length,
       clip: result,
     });
+    await onCheckpoint?.({ kind: "clip-done", clips: [...results] });
     vlog(
       "chain",
       `clip ${clipNum} end-to-end in ${fmtMs(Date.now() - tClip)}`,
@@ -215,6 +283,11 @@ export async function runChain(args: RunChainArgs): Promise<ClipResult[]> {
           `frame uploaded in ${fmtMs(Date.now() - tUpload)}`,
           { url: currentImageUrl },
         );
+        await onCheckpoint?.({
+          kind: "frame-uploaded",
+          clips: [...results],
+          nextImageUrl: currentImageUrl,
+        });
       } catch (err) {
         vwarn(
           "chain",

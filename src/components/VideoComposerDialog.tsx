@@ -38,6 +38,10 @@ import {
   useGenerateVideoPipeline,
   type GenerationPhase,
 } from "@/hooks/useGenerateVideoPipeline";
+import {
+  findResumableForPersona,
+  type ChainSummary,
+} from "@/lib/video/chainStore";
 import type { Persona } from "@/lib/persona";
 
 const DURATION_OPTIONS = [15, 30, 45, 60, 75, 90] as const;
@@ -91,19 +95,39 @@ export function VideoComposerDialog(props: VideoComposerDialogProps) {
   });
   const { phase } = pipeline;
 
-  // Auto-fire the preview generation as soon as the dialog opens with
-  // a non-empty idea. The user can regenerate from the preview-ready
-  // step if they want a different look.
+  // If the user has a checkpointed chain for this persona, ask them
+  // whether to resume before kicking off a fresh preview.
+  const [resumable, setResumable] = useState<ChainSummary | null>(null);
+  const [resumeChecked, setResumeChecked] = useState(false);
+
   useEffect(() => {
     if (!open) return;
+    let cancelled = false;
+    void findResumableForPersona(persona.pubkey).then((r) => {
+      if (cancelled) return;
+      setResumable(r);
+      setResumeChecked(true);
+    });
+    return () => {
+      cancelled = true;
+      setResumeChecked(false);
+      setResumable(null);
+    };
+  }, [open, persona.pubkey]);
+
+  // Auto-fire preview generation only AFTER we've checked for resumes
+  // and there isn't one (or the user dismissed it). The resume step
+  // sets `resumable` to null when dismissed/started.
+  useEffect(() => {
+    if (!open) return;
+    if (!resumeChecked) return;
+    if (resumable) return;
     if (phase.type !== "idle") return;
     if (!idea.trim()) return;
     void pipeline.generatePreview();
-    // We deliberately depend only on `open`; pipeline + idea are
-    // captured by closure and we don't want to re-fire on every
-    // render.
+    // We deliberately depend only on the gating signals.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, resumeChecked, resumable]);
 
   const handleClose = (next: boolean) => {
     if (!next) {
@@ -138,27 +162,47 @@ export function VideoComposerDialog(props: VideoComposerDialogProps) {
         </DialogHeader>
 
         <div className="px-6 py-5 space-y-5 min-h-[20rem]">
-          <PhaseView
-            phase={phase}
-            personaAvatarUrl={personaAvatarUrl}
-            onRegeneratePreview={() => void pipeline.generatePreview()}
-            onConfirmDuration={(dur) =>
-              void pipeline.confirmAndGenerate(dur)
-            }
-            onPublish={(caption) => void pipeline.publish(caption)}
-            onCopyEventId={(id) => {
-              navigator.clipboard
-                .writeText(nip19.noteEncode(id))
-                .then(() =>
-                  toast({
-                    title: "Copied",
-                    description: "Event note id on the clipboard",
-                  }),
-                )
-                .catch(() => undefined);
-            }}
-            onClose={() => handleClose(false)}
-          />
+          {resumable && phase.type === "idle" ? (
+            <ResumePrompt
+              summary={resumable}
+              onResume={() => {
+                const id = resumable.chainId;
+                setResumable(null);
+                void pipeline.resume(id);
+              }}
+              onDiscard={() => {
+                const id = resumable.chainId;
+                setResumable(null);
+                void pipeline.discardCheckpoint(id);
+              }}
+            />
+          ) : (
+            <PhaseView
+              phase={phase}
+              personaAvatarUrl={personaAvatarUrl}
+              onRegeneratePreview={() => void pipeline.generatePreview()}
+              onConfirmDuration={(dur) =>
+                void pipeline.confirmAndGenerate(dur)
+              }
+              onPublish={(caption) => void pipeline.publish(caption)}
+              onResume={(id) => void pipeline.resume(id)}
+              onDiscardCheckpoint={(id) =>
+                void pipeline.discardCheckpoint(id)
+              }
+              onCopyEventId={(id) => {
+                navigator.clipboard
+                  .writeText(nip19.noteEncode(id))
+                  .then(() =>
+                    toast({
+                      title: "Copied",
+                      description: "Event note id on the clipboard",
+                    }),
+                  )
+                  .catch(() => undefined);
+              }}
+              onClose={() => handleClose(false)}
+            />
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -173,6 +217,8 @@ function PhaseView(props: {
   onRegeneratePreview: () => void;
   onConfirmDuration: (durationSecs: number) => void;
   onPublish: (caption: string) => void;
+  onResume: (chainId: string) => void;
+  onDiscardCheckpoint: (chainId: string) => void;
   onCopyEventId: (eventId: string) => void;
   onClose: () => void;
 }) {
@@ -182,6 +228,8 @@ function PhaseView(props: {
     onRegeneratePreview,
     onConfirmDuration,
     onPublish,
+    onResume,
+    onDiscardCheckpoint,
     onCopyEventId,
     onClose,
   } = props;
@@ -300,10 +348,74 @@ function PhaseView(props: {
         <ErrorBlock
           message={phase.message}
           cause={phase.cause}
+          resumableChainId={phase.resumableChainId}
+          resumableCompletedClips={phase.resumableCompletedClips}
+          resumableTotalClips={phase.resumableTotalClips}
           onRetry={onRegeneratePreview}
+          onResume={onResume}
+          onDiscardCheckpoint={onDiscardCheckpoint}
         />
       );
   }
+}
+
+function ResumePrompt(props: {
+  summary: ChainSummary;
+  onResume: () => void;
+  onDiscard: () => void;
+}) {
+  const { summary, onResume, onDiscard } = props;
+  // Lazy initializer runs once on mount — fine for an "X minutes ago" snapshot.
+  const [ageMin] = useState(() =>
+    Math.max(1, Math.round((Date.now() - summary.updatedAt) / 60000)),
+  );
+  const phaseLabel = summary.hasCaption
+    ? "ready to publish"
+    : summary.hasStitchedUrl
+      ? "stitched + uploaded; needs caption"
+      : summary.hasStitched
+        ? "stitched; needs Blossom upload"
+        : summary.totalSegments > 0
+          ? `clip ${summary.completedClips}/${summary.totalSegments} done`
+          : "script not yet ready";
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-xs uppercase tracking-[0.18em] text-rw-gold font-semibold pb-1">
+          Resume?
+        </p>
+        <h3 className="font-display text-xl font-medium tracking-tight">
+          You have an unfinished video for {summary.personaName}
+        </h3>
+        <p className="text-xs text-muted-foreground pt-1">
+          Last activity {ageMin}m ago · {phaseLabel}.
+        </p>
+      </div>
+      <div className="rounded-md border border-imigongo-clay/20 bg-imigongo-cream/30 p-3 text-xs space-y-1">
+        <div>
+          <span className="text-muted-foreground">Idea:</span>{" "}
+          <span className="line-clamp-3">{summary.idea}</span>
+        </div>
+        {summary.totalSegments > 0 && (
+          <div>
+            <span className="text-muted-foreground">Progress:</span>{" "}
+            {summary.completedClips}/{summary.totalSegments} clips already paid
+            for
+          </div>
+        )}
+      </div>
+      <div className="flex justify-end gap-2 pt-1">
+        <Button variant="ghost" onClick={onDiscard}>
+          Start fresh
+        </Button>
+        <Button onClick={onResume} className="shadow-md shadow-primary/20">
+          <RefreshCcw className="size-4 mr-2" aria-hidden="true" />
+          Resume
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 /* ---------- step components ---------- */
@@ -643,9 +755,23 @@ function BusyBlock(props: {
 function ErrorBlock(props: {
   message: string;
   cause?: unknown;
+  resumableChainId?: string;
+  resumableCompletedClips?: number;
+  resumableTotalClips?: number;
   onRetry: () => void;
+  onResume: (chainId: string) => void;
+  onDiscardCheckpoint: (chainId: string) => void;
 }) {
-  const { message, cause, onRetry } = props;
+  const {
+    message,
+    cause,
+    resumableChainId,
+    resumableCompletedClips,
+    resumableTotalClips,
+    onRetry,
+    onResume,
+    onDiscardCheckpoint,
+  } = props;
   // Pull useful diagnostics out of any error-shaped cause: HTTP status,
   // ppq.ai's `body.error.{message,type}` payload, or the raw stack.
   const c = cause as
@@ -698,11 +824,31 @@ function ErrorBlock(props: {
           {c?.stack ?? JSON.stringify(c, null, 2) ?? "(no detail)"}
         </pre>
       </details>
-      <div className="flex justify-end pt-1">
-        <Button variant="outline" onClick={onRetry}>
-          <RefreshCcw className="size-4 mr-2" aria-hidden="true" />
-          Try again
-        </Button>
+      <div className="flex justify-end gap-2 pt-1 flex-wrap">
+        {resumableChainId && (
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => onDiscardCheckpoint(resumableChainId)}
+            >
+              Discard progress
+            </Button>
+            <Button
+              onClick={() => onResume(resumableChainId)}
+              className="shadow-md shadow-primary/20"
+            >
+              <RefreshCcw className="size-4 mr-2" aria-hidden="true" />
+              Resume from clip {(resumableCompletedClips ?? 0) + 1}
+              {resumableTotalClips ? `/${resumableTotalClips}` : ""}
+            </Button>
+          </>
+        )}
+        {!resumableChainId && (
+          <Button variant="outline" onClick={onRetry}>
+            <RefreshCcw className="size-4 mr-2" aria-hidden="true" />
+            Try again
+          </Button>
+        )}
       </div>
     </div>
   );
