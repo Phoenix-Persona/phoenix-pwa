@@ -1,4 +1,11 @@
 @import "tailwindcss";
+/* tailwindcss-safe-area provides *-safe utilities (pt-safe, pb-safe,
+   px-safe, h-dvh-safe, …) backed by env(safe-area-inset-*). Must
+   come AFTER `tailwindcss` so its utilities can pick up the variables.
+   Capacitor's SystemBars plugin (configured in capacitor.config.ts
+   with insetsHandling: 'css') injects --safe-area-inset-* on Android
+   to work around Chromium WebView <140 reporting env() as 0. */
+@import "tailwindcss-safe-area";
 @import "tw-animate-css";
 
 /* Rwandan-rooted typography:
