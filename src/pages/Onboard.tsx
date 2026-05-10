@@ -68,14 +68,12 @@ const Onboard = () => {
   const [step, setStep] = useState<WizardStep>("details");
 
   // Details
-  const [name, setName] = useState("Voice of Rwanda");
+  const [name, setName] = useState("");
   // Persona handle auto-derives from `name` while untouched; once the
   // user edits it, we stop syncing (tracked by `usernameDirty`).
-  const [username, setUsername] = useState(slugifyForUsername("Voice of Rwanda"));
+  const [username, setUsername] = useState("");
   const [usernameDirty, setUsernameDirty] = useState(false);
-  const [lightningUsername, setLightningUsername] = useState(
-    slugifyForUsername("Voice of Rwanda"),
-  );
+  const [lightningUsername, setLightningUsername] = useState("");
   const [lightningUsernameDirty, setLightningUsernameDirty] = useState(false);
   const [bio, setBio] = useState(
     "An AI-assisted voice. Press freedom, civil society, the long memory."

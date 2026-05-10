@@ -125,11 +125,31 @@ describe("Onboard", () => {
     });
   });
 
+  it("starts identity fields blank and derives handles from the display name", () => {
+    render(<Onboard />);
+
+    const name = screen.getByLabelText(/display name/i) as HTMLInputElement;
+    const username = screen.getByLabelText(/^username$/i) as HTMLInputElement;
+    const lightning = screen.getByLabelText(/lightning address/i) as HTMLInputElement;
+
+    expect(name.value).toBe("");
+    expect(username.value).toBe("");
+    expect(lightning.value).toBe("");
+
+    fireEvent.change(name, { target: { value: "Voice of Rwanda" } });
+
+    expect(username.value).toBe("voice-of-rwanda");
+    expect(lightning.value).toBe("voice-of-rwanda");
+  });
+
   it("does not generate the persona keypair until Create is clicked", async () => {
     render(<Onboard />);
 
     expect(mocks.generatePersonaKeypair).not.toHaveBeenCalled();
 
+    fireEvent.change(screen.getByLabelText(/display name/i), {
+      target: { value: "Voice of Rwanda" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /next: profile picture/i }));
 
     expect(mocks.generatePersonaKeypair).not.toHaveBeenCalled();
@@ -167,6 +187,9 @@ describe("Onboard", () => {
   it("does not show a separate skip button on the picture step", () => {
     render(<Onboard />);
 
+    fireEvent.change(screen.getByLabelText(/display name/i), {
+      target: { value: "Voice of Rwanda" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /next: profile picture/i }));
 
     expect(screen.getByRole("button", { name: /create persona/i })).toBeInTheDocument();
