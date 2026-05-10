@@ -1,0 +1,4 @@
+# Local fixtures + outputs from mix-background-music.ts iterations.
+# Re-downloaded on demand from the upstream URLs in the script.
+.cache/
+.out/
