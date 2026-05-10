@@ -786,7 +786,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
                     Encrypting…
                   </>
                 ) : (
-                  'Encrypt &amp; continue'
+                  'Encrypt & continue'
                 )}
               </Button>
             </div>
@@ -1039,7 +1039,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
                     Encrypting…
                   </>
                 ) : (
-                  'Encrypt &amp; continue'
+                  'Encrypt & continue'
                 )}
               </Button>
 
@@ -1055,7 +1055,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
                     Logging in…
                   </>
                 ) : (
-                  'Skip — keep my key accessible without a passphrase'
+                  'Skip — log in without encryption'
                 )}
               </Button>
 
@@ -1128,7 +1128,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
                     Decrypting…
                   </>
                 ) : (
-                  'Import &amp; log in'
+                  'Import & log in'
                 )}
               </Button>
 
