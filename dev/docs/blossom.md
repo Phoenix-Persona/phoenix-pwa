@@ -4,7 +4,7 @@ Content-addressed media protocol for Nostr. Blobs are addressed by their
 sha256 hash and served over HTTP. Auth uses Nostr-signed events instead of
 traditional credentials.
 
-> Phoenix usage: profile picture, reference image, voice sample, post
+> Zuka usage: profile picture, reference image, voice sample, post
 > images, post audio (PROJECT.md §5.4). Voice samples are public — no
 > encryption needed at rest on Blossom.
 
@@ -37,7 +37,7 @@ This means the persona signs its own uploads — no separate Blossom account.
 
 Full list: `github.com/hzrd149/blossom`.
 
-## How Phoenix uses it
+## How Zuka uses it
 
 | Asset             | Where it lives | Referenced from                          |
 | ----------------- | -------------- | ---------------------------------------- |
@@ -58,7 +58,7 @@ image as input.
 - **kind 24242** — auth tokens (BUD-11)
 - **kind 10063** — user's preferred Blossom server list
 - **NIP-92 / NIP-94** — `imeta` tags pointing at Blossom URLs in posts.
-  See `docs/guides/nostr-nips.md`.
+  See `./nostr-nips.md`.
 
 ## Source
 

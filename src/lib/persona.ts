@@ -95,6 +95,24 @@ const personaSchema = z.object({
    */
   dTag: z.string().min(1).max(128).optional(),
   name: z.string().min(1).max(120),
+  /**
+   * URL-friendly handle. Drives the Spark Lightning Address registration
+   * (`<username>@spark.money`) and the kind 0 `name` field. Optional for
+   * back-compat with personas authored before this field landed; new
+   * personas always write it. Lowercase letters, digits, and hyphens.
+   */
+  username: z
+    .string()
+    .min(1)
+    .max(60)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, "lowercase letters, digits, and hyphens; must start with a letter or digit")
+    .optional(),
+  /**
+   * Rich/free-form name shown in the persona's kind 0 `display_name`.
+   * Falls back to `name` if missing — the two are aliases on read but
+   * `display_name` is preferred when present.
+   */
+  display_name: z.string().min(1).max(120).optional(),
   system_prompt: z.string().max(20000),
   voice_id: z.string().min(1).max(64),
   voice_sample_url: z.string().min(1).max(2048).optional(),

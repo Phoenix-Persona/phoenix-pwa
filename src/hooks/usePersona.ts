@@ -38,6 +38,7 @@ import {
   tryDecryptPhoenixEnvelope,
   type Nip44Signer,
 } from "@/lib/personaCrypto";
+import { npubToHex } from "@/lib/nostrIds";
 import { useCurrentUser } from "./useCurrentUser";
 
 // Module-level cache. Lives for the duration of the page session.
@@ -62,16 +63,6 @@ async function decryptWithCache(
   const env = await tryDecryptPhoenixEnvelope(ev.content, userPubkey, signer);
   decryptCache.set(ev.id, env ?? "not-phoenix");
   return env;
-}
-
-function npubToHex(npub: string): string | null {
-  try {
-    const decoded = nip19.decode(npub);
-    if (decoded.type !== "npub") return null;
-    return decoded.data;
-  } catch {
-    return null;
-  }
 }
 
 /**

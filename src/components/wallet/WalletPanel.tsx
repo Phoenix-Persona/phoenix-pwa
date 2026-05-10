@@ -5,16 +5,31 @@
  *
  * Sections:
  *   - Balance (sats + USD where available)
- *   - Lightning Address (copy)
+ *   - Lightning Address (copy + LNURL/QR toggle)
  *   - Receive / Send buttons (open child dialogs)
  *   - PPQ credits + auto-topup state
  *   - Recent payments
+ *
+ * Lightning Address registration lives on the EditPersona page —
+ * changing it requires re-publishing kind 0 and the encrypted backup,
+ * so the wallet panel only renders the read-only address (or a hint
+ * pointing at the edit page when missing).
  */
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Copy, Zap } from "lucide-react";
+import { Link } from "react-router-dom";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  QrCode,
+  Zap,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { QRCodeCanvas } from "@/components/ui/qrcode";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/useToast";
 import type { UseWalletResult } from "@/hooks/useWallet";
@@ -23,6 +38,13 @@ import { SendDialog } from "./SendDialog";
 
 interface WalletPanelProps {
   wallet: UseWalletResult;
+  /**
+   * When provided AND the wallet has no Lightning Address registered,
+   * the missing-address state renders a hint linking here so the user
+   * can claim a username from the persona profile editor. Omitted in
+   * the dev harness (no persona context).
+   */
+  editPersonaHref?: string;
 }
 
 function fmtSats(n: number | undefined): string {
@@ -41,18 +63,26 @@ function fmtTime(ts: number | undefined): string {
   return d.toLocaleString();
 }
 
-export function WalletPanel({ wallet }: WalletPanelProps) {
+export function WalletPanel({ wallet, editPersonaHref }: WalletPanelProps) {
   const { toast } = useToast();
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
+  const [showLnurl, setShowLnurl] = useState(false);
 
   const balanceSats = wallet.info?.balanceSats;
   const lightningAddress = wallet.info?.lightningAddress;
+  const lnurlPay = wallet.info?.lnurlPay;
 
   function copyAddress() {
     if (!lightningAddress) return;
     navigator.clipboard.writeText(lightningAddress);
     toast({ title: "Lightning Address copied" });
+  }
+
+  function copyLnurl() {
+    if (!lnurlPay) return;
+    navigator.clipboard.writeText(lnurlPay);
+    toast({ title: "LNURL copied" });
   }
 
   if (!wallet.handle) {
@@ -92,25 +122,84 @@ export function WalletPanel({ wallet }: WalletPanelProps) {
         </p>
       </section>
 
-      {/* Lightning Address */}
-      <section>
+      {/* Lightning Address + static LNURL */}
+      <section className="space-y-2">
         <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
           Lightning Address
         </p>
         {lightningAddress ? (
-          <div className="flex items-center gap-2">
-            <code className="text-sm bg-muted px-2 py-1 rounded">
-              {lightningAddress}
-            </code>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={copyAddress}
-              aria-label="Copy Lightning Address"
+          <>
+            <div className="flex items-center gap-2 min-w-0">
+              <code className="text-sm bg-muted px-2 py-1 rounded truncate min-w-0">
+                {lightningAddress}
+              </code>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={copyAddress}
+                aria-label="Copy Lightning Address"
+                className="shrink-0"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            {lnurlPay ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowLnurl((v) => !v)}
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
+                  {showLnurl ? "Hide LNURL / QR" : "Show LNURL / QR"}
+                  {showLnurl ? (
+                    <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                </button>
+                {showLnurl ? (
+                  <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
+                    <div className="flex justify-center">
+                      <div className="rounded bg-white p-2">
+                        <QRCodeCanvas value={lnurlPay} size={192} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <code className="flex-1 min-w-0 text-[10px] font-mono bg-background px-2 py-1 rounded truncate">
+                        {lnurlPay}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={copyLnurl}
+                        aria-label="Copy LNURL"
+                        className="shrink-0"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Scan the QR or paste the bech32 LNURL into any wallet
+                      that supports LNURL-pay — same destination as the
+                      Lightning Address above.
+                    </p>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </>
+        ) : editPersonaHref ? (
+          <p className="text-sm text-muted-foreground">
+            No Lightning Address yet. Set a username on the{" "}
+            <Link
+              to={editPersonaHref}
+              className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
             >
-              <Copy className="h-4 w-4" />
-            </Button>
-          </div>
+              Edit persona
+            </Link>{" "}
+            page to register one.
+          </p>
         ) : (
           <p className="text-sm text-muted-foreground">
             Not registered yet. Use Receive to generate an invoice instead.

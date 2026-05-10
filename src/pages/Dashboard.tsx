@@ -25,35 +25,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/useToast";
 import { useAuthor } from "@/hooks/useAuthor";
-import { useCrossPost } from "@/hooks/useCrossPost";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { usePersonaComposer } from "@/hooks/usePersonaComposer";
 import { usePersona, usePersonaPosts } from "@/hooks/usePersona";
-import { usePersonaPublish } from "@/hooks/usePersonaPublish";
-import { usePpqInference } from "@/hooks/usePpqInference";
 import { useWallet } from "@/hooks/useWallet";
-import { buildPersonaPostTemplate } from "@/lib/personaPost";
-import { nip19 } from "nostr-tools";
-
-function npubToHex(npub: string): string | null {
-  try {
-    const decoded = nip19.decode(npub);
-    if (decoded.type !== "npub") return null;
-    return decoded.data;
-  } catch {
-    return null;
-  }
-}
+import { featureFlags } from "@/lib/features";
+import { npubToHex } from "@/lib/nostrIds";
 
 const Dashboard = () => {
   const { npub = "" } = useParams();
   useSeoMeta({ title: "Dashboard — Zuka" });
+  const crossPostEnabled = featureFlags.crossPost;
 
   const { user } = useCurrentUser();
   const { toast } = useToast();
   const persona = usePersona(npub);
   const posts = usePersonaPosts(npub, 20);
-  const publish = usePersonaPublish();
-  const crossPost = useCrossPost();
 
   // Composer fields. `raw` is the idea/draft body (legacy name kept
   // for git-blame continuity); the new V1.5 composer also collects
@@ -86,25 +73,24 @@ const Dashboard = () => {
   const stylingModel =
     envelope?.model_prefs?.agent ?? "anthropic/claude-sonnet-4.5";
 
-  const wallet = useWallet({ mnemonic: walletSeed });
-  const styling = usePpqInference();
+  const wallet = useWallet({
+    walletId: personaConfig ? `persona:${personaConfig.pubkey}` : undefined,
+    mnemonic: walletSeed,
+  });
+  const composer = usePersonaComposer({
+    persona: personaConfig,
+    stylingModel,
+    crossPostEnabled,
+    wallet,
+    onPublished: () => {
+      posts.refetch();
+    },
+  });
 
   async function onStyle() {
-    if (!personaConfig || !raw.trim()) return;
     try {
-      const res = await styling.mutateAsync({
-        model: stylingModel,
-        messages: [
-          { role: "system", content: personaConfig.system_prompt },
-          { role: "user", content: raw },
-        ],
-      });
-      const styled = res.choices?.[0]?.message?.content?.trim();
-      if (styled) {
-        setRaw(styled);
-        wallet.refreshPpqBalance();
-        wallet.refreshInfo();
-      }
+      const styled = await composer.styleInVoice(raw);
+      if (styled) setRaw(styled);
     } catch (e) {
       toast({
         title: "Styling failed",
@@ -115,52 +101,26 @@ const Dashboard = () => {
   }
 
   async function onPost() {
-    if (!personaConfig || !user || !raw.trim()) return;
     try {
-      // The hints field is captured for the future styling pipeline
-      // but not surfaced in the published event (style is shape, not
-      // content). Sources DO go on the event as `r` tags so
-      // attribution rides the post immediately. AI styling is opt-in
-      // via the "Style in voice" button — by the time we get here,
-      // `raw` is whatever the user wants to publish (literal or
-      // styled).
-      const sources = sourcesInput
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const template = buildPersonaPostTemplate({
+      const result = await composer.publishTextOnly({
         text: raw,
-        tags: personaConfig.tags,
-        sources,
+        sourcesInput,
       });
-      const signed = await publish.mutateAsync({
-        personaNsec: personaConfig.nsec,
-        template,
-      });
+      if (!result) return;
 
-      // Successful Nostr publish — try the cross-post webhook if
-      // configured. Failures are non-fatal: the post is already live
-      // on relays, so we surface a non-blocking warning toast.
-      if (personaConfig.cross_post?.webhook_url) {
-        try {
-          await crossPost.mutateAsync({
-            persona: personaConfig,
-            event: signed,
-          });
-          toast({
-            title: "Published",
-            description: "Live on relays and dispatched to your cross-post webhook.",
-          });
-        } catch (e) {
-          toast({
-            title: "Cross-post failed",
-            description:
-              e instanceof Error
-                ? `Posted to relays, but the webhook returned: ${e.message}`
-                : "Posted to relays, but the cross-post webhook didn't accept the event.",
-            variant: "destructive",
-          });
-        }
+      if (result.crossPost === "sent") {
+        toast({
+          title: "Published",
+          description: "Live on relays and dispatched to your cross-post webhook.",
+        });
+      } else if (result.crossPost === "failed") {
+        toast({
+          title: "Cross-post failed",
+          description: `Posted to relays, but the webhook returned: ${
+            result.crossPostError?.message ?? "Unknown error"
+          }`,
+          variant: "destructive",
+        });
       } else {
         toast({ title: "Published", description: "Post is live on relays." });
       }
@@ -168,7 +128,6 @@ const Dashboard = () => {
       setRaw("");
       setSourcesInput("");
       setHintsInput("");
-      posts.refetch();
     } catch (e) {
       toast({
         title: "Publish failed",
@@ -366,7 +325,7 @@ const Dashboard = () => {
                         (e.metaKey || e.ctrlKey) &&
                         e.key === "Enter" &&
                         raw.trim() &&
-                        !publish.isPending
+                        !composer.isPublishing
                       ) {
                         e.preventDefault();
                         onPost();
@@ -429,7 +388,7 @@ const Dashboard = () => {
                 </div>
 
                 {/* Cross-post indicator (read-only) */}
-                {personaConfig.cross_post?.webhook_url && (
+                {crossPostEnabled && personaConfig.cross_post?.webhook_url && (
                   <div className="flex flex-wrap items-center gap-2 rounded-lg border border-rw-sky/25 bg-rw-sky/5 px-4 py-2.5 text-xs">
                     <span className="font-medium text-foreground">
                       Cross-post:
@@ -459,12 +418,10 @@ const Dashboard = () => {
                   </div>
                 )}
 
-                {/* Action row — primary 'Generate video' (disabled until
-                    Jim's PPQ video → Blossom seam lands), secondary
+                {/* Action row — primary 'Generate video', secondary
                     'Publish text-only' fallback that ships the kind 1
-                    immediately. "Style in voice" rewrites the idea
-                    text using the persona's system prompt before
-                    publish (PPQ chat completion). */}
+                    immediately. "Style in voice" rewrites the idea text
+                    using the persona's system prompt before publish. */}
                 <div className="space-y-3 pt-1">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <Button
@@ -475,9 +432,7 @@ const Dashboard = () => {
                         setHintsInput("");
                       }}
                       disabled={
-                        publish.isPending ||
-                        crossPost.isPending ||
-                        styling.isPending
+                        composer.isPublishing || composer.isStyling
                       }
                     >
                       Discard
@@ -487,9 +442,8 @@ const Dashboard = () => {
                         variant="outline"
                         onClick={onStyle}
                         disabled={
-                          styling.isPending ||
-                          publish.isPending ||
-                          crossPost.isPending ||
+                          composer.isStyling ||
+                          composer.isPublishing ||
                           !raw.trim() ||
                           !walletSeed
                         }
@@ -499,7 +453,7 @@ const Dashboard = () => {
                             : "Rewrite the idea in the persona's voice (PPQ chat)"
                         }
                       >
-                        {styling.isPending ? (
+                        {composer.isStyling ? (
                           <>
                             <Loader2
                               className="mr-2 size-4 animate-spin"
@@ -521,14 +475,13 @@ const Dashboard = () => {
                         variant="outline"
                         onClick={onPost}
                         disabled={
-                          publish.isPending ||
-                          crossPost.isPending ||
-                          styling.isPending ||
+                          composer.isPublishing ||
+                          composer.isStyling ||
                           !raw.trim()
                         }
                         title="Publish a text-only kind 1 note (no video)"
                       >
-                        {publish.isPending || crossPost.isPending ? (
+                        {composer.isPublishing ? (
                           <>
                             <Loader2
                               className="mr-2 size-4 animate-spin"
@@ -550,8 +503,8 @@ const Dashboard = () => {
                         onClick={() => setVideoDialogOpen(true)}
                         disabled={
                           !raw.trim() ||
-                          publish.isPending ||
-                          crossPost.isPending
+                          composer.isPublishing ||
+                          composer.isStyling
                         }
                         className="shadow-lg shadow-primary/20"
                         title="Open the video composer (Seedance i2v chain → stitched MP4 → kind 1)"
@@ -638,6 +591,7 @@ const Dashboard = () => {
           open={walletOpen}
           onOpenChange={setWalletOpen}
           personaName={personaConfig.name}
+          editPersonaHref={`/dashboard/${npub}/edit`}
         />
       ) : null}
     </div>

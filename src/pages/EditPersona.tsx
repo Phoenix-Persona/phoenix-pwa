@@ -23,10 +23,9 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useNostr } from "@nostrify/react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { NostrEvent } from "@nostrify/nostrify";
-import { nip19 } from "nostr-tools";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe } from "@/components/ImigongoBand";
@@ -39,15 +38,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePersona } from "@/hooks/usePersona";
 import { useToast } from "@/hooks/useToast";
+import { useUpdatePersona } from "@/hooks/useUpdatePersona";
+import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
+import { featureFlags } from "@/lib/features";
+import { type PhoenixEnvelope } from "@/lib/persona";
 import {
-  buildEncryptedPersonaTemplate,
-  type Persona,
-  type PhoenixEnvelope,
-} from "@/lib/persona";
-import {
-  encryptPhoenixEnvelope,
-  type Nip44Signer,
-} from "@/lib/personaCrypto";
+  isValidLightningUsername,
+  slugifyForUsername,
+  SPARK_LN_DOMAIN,
+} from "@/lib/wallet/lightningAddress";
+import { parseCommaList } from "@/lib/text";
 
 const EditPersona = () => {
   const { npub = "" } = useParams();
@@ -129,16 +129,24 @@ interface EditPersonaFormProps {
 
 function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) {
   const navigate = useNavigate();
-  const { user } = useCurrentUser();
   const { nostr } = useNostr();
+  const { user } = useCurrentUser();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const updatePersona = useUpdatePersona();
+  const crossPostEnabled = featureFlags.crossPost;
 
   const original = envelope.persona;
 
   // Initialize directly from props — the parent passes a `key` of the
   // persona pubkey so a different persona triggers a full remount.
-  const [name, setName] = useState(original.name);
+  // `name` is the schema's required display field; we expose it as
+  // "Display name" in the UI and keep it in sync with the new
+  // `display_name` field on save.
+  const [name, setName] = useState(original.display_name ?? original.name);
+  const initialUsername =
+    original.username ?? slugifyForUsername(original.display_name ?? original.name);
+  const [username, setUsername] = useState(initialUsername);
+  const [usernameDirty, setUsernameDirty] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState(original.system_prompt);
   const [voiceId, setVoiceId] = useState(original.voice_id);
   const [tagsInput, setTagsInput] = useState(original.tags.join(", "));
@@ -166,7 +174,26 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   const [webhookPlatformsInput, setWebhookPlatformsInput] = useState(
     (original.cross_post?.webhook_platforms ?? []).join(", ")
   );
-  const [saving, setSaving] = useState(false);
+  const saving = updatePersona.isPending;
+
+  // Live availability check for the username field. Skip while the
+  // value still matches the original (no-op rename).
+  const availability = useUsernameAvailability(
+    username !== initialUsername ? username : "",
+  );
+
+  function onNameChange(next: string) {
+    setName(next);
+    if (!usernameDirty) {
+      setUsername(slugifyForUsername(next));
+    }
+  }
+
+  function onUsernameChange(next: string) {
+    const cleaned = next.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    setUsername(cleaned);
+    setUsernameDirty(true);
+  }
 
   // Bio + picture come from the persona's public kind 0 — fetched
   // separately because they live on the public profile, not the
@@ -233,108 +260,59 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
       return;
     }
 
-    setSaving(true);
+    // Username gate: if the user edited the username, it must be a
+    // valid LN-address handle before we commit. The mint path's SDK
+    // call would also reject, but we'd rather fail before connecting.
+    const trimmedUsername = username.trim();
+    if (trimmedUsername && !isValidLightningUsername(trimmedUsername)) {
+      toast({
+        title: "Invalid username",
+        description:
+          "Usernames must start with a letter or digit and contain only lowercase letters, digits, and hyphens.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      // Build the updated persona — identity fields are immutable
-      // (pubkey, nsec, created_at, dTag).
       // Cross-post block — only emit if a webhook URL is set, so we
       // don't bloat the encrypted payload with empty fields. Empty
       // string clears the configuration entirely.
       const trimmedWebhook = webhookUrl.trim();
-      const webhookPlatforms = parseList(webhookPlatformsInput, []);
-      const cross_post = trimmedWebhook
-        ? {
-            webhook_url: trimmedWebhook,
-            ...(webhookPlatforms.length > 0
-              ? { webhook_platforms: webhookPlatforms }
-              : {}),
-          }
-        : undefined;
+      const webhookPlatforms = parseCommaList(webhookPlatformsInput, []);
+      const cross_post = crossPostEnabled
+        ? trimmedWebhook
+          ? {
+              webhook_url: trimmedWebhook,
+              ...(webhookPlatforms.length > 0
+                ? { webhook_platforms: webhookPlatforms }
+                : {}),
+            }
+          : undefined
+        : original.cross_post;
 
-      const updated: Persona = {
-        ...original,
-        // Promote the resolved d-tag into the plaintext payload so
-        // future updates don't have to fall back to the event tag.
-        dTag,
-        name: name.trim() || original.name,
-        system_prompt: systemPrompt,
-        voice_id: voiceId.trim() || original.voice_id,
-        languages: parseList(languagesInput, original.languages),
-        tags: parseList(tagsInput, []),
-        reference_image_url: pictureUrl || undefined,
-        cross_post,
-      };
-
-      const signer = user.signer as unknown as Nip44Signer;
-
-      const ciphertext = await encryptPhoenixEnvelope(
-        {
-          persona: updated,
-          wallet: envelope.wallet,
-          model_prefs: envelope.model_prefs,
-          settings: envelope.settings,
-        },
-        user.pubkey,
-        signer
-      );
-
-      const tmpl = buildEncryptedPersonaTemplate({
-        dTag,
-        encryptedContent: ciphertext,
-      });
-      const signed = await user.signer.signEvent(tmpl);
-      await nostr.event(signed, { signal: AbortSignal.timeout(8000) });
-
-      // If the public-facing name, bio, or picture changed,
-      // re-publish kind 0 signed by the persona keypair.
-      const nameChanged = updated.name !== original.name;
-      const bioChanged = bioHydrated && bio !== originalBio;
-      const pictureChanged = pictureHydrated && pictureUrl !== originalPicture;
-      if (nameChanged || bioChanged || pictureChanged) {
-        try {
-          const decoded = nip19.decode(updated.nsec);
-          if (decoded.type !== "nsec") throw new Error("Bad nsec");
-          const { finalizeEvent } = await import("nostr-tools/pure");
-          const kind0Content: Record<string, unknown> = {
-            name: updated.name,
-            display_name: updated.name,
-            about: bio,
-            picture: pictureUrl || "",
-            bot: true,
-          };
-          if (pictureUrl) {
-            kind0Content.phoenix = {
-              reference_image: pictureUrl,
-              version: 1,
-            };
-          }
-          const profileTemplate = {
-            kind: 0,
-            created_at: Math.floor(Date.now() / 1000),
-            tags: [],
-            content: JSON.stringify(kind0Content),
-          };
-          const profileEvent = finalizeEvent(profileTemplate, decoded.data);
-          await nostr.event(profileEvent, {
-            signal: AbortSignal.timeout(8000),
-          });
-        } catch (e) {
-          // Profile update is best-effort — the encrypted backup is
-          // already saved at this point.
-          console.warn("Failed to update persona profile:", e);
-        }
-      }
-
-      queryClient.invalidateQueries({ queryKey: ["phoenix-persona"] });
-      queryClient.invalidateQueries({ queryKey: ["phoenix-my-personas"] });
-      queryClient.invalidateQueries({ queryKey: ["nostr", "author"] });
-      queryClient.invalidateQueries({
-        queryKey: ["persona-public-profile"],
+      const result = await updatePersona.mutateAsync({
+        backupEvent,
+        envelope,
+        npub,
+        name,
+        username: trimmedUsername,
+        systemPrompt,
+        voiceId,
+        languages: parseCommaList(languagesInput, original.languages),
+        tags: parseCommaList(tagsInput, []),
+        bio,
+        originalBio,
+        bioHydrated,
+        pictureUrl,
+        originalPicture,
+        pictureHydrated,
+        crossPost: cross_post,
       });
 
       toast({
         title: "Saved",
-        description: `${updated.name} updated.`,
+        description: `${result.updated.name} updated.`,
       });
       navigate(`/dashboard/${npub}`);
     } catch (e) {
@@ -343,8 +321,6 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
         description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       });
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -357,11 +333,37 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
       </div>
       <CardContent className="space-y-5 pt-5">
         <div className="space-y-2">
-          <Label htmlFor="edit-name">Name</Label>
+          <Label htmlFor="edit-name">Display name</Label>
           <Input
             id="edit-name"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => onNameChange(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Shown in posts and on the persona's public profile.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="edit-username">Username</Label>
+          <div className="flex items-center gap-1.5">
+            <Input
+              id="edit-username"
+              value={username}
+              onChange={(e) => onUsernameChange(e.target.value)}
+              placeholder="username"
+              className="font-mono text-sm"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <span className="text-sm text-muted-foreground whitespace-nowrap">
+              @{SPARK_LN_DOMAIN}
+            </span>
+          </div>
+          <UsernameAvailabilityHint
+            state={availability}
+            originalUsername={initialUsername}
+            currentUsername={username}
           />
         </div>
 
@@ -432,45 +434,46 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
           />
         </div>
 
-        {/* Cross-posting (V1.5 — webhook to a third-party aggregator) */}
-        <div className="space-y-3 pt-2 border-t border-border">
-          <div className="space-y-1">
-            <Label htmlFor="edit-cross-post-url">
-              Cross-posting webhook (optional)
-            </Label>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Paste a webhook URL from your social-media aggregator
-              (Buffer, Zapier, Make.com, n8n, etc.). On every persona
-              publish, Zuka POSTs the event payload there so the
-              aggregator can fan it out to X / Facebook / Instagram /
-              TikTok / wherever you've connected. Leave blank to
-              disable.
-            </p>
-          </div>
-          <Input
-            id="edit-cross-post-url"
-            type="url"
-            value={webhookUrl}
-            onChange={(e) => setWebhookUrl(e.target.value)}
-            placeholder="https://hooks.zapier.com/hooks/catch/..."
-            autoComplete="off"
-          />
-          <div className="space-y-1">
-            <Label htmlFor="edit-cross-post-platforms" className="text-xs">
-              Platforms hint (comma separated, optional)
-            </Label>
+        {crossPostEnabled ? (
+          <div className="space-y-3 pt-2 border-t border-border">
+            <div className="space-y-1">
+              <Label htmlFor="edit-cross-post-url">
+                Cross-posting webhook (optional)
+              </Label>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Paste a webhook URL from your social-media aggregator
+                (Buffer, Zapier, Make.com, n8n, etc.). On every persona
+                publish, Zuka POSTs the event payload there so the
+                aggregator can fan it out to X / Facebook / Instagram /
+                TikTok / wherever you've connected. Leave blank to
+                disable.
+              </p>
+            </div>
             <Input
-              id="edit-cross-post-platforms"
-              value={webhookPlatformsInput}
-              onChange={(e) => setWebhookPlatformsInput(e.target.value)}
-              placeholder="x, facebook, instagram"
+              id="edit-cross-post-url"
+              type="url"
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              placeholder="https://hooks.zapier.com/hooks/catch/..."
+              autoComplete="off"
             />
-            <p className="text-[11px] text-muted-foreground">
-              Passed to your webhook as a `platforms` array — your
-              aggregator decides what to honor.
-            </p>
+            <div className="space-y-1">
+              <Label htmlFor="edit-cross-post-platforms" className="text-xs">
+                Platforms hint (comma separated, optional)
+              </Label>
+              <Input
+                id="edit-cross-post-platforms"
+                value={webhookPlatformsInput}
+                onChange={(e) => setWebhookPlatformsInput(e.target.value)}
+                placeholder="x, facebook, instagram"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Passed to your webhook as a `platforms` array — your
+                aggregator decides what to honor.
+              </p>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="flex justify-between gap-2 pt-2">
           <Button asChild variant="ghost" disabled={saving}>
@@ -502,12 +505,64 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   );
 }
 
-function parseList(raw: string, fallback: string[]): string[] {
-  const parts = raw
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  return parts.length > 0 ? parts : fallback;
+function UsernameAvailabilityHint({
+  state,
+  originalUsername,
+  currentUsername,
+}: {
+  state: ReturnType<typeof useUsernameAvailability>;
+  originalUsername: string;
+  currentUsername: string;
+}) {
+  // If the user hasn't actually changed the username, the live probe
+  // is suppressed (the hook is wired to a blank input). Render a
+  // status that reflects that — and warn that registration won't run.
+  if (currentUsername === originalUsername) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Current Lightning Address. Edit to claim a different one — Spark
+        replaces the old registration on rename.
+      </p>
+    );
+  }
+  switch (state.status) {
+    case "idle":
+      return null;
+    case "invalid":
+      return (
+        <p className="text-xs text-amber-600 dark:text-amber-500">
+          Lowercase letters, digits, and hyphens only — must start with a letter
+          or digit.
+        </p>
+      );
+    case "checking":
+      return (
+        <p className="text-xs text-muted-foreground">
+          Checking <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code>…
+        </p>
+      );
+    case "available":
+      return (
+        <p className="text-xs text-emerald-600 dark:text-emerald-500">
+          <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code> is
+          available.
+        </p>
+      );
+    case "taken":
+      return (
+        <p className="text-xs text-amber-600 dark:text-amber-500">
+          <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code> is
+          taken — pick a different name. Save will append a random suffix
+          rather than fail.
+        </p>
+      );
+    case "error":
+      return (
+        <p className="text-xs text-muted-foreground">
+          Couldn't reach the LNURL host — registration will run anyway.
+        </p>
+      );
+  }
 }
 
 export default EditPersona;

@@ -28,7 +28,7 @@
  * cache is updated alongside for fast subsequent loads.
  */
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { readEnv } from "@/lib/env";
@@ -56,29 +56,42 @@ function envAccount(): PpqAccount | null {
   return { api_key: apiKey, credit_id: creditId };
 }
 
+function resolveAccount(operatorAccount: PpqAccount | undefined): PpqAccount | null {
+  return envAccount() ?? operatorAccount ?? ppqAccountStore.load();
+}
+
 export function usePpqAccount() {
   const qc = useQueryClient();
   const operator = useOperatorEnvelope();
 
-  // Resolve in priority: env > operator envelope > localStorage cache.
-  const account = useMemo<PpqAccount | null>(() => {
-    return (
-      envAccount() ??
-      operator.envelope?.ppq ??
-      ppqAccountStore.load()
-    );
-  }, [operator.envelope?.ppq]);
+  const accountQuery = useQuery({
+    queryKey: ACCOUNT_QK,
+    queryFn: async (): Promise<PpqAccount | null> =>
+      resolveAccount(operator.envelope?.ppq),
+    staleTime: Infinity,
+  });
+  const account = accountQuery.data ?? null;
+
+  useEffect(() => {
+    qc.setQueryData(ACCOUNT_QK, resolveAccount(operator.envelope?.ppq));
+  }, [operator.envelope?.ppq, qc]);
 
   const ensureAccount = useMutation<PpqAccount, Error, void>({
     mutationKey: [...ACCOUNT_QK, "ensure"],
     mutationFn: async () => {
       // env wins — never mint over a pinned account.
       const fromEnv = envAccount();
-      if (fromEnv) return fromEnv;
+      if (fromEnv) {
+        qc.setQueryData(ACCOUNT_QK, fromEnv);
+        return fromEnv;
+      }
 
       // operator envelope is the production source of truth.
       const fromOperator = operator.envelope?.ppq;
-      if (fromOperator) return fromOperator;
+      if (fromOperator) {
+        qc.setQueryData(ACCOUNT_QK, fromOperator);
+        return fromOperator;
+      }
 
       // localStorage fallback (back-compat).
       const cached = ppqAccountStore.load();
@@ -89,12 +102,14 @@ export function usePpqAccount() {
         if (operator.envelope || operator.event) {
           await operator.ensureWithPpq(cached).catch(() => {/* best-effort */});
         }
+        qc.setQueryData(ACCOUNT_QK, cached);
         return cached;
       }
 
       // Mint a brand-new ppq.ai account, write to both stores.
       const fresh = await createAccount();
       ppqAccountStore.save(fresh);
+      qc.setQueryData(ACCOUNT_QK, fresh);
       await operator.ensureWithPpq(fresh).catch((err) => {
         // If the envelope write fails, the localStorage cache still
         // unblocks the current request; log and move on.
@@ -103,6 +118,7 @@ export function usePpqAccount() {
       return fresh;
     },
     onSuccess: (acct) => {
+      qc.setQueryData(ACCOUNT_QK, acct);
       qc.invalidateQueries({ queryKey: BALANCE_QK(acct.credit_id) });
     },
   });
@@ -131,8 +147,9 @@ export function usePpqAccount() {
    */
   const signOut = useCallback(() => {
     ppqAccountStore.clear();
-    qc.removeQueries({ queryKey: ["ppq"] });
-  }, [qc]);
+    qc.setQueryData(ACCOUNT_QK, envAccount() ?? operator.envelope?.ppq ?? null);
+    qc.removeQueries({ queryKey: ["ppq", "balance"] });
+  }, [operator.envelope?.ppq, qc]);
 
   return {
     account,

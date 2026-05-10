@@ -42,6 +42,7 @@ export type OperatorPpqAccount = z.infer<typeof ppqAccountSchema>;
 const operatorEnvelopeSchema = z.object({
   app: z.literal(PHOENIX_OPERATOR_APP),
   version: z.literal(PHOENIX_OPERATOR_VERSION),
+  dTag: z.string().min(1).max(128).optional(),
   wallet: walletSchema.optional(),
   ppq: ppqAccountSchema.optional(),
   created_at: z.number().int().nonnegative(),
@@ -49,6 +50,7 @@ const operatorEnvelopeSchema = z.object({
 export type OperatorEnvelope = z.infer<typeof operatorEnvelopeSchema>;
 
 export interface OperatorEnvelopeInput {
+  dTag?: string;
   wallet?: PersonaWallet;
   ppq?: OperatorPpqAccount;
 }
@@ -62,6 +64,7 @@ export async function encryptOperatorEnvelope(
   const envelope: OperatorEnvelope = {
     app: PHOENIX_OPERATOR_APP,
     version: PHOENIX_OPERATOR_VERSION,
+    dTag: payload.dTag,
     wallet: payload.wallet,
     ppq: payload.ppq,
     created_at: Math.floor(Date.now() / 1000),
