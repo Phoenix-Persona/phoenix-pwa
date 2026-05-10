@@ -11,7 +11,7 @@
  *   npx tsx tests/wallet/fund-spark-wallet-with-sats.ts --amount-sats 10000
  *   npx tsx tests/wallet/fund-spark-wallet-with-sats.ts --amount-sats 10000 --memo "demo top-up"
  *
- * Loads `dev/.env` automatically.
+ * Loads `.env` automatically.
  *
  * Flags:
  *   --amount-sats <n>     Amount to receive (skips the prompt if set).
@@ -66,7 +66,7 @@ async function main(): Promise<void> {
   console.log("Phoenix wallet — receive sats");
   if (!process.env.VITE_BREEZ_API_KEY) {
     console.warn(
-      "VITE_BREEZ_API_KEY not found — add it to dev/.env or export it in the shell.",
+      "VITE_BREEZ_API_KEY not found — add it to .env or export it in the shell.",
     );
   }
 

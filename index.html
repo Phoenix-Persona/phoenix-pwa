@@ -5,7 +5,15 @@
         <meta
             name="viewport"
             content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-        <meta http-equiv="content-security-policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' https:; font-src 'self'; base-uri 'self'; manifest-src 'self'; connect-src 'self' blob: https: wss:; img-src 'self' data: blob: https:; media-src 'self' https:; worker-src 'self' blob:">
+        <!--
+            script-src includes 'wasm-unsafe-eval' so the Breez Spark SDK
+            (V1 wallet, PROJECT.md §7) can compile its WASM module in
+            the browser. This directive specifically permits WASM only
+            and does NOT enable arbitrary `eval()` — that's why it exists
+            as a separate keyword from `'unsafe-eval'`. Per AGENTS.md, do
+            NOT add `'unsafe-eval'` or `'unsafe-inline'` to script-src.
+        -->
+        <meta http-equiv="content-security-policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; frame-src 'self' https:; font-src 'self'; base-uri 'self'; manifest-src 'self'; connect-src 'self' blob: https: wss:; img-src 'self' data: blob: https:; media-src 'self' https:; worker-src 'self' blob:">
 
         <!-- Search-engine policy: production domain — search engines welcome. -->
         <meta name="robots" content="index, follow">

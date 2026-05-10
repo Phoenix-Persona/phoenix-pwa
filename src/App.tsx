@@ -15,6 +15,8 @@ import { AppConfig } from '@/contexts/AppContext';
 import { APP_RELAYS } from '@/lib/appRelays';
 import { UnlockGate } from '@/components/UnlockGate';
 import { InstallBanner } from '@/components/InstallBanner';
+import { DevAutoLogin } from '@/components/DevAutoLogin';
+import { OperatorWalletInit } from '@/components/OperatorWalletInit';
 import AppRouter from './AppRouter';
 const head = createHead({
   plugins: [
@@ -53,6 +55,8 @@ export function App() {
         <QueryClientProvider client={queryClient}>
           <NostrLoginProvider storageKey='nostr:login'>
             <NostrProvider>
+              <DevAutoLogin />
+              <OperatorWalletInit />
               <NostrSync />
               <TooltipProvider>
                 <Toaster />

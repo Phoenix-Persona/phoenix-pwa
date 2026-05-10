@@ -21,7 +21,7 @@ npm install @breeztech/breez-sdk-spark
 - **Node** (≥22): default export is a no-op; `ensureWalletReady()`
   treats that case correctly.
 - **API key**: required. Configure via `import.meta.env.VITE_BREEZ_API_KEY`
-  (Vite-loaded from `dev/.env`); pass explicitly when calling from
+  (Vite-loaded from `.env`); pass explicitly when calling from
   Node integration tests.
 
 ## Connect with a mnemonic
