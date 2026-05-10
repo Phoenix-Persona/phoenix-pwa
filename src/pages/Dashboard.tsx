@@ -22,6 +22,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/useToast";
 import { useAuthor } from "@/hooks/useAuthor";
+import { useCrossPost } from "@/hooks/useCrossPost";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePersona, usePersonaPosts } from "@/hooks/usePersona";
 import { usePersonaPublish } from "@/hooks/usePersonaPublish";
@@ -47,6 +48,7 @@ const Dashboard = () => {
   const persona = usePersona(npub);
   const posts = usePersonaPosts(npub, 20);
   const publish = usePersonaPublish();
+  const crossPost = useCrossPost();
 
   const personaHex = useMemo(() => npubToHex(npub), [npub]);
   const author = useAuthor(personaHex ?? undefined);
@@ -67,11 +69,38 @@ const Dashboard = () => {
         text: raw,
         tags: personaConfig.tags,
       });
-      await publish.mutateAsync({
+      const signed = await publish.mutateAsync({
         personaNsec: personaConfig.nsec,
         template,
       });
-      toast({ title: "Published", description: "Post is live on relays." });
+
+      // Successful Nostr publish — try the cross-post webhook if
+      // configured. Failures are non-fatal: the post is already live
+      // on relays, so we surface a non-blocking warning toast.
+      if (personaConfig.cross_post?.webhook_url) {
+        try {
+          await crossPost.mutateAsync({
+            persona: personaConfig,
+            event: signed,
+          });
+          toast({
+            title: "Published",
+            description: "Live on relays and dispatched to your cross-post webhook.",
+          });
+        } catch (e) {
+          toast({
+            title: "Cross-post failed",
+            description:
+              e instanceof Error
+                ? `Posted to relays, but the webhook returned: ${e.message}`
+                : "Posted to relays, but the cross-post webhook didn't accept the event.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({ title: "Published", description: "Post is live on relays." });
+      }
+
       setRaw("");
       posts.refetch();
     } catch (e) {

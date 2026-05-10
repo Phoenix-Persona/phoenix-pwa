@@ -109,6 +109,26 @@ const personaSchema = z.object({
   bio: z.string().max(2000).optional(),
   tone: z.string().max(2000).optional(),
   sources: z.array(personaSourceSchema).max(64).optional(),
+  /**
+   * Cross-posting webhook (V1.5 — see derek-plan.md "Cross-post +
+   * video composer"). When set, the Dashboard composer POSTs every
+   * published kind 1 event to `webhook_url` so a third-party
+   * aggregator (Buffer / Zapier / Make.com / etc.) can fan it out
+   * to non-Nostr platforms (X / Facebook / Instagram / etc.).
+   *
+   * `webhook_platforms` is a hint passed to the aggregator inside
+   * the payload — the aggregator's account configuration is the
+   * actual source of truth for what gets posted where.
+   */
+  cross_post: z
+    .object({
+      webhook_url: z.string().min(1).max(4096).optional(),
+      webhook_platforms: z
+        .array(z.string().min(1).max(32))
+        .max(8)
+        .optional(),
+    })
+    .optional(),
 });
 
 const walletSchema = z.object({
