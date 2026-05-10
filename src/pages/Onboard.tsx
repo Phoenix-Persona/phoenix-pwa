@@ -14,7 +14,7 @@
  * the same publish path when it's ready.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 import {
@@ -27,7 +27,10 @@ import {
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
-import { PersonaPictureField } from "@/components/PersonaPictureField";
+import {
+  PersonaPictureStager,
+  type StagedPersonaPicture,
+} from "@/components/PersonaPictureStager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -45,6 +48,7 @@ import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 
 import { generatePersonaKeypair } from "@/lib/personaKey";
 import { createPersonaSigner } from "@/lib/personaSigner";
+import { uploadFileToBlossom, urlFromUploadTags } from "@/lib/blossomUpload";
 import {
   slugifyForUsername,
   isValidLightningUsername,
@@ -76,33 +80,24 @@ const Onboard = () => {
     "You are an AI-assisted activist voice. Write with precision. Avoid sensationalism. Ground every claim in cited sources. Speak truth without dehumanizing anyone."
   );
 
-  // Picture
-  const [pictureUrl, setPictureUrl] = useState("");
+  const [stagedPicture, setStagedPicture] =
+    useState<StagedPersonaPicture | null>(null);
+  const [creating, setCreating] = useState(false);
 
-  // Generate the persona's keypair UPFRONT — before the picture step.
-  //
-  // **Privacy.** The picture upload happens before publish; if we wait
-  // until createPersona to mint the keypair, the upload's BUD-01 auth
-  // event is signed by the operator and correlates operator ↔ persona
-  // on every Blossom server. Generating early lets us pass an
-  // NSecSigner through to PersonaPictureField so the auth event uses
-  // the persona's pubkey only.
-  //
-  // useState lazy initializer so the keypair persists across re-renders
-  // and is not re-generated on every render. The same kp is then handed
-  // to useCreatePersona via the `keypair` field.
-  const [personaKeypair] = useState(() => generatePersonaKeypair());
-  const personaSigner = useMemo(
-    () => createPersonaSigner(personaKeypair.nsec),
-    [personaKeypair.nsec],
-  );
-
-  const publishing = createPersona.isPending;
+  const publishing = creating || createPersona.isPending;
 
   // Live availability hint for the username field. Debounced HTTP probe
-  // against the public LUD-16 endpoint. The mint path's authoritative
+  // against the public LUD-16 endpoint. The create path's authoritative
   // SDK check still runs and fixes any race against this preview.
   const availability = useUsernameAvailability(username);
+
+  useEffect(() => {
+    return () => {
+      if (stagedPicture?.previewUrl) {
+        URL.revokeObjectURL(stagedPicture.previewUrl);
+      }
+    };
+  }, [stagedPicture?.previewUrl]);
 
   // Auto-sync username from the display name until the user takes
   // control of it. Single source of truth: changing `name` updates
@@ -151,14 +146,30 @@ const Onboard = () => {
       });
       return;
     }
+    setCreating(true);
     try {
+      const keypair = generatePersonaKeypair();
+      let pictureUrl: string | undefined;
+
+      if (stagedPicture) {
+        const tags = await uploadFileToBlossom({
+          file: stagedPicture.file,
+          signer: createPersonaSigner(keypair.nsec),
+        });
+        const uploadedUrl = urlFromUploadTags(tags);
+        if (!uploadedUrl) {
+          throw new Error("Picture upload succeeded but no URL was returned.");
+        }
+        pictureUrl = uploadedUrl;
+      }
+
       const result = await createPersona.mutateAsync({
         name,
         username,
         bio,
         systemPrompt,
-        pictureUrl: pictureUrl || undefined,
-        keypair: personaKeypair,
+        pictureUrl,
+        keypair,
       });
 
       if (result.warning) {
@@ -170,19 +181,21 @@ const Onboard = () => {
       }
 
       toast({
-        title: "Persona published",
+        title: "Persona created",
         description: `${result.envelope.persona.name} is live and private to you.`,
       });
       navigate(`/dashboard/${result.npub}`);
     } catch (e) {
       toast({
-        title: "Publish failed",
+        title: "Create failed",
         description:
           e instanceof Error
             ? e.message
-            : "Could not publish persona event to relays.",
+            : "Could not create the persona.",
         variant: "destructive",
       });
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -232,7 +245,7 @@ const Onboard = () => {
                 </h1>
                 <p className="text-imigongo-cream/80 leading-relaxed max-w-xl">
                   {step === "details"
-                    ? "Mint a new voice. Zuka generates a fresh Nostr keypair for the persona — only you can operate it. The configuration below is encrypted to your key and published privately to relays; the persona's public profile goes out so anyone can find and follow its feed."
+                    ? "Create a new voice. Zuka generates a fresh Nostr keypair for the persona when you finish — only you can operate it. The configuration below is encrypted to your key and published privately to relays; the persona's public profile goes out so anyone can find and follow its feed."
                     : "Add a portrait so the persona has a face. Upload an image or generate one. You can skip this step and add a picture later."}
                 </p>
               </div>
@@ -364,21 +377,15 @@ const Onboard = () => {
                 </>
               ) : (
                 <>
-                  <PersonaPictureField
-                    value={pictureUrl}
-                    onChange={setPictureUrl}
+                  <PersonaPictureStager
+                    value={stagedPicture}
+                    onChange={setStagedPicture}
                     promptHint={promptHint}
                     // Onboarding users haven't funded a wallet yet — let
                     // the field fall back to the free Pollinations
                     // endpoint when PPQ returns 402 so they can still
-                    // ship a portrait. EditPersona keeps PPQ-only
-                    // (post-onboarding the user has the paid path).
+                    // preview a portrait before creating the persona.
                     allowFreeFallback
-                    // Persona-keypair signer for the BUD-01 Blossom auth
-                    // event. Without this, the upload would be signed by
-                    // the operator and correlate operator ↔ persona on
-                    // every Blossom server.
-                    signer={personaSigner}
                   />
 
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">
@@ -392,13 +399,13 @@ const Onboard = () => {
                     </Button>
 
                     <div className="flex flex-wrap gap-2">
-                      {!pictureUrl && (
+                      {!stagedPicture && (
                         <Button
                           variant="outline"
                           onClick={publishPersona}
                           disabled={publishing || !user}
                         >
-                          Skip &amp; mint
+                          Skip &amp; create
                         </Button>
                       )}
                       <Button
@@ -410,12 +417,12 @@ const Onboard = () => {
                         {publishing ? (
                           <>
                             <Loader2 className="mr-2 size-4 animate-spin" />
-                            Publishing…
+                            Creating...
                           </>
                         ) : (
                           <>
                             <Sparkles className="mr-2 size-4" />
-                            Mint persona
+                            Create persona
                           </>
                         )}
                       </Button>
@@ -474,14 +481,14 @@ function UsernameAvailabilityHint({
       return (
         <p className="text-xs text-amber-600 dark:text-amber-500">
           <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code> is
-          taken — we'll append a short random suffix on mint.
+          taken — we'll append a short random suffix during creation.
         </p>
       );
     case "error":
       return (
         <p className="text-xs text-muted-foreground">
           Couldn't reach the LNURL host — we'll try registration directly during
-          mint.
+          creation.
         </p>
       );
   }

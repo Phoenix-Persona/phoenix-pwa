@@ -48,10 +48,8 @@ export interface CreatePersonaInput {
    * Optional pre-generated persona keypair. When provided, the hook
    * uses it instead of generating a fresh one.
    *
-   * Onboard generates the keypair upfront so the picture-upload step
-   * (which runs BEFORE this mutation) can sign Blossom BUD-01 auth
-   * events with the persona's nsec for privacy. By the time we publish,
-   * the keypair already exists — pass it through.
+   * Onboard generates this at Create time so any staged picture upload
+   * and the public profile publish use the same persona identity.
    */
   keypair?: PersonaKeypair;
 }

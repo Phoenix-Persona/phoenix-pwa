@@ -69,11 +69,11 @@ export function DashboardComposerCard({
   const showCrossPost = crossPostEnabled && Boolean(crossPost?.webhook_url);
   const styleDisabled = isStyling || isPublishing || !raw.trim() || !walletSeed;
   const styleTitle = !walletSeed
-    ? "Mint a new persona to enable AI styling"
+    ? "Create a new persona to enable AI styling"
     : "Rewrite the idea in the persona's voice (PPQ chat)";
   const wizardDisabled = isStyling || isPublishing || !walletSeed;
   const wizardTitle = !walletSeed
-    ? "Mint a new persona to enable the post wizard"
+    ? "Create a new persona to enable the post wizard"
     : "Build a post with an AI-guided wizard";
 
   const crossPostBanner = showCrossPost ? (
