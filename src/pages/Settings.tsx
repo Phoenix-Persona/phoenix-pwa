@@ -1,11 +1,15 @@
 /**
- * Settings — account, relays, and persona management.
+ * Settings — account, relays, media servers, and persona management.
  *
- * Logged-in only. Surfaces three sections in a single scrollable
- * page: Account (the Feniksi-managed user nsec, lock/forget device),
- * Relays (NIP-65 inbox/outbox via RelayListManager), and Personas
- * (a thin list with edit/delete affordances on top of the same
- * useMyPersonas query that powers /my-personas).
+ * Logged-in only. Four sections on a single scrollable page:
+ *   - Account: Feniksi-managed user nsec, lock / forget device,
+ *     change passphrase, download key backup
+ *   - Relays: NIP-65 inbox/outbox via RelayListManager
+ *   - Media: BUD-03 Blossom server list via BlossomServerListManager
+ *     (where persona pictures, post images, and generated videos are
+ *     uploaded)
+ *   - Personas: thin list with edit/delete affordances on top of the
+ *     same useMyPersonas query that powers /my-personas
  */
 
 import { Link, useNavigate } from "react-router-dom";
@@ -23,6 +27,7 @@ import { useNostrLogin } from "@nostrify/react/login";
 import { nip19 } from "nostr-tools";
 
 import { AppHeader } from "@/components/AppHeader";
+import { BlossomServerListManager } from "@/components/BlossomServerListManager";
 import { ChangePassphraseDialog } from "@/components/ChangePassphraseDialog";
 import { DownloadBackupDialog } from "@/components/DownloadBackupDialog";
 import { FlagStripe } from "@/components/ImigongoBand";
@@ -239,6 +244,20 @@ const Settings = () => {
               <Card className="border-imigongo-clay/20 overflow-hidden">
                 <CardContent className="p-6">
                   <RelayListManager />
+                </CardContent>
+              </Card>
+            </section>
+
+            {/* Blossom servers */}
+            <section className="space-y-4">
+              <SectionHeader
+                eyebrow="Media"
+                title="Where your images and videos live"
+                description="Persona pictures, post images, and generated videos are uploaded to Blossom servers. Add your own to control where the media is hosted; Feniksi's defaults stay in the rotation if you keep that toggle on."
+              />
+              <Card className="border-imigongo-clay/20 overflow-hidden">
+                <CardContent className="p-6">
+                  <BlossomServerListManager />
                 </CardContent>
               </Card>
             </section>
