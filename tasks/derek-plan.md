@@ -63,6 +63,58 @@
 
 ---
 
+## Capacitor Android wrapper (planned — not yet started)
+
+> Plan locked, awaiting return-to-branch. `appId` decision: **`live.zuka.app`** (reverse-DNS of `zuka.live`). Locked once published — don't change after first store submission.
+
+Wraps the existing PWA in a Capacitor WebView for Android (and iOS later) without touching React. The skill in `.agents/skills/capacitor/` provides the templates; ditto's setup at `~/Projects/ditto/` is a working production reference.
+
+### Phase 1 — Scaffold
+
+- Install Capacitor 8.x deps (matches ditto): `@capacitor/core`, `@capacitor/app`, `@capacitor/filesystem`, `@capacitor/haptics`, `@capacitor/keyboard`, `@capacitor/share`, `@capacitor/local-notifications`, `capacitor-secure-storage-plugin`, plus dev deps `@capacitor/cli`, `@capacitor/android`, `@capacitor/ios`, `tailwindcss-safe-area`
+- `capacitor.config.ts` at project root with `appId: "live.zuka.app"`, `appName: "Zuka"`, `backgroundColor: "#1a0f08"` (charcoal hero-mat), `scheme: "Zuka"`, `SystemBars.insetsHandling: "css"` (Android Chromium <140 fallback)
+- Copy from `.agents/skills/capacitor/files/`:
+  - `lib/haptics.ts`, `lib/downloadFile.ts`, `lib/secureStorage.ts`, `lib/nativeBootstrap.ts`
+  - `hooks/useSecureLocalStorage.ts`
+  - `components/DeepLinkHandler.tsx`
+  - `safe-area-shim.css` (only if WebView <140 testing surfaces issues)
+- Wire `bootstrapNative()` at top of `main.tsx` (before React mounts)
+- Mount `<DeepLinkHandler />` inside `<BrowserRouter>` (in `AppRouter.tsx`)
+- `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">` in `index.html`
+- Add `@import "tailwindcss-safe-area";` to `src/index.css`
+- `npx cap add android` — generates `android/` directory; commit it
+- Verify `npm test` passes + `npx cap sync` runs clean
+
+### Phase 2 — Zuka-specific native integration
+
+- **Migrate `nip49Storage.ts` ncryptsec to OS Keychain/KeyStore.** Currently lives in localStorage as `zuka:user:ncryptsec`. On native, swap to `secureStorage.setItem`/`getItem`. Provide a one-shot migration: on boot, if localStorage has the key but secureStorage doesn't, copy across then clear localStorage.
+- **Migrate `DownloadBackupDialog` `<a download>` → `downloadTextFile()`.** Writes the `.ncryptsec` to the app Documents directory on native; falls back to anchor-click on web.
+- **Haptics** on publish (`impactLight`), Lock now (`notificationWarning`), persona switch (`selectionStart`), wallet receive/send confirmations (`notificationSuccess`).
+- **Hide PWA install prompt natively.** `<InstallBanner />` should early-return when `Capacitor.isNativePlatform()` is true — we're already a native app.
+- **Hide "Install Zuka" UX from native builds.** Same logic.
+- **App icons + splash screen** from existing brand assets — favicon SVG + Imigongo seal as base.
+- **Status-bar icon style** is auto-synced by `bootstrapNative()` (light/dark text based on theme).
+
+### Phase 3 — Verification before ship
+
+- **SharedArrayBuffer / Spark SDK in Capacitor WebView.** The COEP=credentialless we set in `vite.config.ts` is for the Vite dev server. Production-built static files don't carry headers — Capacitor WebView serves locally and won't get them. Need to either:
+  - Configure WebView via `android/app/src/main/AndroidManifest.xml` to set the relevant headers
+  - Or use Capacitor's HTTP plugin to inject headers
+  - Or accept that wallet won't work in WebView and degrade gracefully (wallet UI shows "wallet unavailable on this device — use the web version")
+  - Test on a real Android device to determine which path applies.
+- **Cross-origin Blossom images.** Same headers concern. Likely worse on native than web because there's no service worker layer to massage requests. May need `crossOrigin="anonymous"` everywhere AND server-side CORS, OR proxy media through a known-good origin.
+- **End-to-end kill-and-resurrect on a real Android device.** Sign up, mint persona, force-stop the app via Android system, reopen, verify ncryptsec → unlock → personas hydrate → wallet reconnects.
+- **`.apk` build for distribution.** Initial signed APK for sideload-testing. Production AAB for Play Store later.
+
+### Risks / open questions
+
+- **Spark SDK WASM threading** — biggest unknown. The SDK requires `crossOriginIsolated`, which requires the COEP/COOP headers. WebView serves files locally, no HTTP layer to set headers on. Will need experimentation.
+- **Background tasks** — Spark wallet should keep running in the background to receive zaps. Capacitor's `BackgroundTask` plugin provides ~30 seconds of background time per event; not enough for a persistent wallet. Hosted-key zap-receive might be the answer.
+- **Push notifications for zaps** — needs Topher's NIP-57 zap-receipt detection + a server to push notifications (FCM). Out of scope for Phase 1.
+- **iOS port** — Phase 1 should add iOS too (`npx cap add ios`) but the Spark/SharedArrayBuffer story is even more uncertain on iOS WKWebView.
+
+---
+
 ## Cross-post + video composer (V1.5 — JIM owns ongoing; Derek did the scaffold)
 
 > **Ownership note (post PR #5):** the architectural plan, the
