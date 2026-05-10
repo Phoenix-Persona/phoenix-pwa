@@ -673,9 +673,9 @@ adaptation, not a full rewrite. Replace what the new stack obsoletes.
 **Delete.**
 - Any reference to OpenRouter and the Vercel `/style` endpoint plan
 
-`tasks/todo.md` should be rewritten as a build plan for the scope in §8.
-`AGENTS.md` should be amended with a "Zuka-specific guidance" section
-that points contributors at this document.
+`AGENTS.md` has been amended with a "Zuka-specific guidance" section
+that points contributors at this document. Per-feature build plans
+live under `dev/plans/`; shipped plans stay there with a status banner.
 
 ---
 

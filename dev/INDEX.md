@@ -28,10 +28,9 @@ External libraries and protocols Zuka depends on. Each guide has a
 | Path | Intent |
 | --- | --- |
 | `adr/` | Architecture Decision Records — short docs capturing a trade-off + decision. Currently empty. |
-| `plans/` | Per-feature build plans. Currently empty. |
+| `plans/` | Per-feature build plans. The shipped ones (`2026-05-09-wallet-followups.md`, `2026-05-10-follow-up-refactoring.md`, `2026-05-10-adopt-extracted-persona-components.md`) are kept as historical context. |
 | `reports/` | Post-spike or post-implementation reports. |
 
 ## Related
 
-- [`../tasks/todo.md`](../tasks/todo.md) — active V1 task list.
 - [`../AGENTS.md`](../AGENTS.md) — agent working agreement (lint rules, security model, file conventions).

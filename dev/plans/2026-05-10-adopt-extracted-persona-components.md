@@ -1,6 +1,8 @@
 # Adopt extracted persona components — implementation plan
 
-> **Status:** Ready to execute. Branch: `derek/edit-persona-cleanup-adoption`.
+> **Status: SHIPPED** in PR #21 (merged 2026-05-10). All three tasks completed; net -213 lines across `EditPersona.tsx`, `Dashboard.tsx`, `PersonaFeed.tsx`. 117/117 tests passed at merge time.
+>
+> Kept for historical context — the discovery (PR #20 created four extracted components but only wired up `DashboardComposerCard`) is a useful pattern recognition data point for future audit-driven refactors.
 
 ## Problem
 

@@ -1,6 +1,8 @@
 # Follow-Up Refactoring Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status: SHIPPED** in PR #20 (`fix/ui-polish`, merged 2026-05-10). All six tasks completed: OperatorWalletInit hook warning fix, URL sanitization library, public persona profile hook, query key factories, centralised Nostr publish helper, and route-component decomposition (`DashboardComposerCard`, `PersonaHero`, `EditPersonaIdentityFields`, `EditPersonaPublicProfileFields`, `EditPersonaCrossPostFields`).
+>
+> The component-adoption follow-up (wiring those extracted components into their consumer pages) shipped separately in PR #21 — see `2026-05-10-adopt-extracted-persona-components.md`.
 
 **Goal:** Clean up remaining code quality debt after PR #10 without blocking other pending PRs.
 
