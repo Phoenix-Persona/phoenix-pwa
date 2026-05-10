@@ -1,5 +1,5 @@
 /**
- * Settings — account, relays, media servers, and persona management.
+ * Settings — account, relays, media servers, and Nostr viewer preferences.
  *
  * Logged-in only. Four sections on a single scrollable page:
  *   - Account: Zuka-managed user nsec, lock / forget device,
@@ -8,24 +8,19 @@
  *   - Media: BUD-03 Blossom server list via BlossomServerListManager
  *     (where persona pictures, post images, and generated videos are
  *     uploaded)
- *   - Personas: thin list with edit/delete affordances on top of the
- *     same useMyPersonas query that powers /my-personas
+ *   - Nostr viewer: external client used for event links
  */
 
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
 import {
   Lock,
   LogOut,
-  Pencil,
-  Plus,
-  Trash2,
   TriangleAlert,
   User as UserIcon,
 } from "lucide-react";
 import { useNostrLogin } from "@nostrify/react/login";
 import { nip19 } from "nostr-tools";
-import type { NostrEvent } from "@nostrify/nostrify";
 
 import { AppHeader } from "@/components/AppHeader";
 import { BlossomServerListManager } from "@/components/BlossomServerListManager";
@@ -33,7 +28,6 @@ import { ChangePassphraseDialog } from "@/components/ChangePassphraseDialog";
 import { DownloadBackupDialog } from "@/components/DownloadBackupDialog";
 import { FlagStripe } from "@/components/ImigongoBand";
 import { NostrViewerSettings } from "@/components/NostrViewerSettings";
-import { PersonaStatsBadge } from "@/components/PersonaStatsBadge";
 import { RelayListManager } from "@/components/RelayListManager";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,8 +44,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLoggedInAccounts } from "@/hooks/useLoggedInAccounts";
-import { useMyPersonas, usePersonaActivityStats } from "@/hooks/usePersona";
-import { useDeletePersona } from "@/hooks/useDeletePersona";
 import { impactHeavy, notificationWarning } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
 import {
@@ -60,7 +52,6 @@ import {
   hasUserNcryptsec,
   NOSTR_LOGIN_STORAGE_KEY,
 } from "@/lib/nip49Storage";
-import { formatDeletePersonaWarnings } from "@/lib/personaDeleteWarnings";
 
 const Settings = () => {
   useSeoMeta({ title: "Settings — Zuka" });
@@ -68,10 +59,6 @@ const Settings = () => {
   const { user } = useCurrentUser();
   const { logins, removeLogin } = useNostrLogin();
   const { currentUser } = useLoggedInAccounts();
-  const personas = useMyPersonas();
-  const personaPubkeys = personas.data?.map((p) => p.envelope.persona.pubkey);
-  const personaStats = usePersonaActivityStats(personaPubkeys);
-  const deletePersona = useDeletePersona();
   const { toast } = useToast();
 
   const userNpub = user ? nip19.npubEncode(user.pubkey) : "";
@@ -131,39 +118,6 @@ const Settings = () => {
     window.location.assign("/");
   }
 
-  function deletePersonaFromSettings({
-    backupEvent,
-    personaPubkey,
-    npub,
-    personaName,
-  }: {
-    backupEvent: NostrEvent;
-    personaPubkey: string;
-    npub: string;
-    personaName: string;
-  }) {
-    deletePersona.mutate(
-      { backupEvent, personaPubkey, npub },
-      {
-        onSuccess: (result) => {
-          toast({
-            title: "Persona deleted",
-            description:
-              formatDeletePersonaWarnings(result.warnings) ??
-              `${personaName} was removed from your personas.`,
-          });
-        },
-        onError: (error) => {
-          toast({
-            title: "Delete failed",
-            description: error.message,
-            variant: "destructive",
-          });
-        },
-      },
-    );
-  }
-
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <AppHeader />
@@ -181,7 +135,7 @@ const Settings = () => {
               Settings
             </p>
             <h1 className="font-display text-4xl md:text-5xl font-medium tracking-tight">
-              Account, relays, personas
+              Account, relays, media
             </h1>
           </div>
           <FlagStripe height={4} />
@@ -335,122 +289,6 @@ const Settings = () => {
               </Card>
             </section>
 
-            {/* Personas */}
-            <section className="space-y-4">
-              <SectionHeader
-                eyebrow="Personas"
-                title="Voices you operate"
-                description="Edit a persona's prompt, voice, or tags. Delete one to unlink it from your account."
-                action={
-                  <Button asChild size="sm" variant="outline">
-                    <Link to="/onboard">
-                      <Plus className="mr-2 size-4" />
-                      New persona
-                    </Link>
-                  </Button>
-                }
-              />
-
-              {personas.isLoading ? (
-                <div className="space-y-2">
-                  {[0, 1, 2].map((i) => (
-                    <Card
-                      key={i}
-                      className="border-imigongo-clay/20 animate-pulse"
-                    >
-                      <CardContent className="h-20" />
-                    </Card>
-                  ))}
-                </div>
-              ) : personas.data && personas.data.length > 0 ? (
-                <ul className="space-y-2">
-                  {personas.data.map(({ event, envelope, npub }) => {
-                    const persona = envelope.persona;
-                    return (
-                      <li key={event.id}>
-                        <Card className="border-imigongo-clay/20 overflow-hidden">
-                          <CardContent className="p-5 flex items-center gap-4 flex-wrap">
-                            <div className="flex-1 min-w-0 space-y-1.5">
-                              <p className="font-display text-lg font-medium tracking-tight">
-                                {persona.name}
-                              </p>
-                              <PersonaStatsBadge
-                                stats={personaStats.data?.get(persona.pubkey)}
-                                loading={personaStats.isLoading}
-                              />
-                            </div>
-                            <div className="flex gap-1.5">
-                              <Button asChild size="sm" variant="outline">
-                                <Link to={`/dashboard/${npub}/edit`}>
-                                  <Pencil className="mr-1.5 size-3.5" />
-                                  Edit
-                                </Link>
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-destructive border-destructive/30 hover:bg-destructive/5"
-                                    disabled={deletePersona.isPending}
-                                  >
-                                    <Trash2 className="mr-1.5 size-3.5" />
-                                    Delete
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Delete {persona.name}?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Zuka will publish a deletion request
-                                      for this persona's encrypted backup. The
-                                      persona keypair becomes inaccessible to
-                                      you afterwards. Posts already published
-                                      to relays will remain public — Nostr
-                                      cannot retract them.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() =>
-                                        deletePersonaFromSettings({
-                                          backupEvent: event,
-                                          personaPubkey: persona.pubkey,
-                                          npub,
-                                          personaName: persona.name,
-                                        })
-                                      }
-                                      className="bg-destructive hover:bg-destructive/90"
-                                    >
-                                      Delete persona
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <Card className="border-dashed border-imigongo-clay/30">
-                  <CardContent className="py-10 text-center text-muted-foreground space-y-3">
-                    <p className="text-sm">No personas yet.</p>
-                    <Button asChild size="sm">
-                      <Link to="/onboard">
-                        <Plus className="mr-2 size-4" />
-                        Create your first persona
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-            </section>
           </div>
         )}
       </main>
