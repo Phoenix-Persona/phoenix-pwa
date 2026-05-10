@@ -45,14 +45,16 @@ import {
 
 import { usePpqAccount } from "./usePpqAccount";
 
-const WALLET_QK = (mnemonic: string | undefined) =>
-  ["wallet", "info", mnemonic ? mnemonic.slice(0, 8) : "none"] as const;
-const PAYMENTS_QK = (mnemonic: string | undefined) =>
-  ["wallet", "payments", mnemonic ? mnemonic.slice(0, 8) : "none"] as const;
+const WALLET_QK = (walletId: string | undefined) =>
+  ["wallet", "info", walletId ?? "none"] as const;
+const PAYMENTS_QK = (walletId: string | undefined) =>
+  ["wallet", "payments", walletId ?? "none"] as const;
 
 const WALLET_INFO_REFETCH_MS = 15_000;
 
 export interface UseWalletOptions {
+  /** Non-secret identity for query keys, e.g. `persona:<pubkey>`. */
+  walletId: string | undefined;
   /** BIP-39 mnemonic. Hook stays in disconnected state when undefined. */
   mnemonic: string | undefined;
   /**
@@ -102,7 +104,7 @@ export interface UseWalletResult {
 }
 
 export function useWallet(opts: UseWalletOptions): UseWalletResult {
-  const { mnemonic } = opts;
+  const { mnemonic, walletId } = opts;
   const qc = useQueryClient();
 
   const ppq = usePpqAccount();
@@ -188,7 +190,7 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
   /* ---------- Wallet info / payments ---------- */
 
   const infoQuery = useQuery({
-    queryKey: WALLET_QK(mnemonic),
+    queryKey: WALLET_QK(walletId),
     enabled: Boolean(handle),
     queryFn: async () => {
       if (!handle) throw new Error("Wallet not connected");
@@ -199,7 +201,7 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
   });
 
   const paymentsQuery = useQuery({
-    queryKey: PAYMENTS_QK(mnemonic),
+    queryKey: PAYMENTS_QK(walletId),
     enabled: Boolean(handle),
     queryFn: async () => {
       if (!handle) throw new Error("Wallet not connected");
@@ -209,11 +211,11 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
   });
 
   const refreshInfo = useCallback(() => {
-    qc.invalidateQueries({ queryKey: WALLET_QK(mnemonic) });
-  }, [mnemonic, qc]);
+    qc.invalidateQueries({ queryKey: WALLET_QK(walletId) });
+  }, [walletId, qc]);
   const refreshPayments = useCallback(() => {
-    qc.invalidateQueries({ queryKey: PAYMENTS_QK(mnemonic) });
-  }, [mnemonic, qc]);
+    qc.invalidateQueries({ queryKey: PAYMENTS_QK(walletId) });
+  }, [walletId, qc]);
 
   /* ---------- Receive / send ---------- */
 

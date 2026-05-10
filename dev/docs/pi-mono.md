@@ -1,6 +1,6 @@
 # pi-mono
 
-Earendil's open-source AI agent toolkit. **V1 of Phoenix uses `pi-ai`
+Earendil's open-source AI agent toolkit. **V1 of Zuka uses `pi-ai`
 only** — for chat completions through PPQ (post styling) and image
 generation. The agent runtime (`pi-agent-core`) and chat surface
 (`pi-web-ui`) are reserved for the V2 agent-driven character-creator
@@ -17,8 +17,8 @@ wizard; V1 ships a form-based wizard instead.
 | `@earendil-works/pi-ai`          | Unified multi-provider LLM API                            |
 | `@earendil-works/pi-agent-core`  | Stateful agent: tool execution + event streaming          |
 | `@earendil-works/pi-web-ui`      | React-ish chat UI components (mini-lit web components)    |
-| `@earendil-works/pi-coding-agent`| CLI coding agent — not used by Phoenix                    |
-| `@earendil-works/pi-tui`         | Terminal UI library — not used by Phoenix                 |
+| `@earendil-works/pi-coding-agent`| CLI coding agent — not used by Zuka                    |
+| `@earendil-works/pi-tui`         | Terminal UI library — not used by Zuka                 |
 
 None are in `package.json` yet. Install with:
 
@@ -29,7 +29,7 @@ npm install @earendil-works/pi-ai @earendil-works/pi-agent-core @earendil-works/
 ## `pi-ai` — LLM client
 
 OpenAI-compatible providers and many natively-typed providers. **For
-Phoenix, point it at PPQ via the OpenAI-compatible surface.**
+Zuka, point it at PPQ via the OpenAI-compatible surface.**
 
 ### Two API styles
 
@@ -57,7 +57,7 @@ const finalMessage = await s.result();
 
 ### Pointing at PPQ
 
-PPQ is OpenAI-compatible (see `docs/guides/ppq.md`). `pi-ai` exposes
+PPQ is OpenAI-compatible (see `./ppq.md`). `pi-ai` exposes
 this through its **Custom Models** API: you build a `Model<>` object
 with `baseUrl` set to PPQ and pass `apiKey` per call.
 
@@ -81,15 +81,15 @@ const ppqClaude: Model<'openai-completions'> = {
 await stream(ppqClaude, context, { apiKey: 'ppq_<token>' });
 ```
 
-**Auth surface — bearer all the way.** Phoenix uses PPQ's **credits
+**Auth surface — bearer all the way.** Zuka uses PPQ's **credits
 system**: a single `credit_id` per persona, funded by Lightning
 top-ups via the Spark wallet (NIP-47 NWC auto-topup), authenticates
 every PPQ request with a bearer token. `pi-ai` natively supports
-bearer, which is all Phoenix needs. PPQ also supports L402
+bearer, which is all Zuka needs. PPQ also supports L402
 per-request but only on a subset of endpoints; the credits system
-covers the whole API surface, so Phoenix uses credits across the
+covers the whole API surface, so Zuka uses credits across the
 board (image gen and TTS go through the same `credit_id` + bearer
-even when called outside `pi-ai`). See `docs/guides/ppq.md` for the
+even when called outside `pi-ai`). See `./ppq.md` for the
 credits flow and the `/nwc-auto-topup/connect` wiring.
 
 If `pi-ai`'s defaults fail against PPQ on specific fields (e.g.
@@ -122,7 +122,7 @@ Image generation has a separate API surface (`getImageModel`,
 ## `pi-agent-core` — agent runtime
 
 Built on `pi-ai`. Manages the agent loop, tool execution, and event
-streaming. Phoenix's character-creator runs on this.
+streaming. Zuka's character-creator runs on this.
 
 ```typescript
 import { Agent } from '@earendil-works/pi-agent-core';
@@ -130,7 +130,7 @@ import { getModel } from '@earendil-works/pi-ai';
 
 const agent = new Agent({
   initialState: {
-    systemPrompt: 'You are the Phoenix character-creator agent.',
+    systemPrompt: 'You are the Zuka character-creator agent.',
     model: getModel('anthropic', 'claude-sonnet-4.5-20250929'),
     thinkingLevel: 'off',
     messages: [],
@@ -162,7 +162,7 @@ await agent.prompt('Start the persona interview.');
 
 `agent.steer(msg)` interrupts mid-tool-batch (after current turn).
 `agent.followUp(msg)` queues a message after the agent would otherwise stop.
-Phoenix uses these to let users edit a wizard proposal before continuing.
+Zuka uses these to let users edit a wizard proposal before continuing.
 
 ### Defining tools
 
@@ -198,13 +198,13 @@ For non-`Agent`-class flows (e.g. server-side streaming), `agentLoop` and
 elements. Tailwind v4. Compatible with React via standard custom-element
 interop, but it does not ship React components directly.
 
-Phoenix has two integration choices:
+Zuka has two integration choices:
 
 1. **`ChatPanel` + `AgentInterface` web components** — drop-in chat surface
    (used as-is). Includes the mini-lit chat panel, attachments, artifact
    panel, model selector, IndexedDB-backed sessions. Heavy.
 2. **Roll our own** UI in React, using `pi-agent-core` events directly.
-   Lighter, fits the rest of the Phoenix stack better. **Probably what
+   Lighter, fits the rest of the Zuka stack better. **Probably what
    we want for V1.**
 
 ```typescript
@@ -233,9 +233,9 @@ The PROJECT.md §11 plan calls out `src/components/CharacterCreator.tsx` as
 new — most likely option 2 (custom React UI on top of `pi-agent-core`),
 not the heavy web-component panel. Confirm the choice with Jim.
 
-## How Phoenix uses each (PROJECT.md §6)
+## How Zuka uses each (PROJECT.md §6)
 
-| Phoenix flow                  | Package                          |
+| Zuka flow                  | Package                          |
 | ----------------------------- | -------------------------------- |
 | Wizard interview loop         | `pi-agent-core` `Agent`          |
 | Persona text styling          | `pi-ai` `complete()` / `stream()`|

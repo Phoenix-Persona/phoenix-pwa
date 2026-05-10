@@ -29,7 +29,10 @@ export default function WalletHarness() {
   const [activeMnemonic, setActiveMnemonic] = useState<string | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
 
-  const wallet = useWallet({ mnemonic: activeMnemonic });
+  const wallet = useWallet({
+    walletId: activeMnemonic ? "dev:wallet-harness" : undefined,
+    mnemonic: activeMnemonic,
+  });
 
   async function generate() {
     setGenerating(true);

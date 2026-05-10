@@ -24,8 +24,6 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
-import { useNostr } from "@nostrify/react";
-import { useQueryClient } from "@tanstack/react-query";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
@@ -42,27 +40,15 @@ import {
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/useToast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCreatePersona } from "@/hooks/useCreatePersona";
+import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 
+import { parseCommaList } from "@/lib/text";
 import {
-  buildEncryptedPersonaTemplate,
-  DEFAULT_MODEL_PREFS,
-  generatePersonaDTag,
-  PHOENIX_PAYLOAD_APP,
-  PHOENIX_PAYLOAD_VERSION,
-  type Persona,
-  type PersonaWallet,
-  type PhoenixEnvelope,
-} from "@/lib/persona";
-import {
-  encryptPhoenixEnvelope,
-  type Nip44Signer,
-} from "@/lib/personaCrypto";
-import {
-  generatePersonaKeypair,
-  signWithPersona,
-} from "@/lib/personaKey";
-import { generateMnemonic } from "@/lib/wallet/client";
-import { DEFAULT_AUTO_TOPUP_CONFIG } from "@/lib/wallet/types";
+  slugifyForUsername,
+  isValidLightningUsername,
+  SPARK_LN_DOMAIN,
+} from "@/lib/wallet/lightningAddress";
 
 type WizardStep = "details" | "picture";
 
@@ -70,14 +56,18 @@ const Onboard = () => {
   useSeoMeta({ title: "Create a persona — Zuka" });
   const navigate = useNavigate();
   const { user } = useCurrentUser();
-  const { nostr } = useNostr();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const createPersona = useCreatePersona();
 
   const [step, setStep] = useState<WizardStep>("details");
 
   // Details
   const [name, setName] = useState("Voice of Rwanda");
+  // Username drives the breez.tips LN address. Auto-derives from
+  // `name` while untouched; once the user edits it, we stop syncing
+  // (tracked by `usernameDirty`).
+  const [username, setUsername] = useState(slugifyForUsername("Voice of Rwanda"));
+  const [usernameDirty, setUsernameDirty] = useState(false);
   const [bio, setBio] = useState(
     "An AI-assisted voice. Press freedom, civil society, the long memory."
   );
@@ -91,13 +81,44 @@ const Onboard = () => {
   // Picture
   const [pictureUrl, setPictureUrl] = useState("");
 
-  const [publishing, setPublishing] = useState(false);
+  const publishing = createPersona.isPending;
+
+  // Live availability hint for the username field. Debounced HTTP probe
+  // against the public LUD-16 endpoint. The mint path's authoritative
+  // SDK check still runs and fixes any race against this preview.
+  const availability = useUsernameAvailability(username);
+
+  // Auto-sync username from the display name until the user takes
+  // control of it. Single source of truth: changing `name` updates
+  // `username` *only* if `usernameDirty` is false.
+  function onNameChange(next: string) {
+    setName(next);
+    if (!usernameDirty) {
+      setUsername(slugifyForUsername(next));
+    }
+  }
+
+  function onUsernameChange(next: string) {
+    // Constrain to LN-address characters as the user types — strip
+    // anything that wouldn't survive the registration step anyway.
+    const cleaned = next.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    setUsername(cleaned);
+    setUsernameDirty(true);
+  }
 
   function goNext() {
     if (!name.trim()) {
       toast({
-        title: "Name required",
+        title: "Display name required",
         description: "Give the persona a name before continuing.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (username && !isValidLightningUsername(username)) {
+      toast({
+        title: "Invalid username",
+        description: "Usernames must start with a letter or digit and contain only lowercase letters, digits, and hyphens.",
         variant: "destructive",
       });
       return;
@@ -114,123 +135,31 @@ const Onboard = () => {
       });
       return;
     }
-    setPublishing(true);
     try {
-      const kp = generatePersonaKeypair();
-      // Generate the stable d-tag once and store it inside the
-      // encrypted payload (PROJECT.md §5.2). Updates reuse this same
-      // d-tag so addressable-event semantics replace prior revisions.
-      const dTag = generatePersonaDTag();
-      const persona: Persona = {
-        pubkey: kp.hex.pk,
-        nsec: kp.nsec,
-        dTag,
-        name: name.trim() || "Untitled",
-        system_prompt: systemPrompt,
-        voice_id: voiceId,
-        languages: parseList(languagesInput, ["en"]),
-        tags: parseList(tagsInput, []),
-        // The picture doubles as the canonical reference image used
-        // by future post-image generation for likeness consistency.
-        reference_image_url: pictureUrl || undefined,
-        created_at: Math.floor(Date.now() / 1000),
-      };
-
-      // Mint a fresh BIP-39 mnemonic for the persona's Spark wallet.
-      // Stored only inside the encrypted envelope; recoverable on any
-      // device with the user's signer (PROJECT.md §7.1).
-      const mnemonic = await generateMnemonic();
-      const wallet: PersonaWallet = {
-        kind: "spark",
-        seed: mnemonic,
-        auto_topup: {
-          enabled: DEFAULT_AUTO_TOPUP_CONFIG.enabled,
-          threshold_usd: DEFAULT_AUTO_TOPUP_CONFIG.thresholdUsd,
-          target_usd: DEFAULT_AUTO_TOPUP_CONFIG.targetUsd,
-        },
-      };
-
-      const signer = user.signer as unknown as Nip44Signer;
-
-      // 1. Encrypt the Phoenix envelope (user self-encryption).
-      const ciphertext = await encryptPhoenixEnvelope(
-        {
-          persona,
-          wallet,
-          model_prefs: DEFAULT_MODEL_PREFS,
-        },
-        user.pubkey,
-        signer
-      );
-
-      // 2. Build + sign — d-tag mirrors persona.dTag so addressable
-      //    replacement works on update.
-      const personaTemplate = buildEncryptedPersonaTemplate({
-        dTag,
-        encryptedContent: ciphertext,
+      const result = await createPersona.mutateAsync({
+        name,
+        username,
+        bio,
+        systemPrompt,
+        voiceId,
+        languages: parseCommaList(languagesInput, ["en"]),
+        tags: parseCommaList(tagsInput, []),
+        pictureUrl: pictureUrl || undefined,
       });
-      const signed = await user.signer.signEvent(personaTemplate);
-      await nostr.event(signed, { signal: AbortSignal.timeout(8000) });
 
-      // 3. Publish a public kind 0 profile so the persona's feed is
-      //    browsable from any Nostr client.
-      const kind0Content: Record<string, unknown> = {
-        name: persona.name,
-        display_name: persona.name,
-        about: bio,
-        picture: pictureUrl || "",
-        bot: true,
-      };
-      // Phoenix-namespace extension: the canonical reference image
-      // (PROJECT.md §5.1). Same URL as the picture for V1.
-      if (pictureUrl) {
-        kind0Content.phoenix = {
-          reference_image: pictureUrl,
-          version: 1,
-        };
+      if (result.warning) {
+        toast({
+          title: "Lightning Address skipped",
+          description: result.warning,
+          variant: "destructive",
+        });
       }
-      const profileEvent = signWithPersona(
-        {
-          kind: 0,
-          created_at: Math.floor(Date.now() / 1000),
-          tags: [],
-          content: JSON.stringify(kind0Content),
-        },
-        kp
-      );
-      await nostr.event(profileEvent, { signal: AbortSignal.timeout(8000) });
-
-      // Optimistic cache updates so the user doesn't have to reload to
-      // see the new persona in /my-personas or its kind 0 metadata.
-      const envelope: PhoenixEnvelope = {
-        app: PHOENIX_PAYLOAD_APP,
-        version: PHOENIX_PAYLOAD_VERSION,
-        persona,
-        model_prefs: DEFAULT_MODEL_PREFS,
-      };
-      const newRecord = {
-        event: signed,
-        envelope,
-        npub: kp.npub,
-      };
-      queryClient.setQueryData(
-        ["phoenix-my-personas", user.pubkey],
-        (old: typeof newRecord[] | undefined) => {
-          const existing = old ?? [];
-          if (existing.some((r) => r.event.id === signed.id)) return existing;
-          return [newRecord, ...existing];
-        }
-      );
-      queryClient.setQueryData(["nostr", "author", kp.hex.pk], {
-        event: profileEvent,
-        metadata: kind0Content,
-      });
 
       toast({
         title: "Persona published",
-        description: `${persona.name} is live and private to you.`,
+        description: `${result.envelope.persona.name} is live and private to you.`,
       });
-      navigate(`/dashboard/${kp.npub}`);
+      navigate(`/dashboard/${result.npub}`);
     } catch (e) {
       toast({
         title: "Publish failed",
@@ -240,8 +169,6 @@ const Onboard = () => {
             : "Could not publish persona event to relays.",
         variant: "destructive",
       });
-    } finally {
-      setPublishing(false);
     }
   }
 
@@ -351,15 +278,37 @@ const Onboard = () => {
               {step === "details" ? (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="persona-name">Name</Label>
+                    <Label htmlFor="persona-name">Display name</Label>
                     <Input
                       id="persona-name"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => onNameChange(e.target.value)}
                       placeholder="Voice of Rwanda"
                       className="bg-background/60"
                       autoFocus
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Shown in posts and on the persona's public profile.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="persona-username">Username</Label>
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        id="persona-username"
+                        value={username}
+                        onChange={(e) => onUsernameChange(e.target.value)}
+                        placeholder="voice-of-rwanda"
+                        className="bg-background/60 font-mono text-sm"
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                      <span className="text-sm text-muted-foreground whitespace-nowrap">
+                        @{SPARK_LN_DOMAIN}
+                      </span>
+                    </div>
+                    <UsernameAvailabilityHint state={availability} />
                   </div>
 
                   <div className="space-y-2">
@@ -499,16 +448,60 @@ const Onboard = () => {
   );
 };
 
-function parseList(raw: string, fallback: string[]): string[] {
-  const parts = raw
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  return parts.length > 0 ? parts : fallback;
-}
-
 function truncate(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, n).trimEnd() + "…";
+}
+
+function UsernameAvailabilityHint({
+  state,
+}: {
+  state: ReturnType<typeof useUsernameAvailability>;
+}) {
+  // Stable layout: render a one-line hint at all states so the form
+  // doesn't shift when status changes. Color carries the signal.
+  switch (state.status) {
+    case "idle":
+      return (
+        <p className="text-xs text-muted-foreground">
+          URL-friendly handle. Becomes the persona's Lightning Address — donors
+          zap <code className="font-mono">username@{SPARK_LN_DOMAIN}</code>.
+        </p>
+      );
+    case "invalid":
+      return (
+        <p className="text-xs text-amber-600 dark:text-amber-500">
+          Lowercase letters, digits, and hyphens only — must start with a letter
+          or digit.
+        </p>
+      );
+    case "checking":
+      return (
+        <p className="text-xs text-muted-foreground">
+          Checking <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code>…
+        </p>
+      );
+    case "available":
+      return (
+        <p className="text-xs text-emerald-600 dark:text-emerald-500">
+          <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code> is
+          available.
+        </p>
+      );
+    case "taken":
+      return (
+        <p className="text-xs text-amber-600 dark:text-amber-500">
+          <code className="font-mono">{state.username}@{SPARK_LN_DOMAIN}</code> is
+          taken — we'll append a short random suffix on mint.
+        </p>
+      );
+    case "error":
+      return (
+        <p className="text-xs text-muted-foreground">
+          Couldn't reach the LNURL host — we'll try registration directly during
+          mint.
+        </p>
+      );
+  }
 }
 
 export default Onboard;

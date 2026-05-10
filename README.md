@@ -17,8 +17,8 @@ The authoritative design document is **[`PROJECT.md`](./dev/PROJECT.md)**.
 - **Persona-owned wallet** — each persona has its own Lightning wallet (Breez Spark SDK). It accepts NIP-57 zaps, exposes a Lightning Address, and pays for its own AI inference via [PPQ](https://ppq.ai).
 - **Video-first composer** — idea + sources + style hints feed an AI prompt that generates the persona's video. Posted to Nostr (kind 1 with NIP-92 imeta video tag) and optionally cross-posted to X / Facebook / Instagram via a user-supplied webhook (Buffer / Zapier / Make.com / etc.). Text-only kind 1 publish is available as a fallback.
 - **Encrypted backup on Nostr** — persona config + wallet seed + asset references encrypted (NIP-44) to the user's own pubkey and published as a kind 30078 event with no identifying tags. A new device with the user's nsec re-hydrates every persona from relays.
-- **At-rest key encryption** — fresh Phoenix-generated user nsecs are wrapped with NIP-49 (`ncryptsec`) before they hit localStorage. Once-per-session passphrase unlock. Download/import the backup file across devices for the kill-and-resurrect demo arc.
-- **No Phoenix backend** — the PWA talks directly to PPQ, Nostr relays, Blossom servers, and the Lightning network. Zuka never custodies funds or holds user data.
+- **At-rest key encryption** — fresh Zuka-generated user nsecs are wrapped with NIP-49 (`ncryptsec`) before they hit localStorage. Once-per-session passphrase unlock. Download/import the backup file across devices for the kill-and-resurrect demo arc.
+- **No Zuka backend** — the PWA talks directly to PPQ, Nostr relays, Blossom servers, and the Lightning network. Zuka never custodies funds or holds user data.
 
 ## Tech stack
 

@@ -18,6 +18,8 @@ interface WalletDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   personaName?: string;
+  /** Forwarded to WalletPanel — see its prop docs. */
+  editPersonaHref?: string;
 }
 
 export function WalletDialog({
@@ -25,6 +27,7 @@ export function WalletDialog({
   open,
   onOpenChange,
   personaName,
+  editPersonaHref,
 }: WalletDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -38,7 +41,7 @@ export function WalletDialog({
             inference is paid from here automatically.
           </DialogDescription>
         </DialogHeader>
-        <WalletPanel wallet={wallet} />
+        <WalletPanel wallet={wallet} editPersonaHref={editPersonaHref} />
       </DialogContent>
     </Dialog>
   );
