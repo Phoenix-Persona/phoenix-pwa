@@ -15,7 +15,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/useToast";
 import type { UseWalletResult } from "@/hooks/useWallet";
@@ -56,7 +56,7 @@ export function SendDialog({ wallet, open, onOpenChange }: SendDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Send sats</DialogTitle>
           <DialogDescription>
@@ -64,17 +64,28 @@ export function SendDialog({ wallet, open, onOpenChange }: SendDialogProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
+        <div className="space-y-4 min-w-0">
+          <div className="space-y-2 min-w-0">
             <Label htmlFor="invoice">BOLT11 invoice</Label>
-            <Textarea
+            {/* Single-line Input avoids the textarea field-sizing-content
+                growth that breaks layout on narrow viewports when a long
+                BOLT11 string is pasted. The input scrolls horizontally
+                on focus instead of expanding the dialog. */}
+            <Input
               id="invoice"
               value={invoice}
               onChange={(e) => setInvoice(e.target.value)}
               placeholder="lnbc..."
-              rows={4}
-              className="font-mono text-xs"
+              autoFocus
+              autoComplete="off"
+              spellCheck={false}
+              className="font-mono text-xs w-full"
             />
+            {invoice ? (
+              <p className="text-[11px] text-muted-foreground tabular-nums">
+                {invoice.trim().length} chars
+              </p>
+            ) : null}
           </div>
           <Button
             onClick={pay}

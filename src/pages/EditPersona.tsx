@@ -39,15 +39,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePersona } from "@/hooks/usePersona";
 import { useToast } from "@/hooks/useToast";
+import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 import {
   buildEncryptedPersonaTemplate,
   type Persona,
+  type PersonaWallet,
   type PhoenixEnvelope,
 } from "@/lib/persona";
 import {
   encryptPhoenixEnvelope,
   type Nip44Signer,
 } from "@/lib/personaCrypto";
+import { connectWallet, disconnectWallet } from "@/lib/wallet/client";
+import {
+  isValidLightningUsername,
+  registerLightningAddressWithRetry,
+  slugifyForUsername,
+} from "@/lib/wallet/lightningAddress";
 
 const EditPersona = () => {
   const { npub = "" } = useParams();
@@ -138,7 +146,14 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
 
   // Initialize directly from props — the parent passes a `key` of the
   // persona pubkey so a different persona triggers a full remount.
-  const [name, setName] = useState(original.name);
+  // `name` is the schema's required display field; we expose it as
+  // "Display name" in the UI and keep it in sync with the new
+  // `display_name` field on save.
+  const [name, setName] = useState(original.display_name ?? original.name);
+  const initialUsername =
+    original.username ?? slugifyForUsername(original.display_name ?? original.name);
+  const [username, setUsername] = useState(initialUsername);
+  const [usernameDirty, setUsernameDirty] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState(original.system_prompt);
   const [voiceId, setVoiceId] = useState(original.voice_id);
   const [tagsInput, setTagsInput] = useState(original.tags.join(", "));
@@ -167,6 +182,25 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
     (original.cross_post?.webhook_platforms ?? []).join(", ")
   );
   const [saving, setSaving] = useState(false);
+
+  // Live availability check for the username field. Skip while the
+  // value still matches the original (no-op rename).
+  const availability = useUsernameAvailability(
+    username !== initialUsername ? username : "",
+  );
+
+  function onNameChange(next: string) {
+    setName(next);
+    if (!usernameDirty) {
+      setUsername(slugifyForUsername(next));
+    }
+  }
+
+  function onUsernameChange(next: string) {
+    const cleaned = next.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    setUsername(cleaned);
+    setUsernameDirty(true);
+  }
 
   // Bio + picture come from the persona's public kind 0 — fetched
   // separately because they live on the public profile, not the
@@ -233,10 +267,22 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
       return;
     }
 
+    // Username gate: if the user edited the username, it must be a
+    // valid LN-address handle before we commit. The mint path's SDK
+    // call would also reject, but we'd rather fail before connecting.
+    const trimmedUsername = username.trim();
+    if (trimmedUsername && !isValidLightningUsername(trimmedUsername)) {
+      toast({
+        title: "Invalid username",
+        description:
+          "Usernames must start with a letter or digit and contain only lowercase letters, digits, and hyphens.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
-      // Build the updated persona — identity fields are immutable
-      // (pubkey, nsec, created_at, dTag).
       // Cross-post block — only emit if a webhook URL is set, so we
       // don't bloat the encrypted payload with empty fields. Empty
       // string clears the configuration entirely.
@@ -251,12 +297,54 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
           }
         : undefined;
 
+      // Re-register the LN address only if the username actually
+      // changed AND we have a wallet seed to drive the SDK. Spark's
+      // `registerLightningAddress` is per-Spark-identity idempotent —
+      // calling it with a new username automatically frees the old one.
+      let registeredAddress: string | undefined;
+      let registeredLnurl: string | undefined;
+      let resolvedUsername = trimmedUsername || original.username;
+      const usernameChanged =
+        trimmedUsername.length > 0 && trimmedUsername !== original.username;
+      const seed = envelope.wallet?.seed;
+      if (usernameChanged && seed) {
+        try {
+          const handle = await connectWallet({ mnemonic: seed });
+          try {
+            const ln = await registerLightningAddressWithRetry(handle, {
+              baseUsername: trimmedUsername,
+              description: `Donations to ${name.trim() || original.name}`,
+              fallbackBase: "persona",
+            });
+            registeredAddress = ln.lightningAddress;
+            registeredLnurl = ln.lnurl;
+            resolvedUsername = ln.username;
+          } finally {
+            await disconnectWallet(handle).catch(() => undefined);
+          }
+        } catch (err) {
+          toast({
+            title: "Lightning Address update failed",
+            description:
+              err instanceof Error
+                ? err.message
+                : "Couldn't claim the new username. Other changes were not saved — fix the username or revert it.",
+            variant: "destructive",
+          });
+          setSaving(false);
+          return;
+        }
+      }
+
+      const trimmedName = name.trim() || original.name;
       const updated: Persona = {
         ...original,
         // Promote the resolved d-tag into the plaintext payload so
         // future updates don't have to fall back to the event tag.
         dTag,
-        name: name.trim() || original.name,
+        name: trimmedName,
+        display_name: trimmedName,
+        username: resolvedUsername,
         system_prompt: systemPrompt,
         voice_id: voiceId.trim() || original.voice_id,
         languages: parseList(languagesInput, original.languages),
@@ -265,12 +353,26 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
         cross_post,
       };
 
+      // Wallet — if we registered a new address, embed it. Otherwise
+      // preserve the existing wallet block verbatim.
+      const updatedWallet: PersonaWallet | undefined = envelope.wallet
+        ? {
+            ...envelope.wallet,
+            ...(registeredAddress !== undefined
+              ? { lightning_address: registeredAddress }
+              : {}),
+            ...(registeredLnurl !== undefined
+              ? { lnurl: registeredLnurl }
+              : {}),
+          }
+        : undefined;
+
       const signer = user.signer as unknown as Nip44Signer;
 
       const ciphertext = await encryptPhoenixEnvelope(
         {
           persona: updated,
-          wallet: envelope.wallet,
+          wallet: updatedWallet,
           model_prefs: envelope.model_prefs,
           settings: envelope.settings,
         },
@@ -285,23 +387,37 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
       const signed = await user.signer.signEvent(tmpl);
       await nostr.event(signed, { signal: AbortSignal.timeout(8000) });
 
-      // If the public-facing name, bio, or picture changed,
-      // re-publish kind 0 signed by the persona keypair.
-      const nameChanged = updated.name !== original.name;
+      // If anything that surfaces in the public kind 0 changed,
+      // re-publish kind 0 signed by the persona keypair. This includes
+      // the new lud16 from registration so Nostr clients show the zap
+      // button against the current address.
+      const displayNameChanged = updated.name !== original.name;
       const bioChanged = bioHydrated && bio !== originalBio;
       const pictureChanged = pictureHydrated && pictureUrl !== originalPicture;
-      if (nameChanged || bioChanged || pictureChanged) {
+      const lud16Changed = registeredAddress !== undefined;
+      if (
+        displayNameChanged ||
+        bioChanged ||
+        pictureChanged ||
+        usernameChanged ||
+        lud16Changed
+      ) {
         try {
           const decoded = nip19.decode(updated.nsec);
           if (decoded.type !== "nsec") throw new Error("Bad nsec");
           const { finalizeEvent } = await import("nostr-tools/pure");
+          const finalLightningAddress =
+            registeredAddress ?? envelope.wallet?.lightning_address;
           const kind0Content: Record<string, unknown> = {
-            name: updated.name,
-            display_name: updated.name,
+            name: updated.username ?? updated.name,
+            display_name: updated.display_name ?? updated.name,
             about: bio,
             picture: pictureUrl || "",
             bot: true,
           };
+          if (finalLightningAddress) {
+            kind0Content.lud16 = finalLightningAddress;
+          }
           if (pictureUrl) {
             kind0Content.phoenix = {
               reference_image: pictureUrl,
@@ -357,11 +473,37 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
       </div>
       <CardContent className="space-y-5 pt-5">
         <div className="space-y-2">
-          <Label htmlFor="edit-name">Name</Label>
+          <Label htmlFor="edit-name">Display name</Label>
           <Input
             id="edit-name"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => onNameChange(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Shown in posts and on the persona's public profile.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="edit-username">Username</Label>
+          <div className="flex items-center gap-1.5">
+            <Input
+              id="edit-username"
+              value={username}
+              onChange={(e) => onUsernameChange(e.target.value)}
+              placeholder="username"
+              className="font-mono text-sm"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <span className="text-sm text-muted-foreground whitespace-nowrap">
+              @spark.money
+            </span>
+          </div>
+          <UsernameAvailabilityHint
+            state={availability}
+            originalUsername={initialUsername}
+            currentUsername={username}
           />
         </div>
 
@@ -508,6 +650,66 @@ function parseList(raw: string, fallback: string[]): string[] {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
   return parts.length > 0 ? parts : fallback;
+}
+
+function UsernameAvailabilityHint({
+  state,
+  originalUsername,
+  currentUsername,
+}: {
+  state: ReturnType<typeof useUsernameAvailability>;
+  originalUsername: string;
+  currentUsername: string;
+}) {
+  // If the user hasn't actually changed the username, the live probe
+  // is suppressed (the hook is wired to a blank input). Render a
+  // status that reflects that — and warn that registration won't run.
+  if (currentUsername === originalUsername) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Current Lightning Address. Edit to claim a different one — Spark
+        replaces the old registration on rename.
+      </p>
+    );
+  }
+  switch (state.status) {
+    case "idle":
+      return null;
+    case "invalid":
+      return (
+        <p className="text-xs text-amber-600 dark:text-amber-500">
+          Lowercase letters, digits, and hyphens only — must start with a letter
+          or digit.
+        </p>
+      );
+    case "checking":
+      return (
+        <p className="text-xs text-muted-foreground">
+          Checking <code className="font-mono">{state.username}@spark.money</code>…
+        </p>
+      );
+    case "available":
+      return (
+        <p className="text-xs text-emerald-600 dark:text-emerald-500">
+          <code className="font-mono">{state.username}@spark.money</code> is
+          available.
+        </p>
+      );
+    case "taken":
+      return (
+        <p className="text-xs text-amber-600 dark:text-amber-500">
+          <code className="font-mono">{state.username}@spark.money</code> is
+          taken — pick a different name. Save will append a random suffix
+          rather than fail.
+        </p>
+      );
+    case "error":
+      return (
+        <p className="text-xs text-muted-foreground">
+          Couldn't reach the LNURL host — registration will run anyway.
+        </p>
+      );
+  }
 }
 
 export default EditPersona;

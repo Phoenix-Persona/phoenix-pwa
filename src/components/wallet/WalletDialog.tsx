@@ -11,13 +11,15 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import type { UseWalletResult } from "@/hooks/useWallet";
-import { WalletPanel } from "./WalletPanel";
+import { WalletPanel, type WalletPanelRegisterProps } from "./WalletPanel";
 
 interface WalletDialogProps {
   wallet: UseWalletResult;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   personaName?: string;
+  /** Forwarded to WalletPanel — see its prop docs. */
+  registerLightningAddress?: WalletPanelRegisterProps;
 }
 
 export function WalletDialog({
@@ -25,6 +27,7 @@ export function WalletDialog({
   open,
   onOpenChange,
   personaName,
+  registerLightningAddress,
 }: WalletDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -38,7 +41,10 @@ export function WalletDialog({
             inference is paid from here automatically.
           </DialogDescription>
         </DialogHeader>
-        <WalletPanel wallet={wallet} />
+        <WalletPanel
+          wallet={wallet}
+          registerLightningAddress={registerLightningAddress}
+        />
       </DialogContent>
     </Dialog>
   );

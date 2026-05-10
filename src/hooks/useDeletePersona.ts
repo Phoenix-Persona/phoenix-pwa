@@ -1,12 +1,20 @@
 /**
- * Delete a persona — publishes a NIP-09 deletion request and
- * overwrites the kind 30078 envelope with a "deleted" sentinel.
+ * Delete a persona — releases the persona's Lightning Address (so the
+ * `username@spark.money` slot is freed up), publishes a NIP-09 deletion
+ * request, and overwrites the kind 30078 envelope with a "deleted"
+ * sentinel.
  *
  * Mechanics:
- *  1. Publish kind 5 (NIP-09) referencing the backup event id and the
+ *  1. Decrypt the existing backup to recover the persona's wallet seed.
+ *     Best-effort: if decryption fails or the persona has no wallet,
+ *     skip the LN address release and proceed.
+ *  2. Connect to the Spark SDK with the persona's seed and call
+ *     `deleteLightningAddress()`. Best-effort — log and continue if it
+ *     fails so the operator can still tombstone the envelope.
+ *  3. Publish kind 5 (NIP-09) referencing the backup event id and the
  *     persona's kind 0 if we can find one. Best-effort — relays honor
  *     this at their discretion.
- *  2. Publish a NEW kind 30078 with the SAME d-tag as the original
+ *  4. Publish a NEW kind 30078 with the SAME d-tag as the original
  *     backup, but with encrypted content that's a "deleted" sentinel
  *     (`{ app, version, deleted: true }`). Because kind 30078 is
  *     addressable, this replaces the original on every relay that
@@ -34,6 +42,8 @@ import {
   PHOENIX_PAYLOAD_APP,
   PHOENIX_PAYLOAD_VERSION,
 } from "@/lib/persona";
+import { tryDecryptPhoenixEnvelope } from "@/lib/personaCrypto";
+import { connectWallet, disconnectWallet } from "@/lib/wallet/client";
 import { useCurrentUser } from "./useCurrentUser";
 
 interface DeletePersonaArgs {
@@ -52,7 +62,28 @@ interface Nip44Signer {
   }) => Promise<NostrEvent>;
   nip44: {
     encrypt: (pubkey: string, plaintext: string) => Promise<string>;
+    decrypt: (pubkey: string, ciphertext: string) => Promise<string>;
   };
+}
+
+/**
+ * Best-effort: connect with the persona's seed and release the
+ * `username@spark.money` slot so it can be reclaimed by future
+ * personas (or by other Phoenix users). Swallow all errors — a
+ * deletion that misses the LN release is still a successful
+ * persona deletion from the operator's POV.
+ */
+async function tryReleaseLightningAddress(seed: string): Promise<void> {
+  try {
+    const handle = await connectWallet({ mnemonic: seed });
+    try {
+      await handle.deleteLightningAddress();
+    } finally {
+      await disconnectWallet(handle).catch(() => undefined);
+    }
+  } catch (err) {
+    console.warn("[useDeletePersona] LN address release failed:", err);
+  }
 }
 
 export function useDeletePersona() {
@@ -70,6 +101,29 @@ export function useDeletePersona() {
       const dTag = backupEvent.tags.find(([n]) => n === "d")?.[1];
       if (!dTag) {
         throw new Error("Backup event is missing its d-tag");
+      }
+
+      // 0. Best-effort LN address release. Decrypt the backup, pull
+      //    the wallet seed, ask Spark to drop the registration. We do
+      //    this BEFORE the tombstone so we still have a usable seed
+      //    on disk; the SDK call is the slow step (WASM init + network)
+      //    but bounding the worst case is fine — failures don't block
+      //    the rest of the deletion.
+      try {
+        const envelope = await tryDecryptPhoenixEnvelope(
+          backupEvent.content,
+          user.pubkey,
+          signer,
+        );
+        const seed = envelope?.wallet?.seed;
+        if (seed) {
+          await tryReleaseLightningAddress(seed);
+        }
+      } catch (err) {
+        console.warn(
+          "[useDeletePersona] could not decrypt backup to release LN address:",
+          err,
+        );
       }
 
       // Best-effort: look up the persona's kind 0 so we can include

@@ -1,12 +1,13 @@
 /**
  * Receive — generate a BOLT11 invoice the user can pay from any
- * Lightning wallet. Shows the QR + raw invoice. The wallet hook's
- * 15-second balance refresh is what closes the loop; this dialog
- * doesn't poll separately.
+ * Lightning wallet. Shows the QR + raw invoice. While the invoice is
+ * displayed the dialog subscribes to the SDK's event stream and
+ * dismisses itself once the matching `paymentSucceeded` event lands —
+ * the user gets a brief "received" confirmation, then the modal closes.
  */
 
-import { useState } from "react";
-import { Copy, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, Copy, Loader2 } from "lucide-react";
 
 import {
   Dialog,
@@ -28,11 +29,14 @@ interface ReceiveDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const RECEIVED_AUTO_CLOSE_MS = 1800;
+
 export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps) {
   const { toast } = useToast();
   const [amountStr, setAmountStr] = useState("5000");
   const [memo, setMemo] = useState("Phoenix top-up");
   const [invoice, setInvoice] = useState<string | null>(null);
+  const [received, setReceived] = useState(false);
 
   async function generate() {
     const amount = Number(amountStr);
@@ -47,6 +51,7 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
     try {
       const res = await wallet.receive({ amountSats: amount, description: memo });
       setInvoice(res.paymentRequest);
+      setReceived(false);
     } catch (e) {
       toast({
         title: "Could not generate invoice",
@@ -64,7 +69,61 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
 
   function reset() {
     setInvoice(null);
+    setReceived(false);
   }
+
+  // Subscribe to SDK events while an invoice is on screen. When a
+  // `paymentSucceeded` event fires for the BOLT11 string we generated,
+  // refresh balances, flip to a success state, and auto-dismiss the
+  // dialog after a short delay so the user sees the confirmation.
+  const handle = wallet.handle;
+  useEffect(() => {
+    if (!handle || !invoice || !open) return;
+
+    let listenerId: string | undefined;
+    let cancelled = false;
+    let closeTimer: ReturnType<typeof setTimeout> | undefined;
+
+    void handle
+      .addEventListener({
+        onEvent: (event) => {
+          if (cancelled) return;
+          if (event.type !== "paymentSucceeded") return;
+          const p = event.payment;
+          if (p.paymentType !== "receive") return;
+          // Match by BOLT11 string — the SDK echoes the same paymentRequest
+          // back inside `details.invoice` for lightning receive payments.
+          const matched =
+            p.details?.type === "lightning" && p.details.invoice === invoice;
+          if (!matched) return;
+
+          setReceived(true);
+          wallet.refreshInfo();
+          wallet.refreshPayments();
+          closeTimer = setTimeout(() => {
+            if (cancelled) return;
+            onOpenChange(false);
+            reset();
+          }, RECEIVED_AUTO_CLOSE_MS);
+        },
+      })
+      .then((id) => {
+        if (cancelled) {
+          void handle.removeEventListener(id).catch(() => undefined);
+          return;
+        }
+        listenerId = id;
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+      if (closeTimer) clearTimeout(closeTimer);
+      if (listenerId) {
+        void handle.removeEventListener(listenerId).catch(() => undefined);
+      }
+    };
+  }, [handle, invoice, open, onOpenChange, wallet]);
 
   return (
     <Dialog
@@ -74,7 +133,7 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
         if (!o) reset();
       }}
     >
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Receive sats</DialogTitle>
           <DialogDescription>
@@ -118,21 +177,36 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
               )}
             </Button>
           </div>
+        ) : received ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 ring-2 ring-emerald-500/30">
+              <Check className="h-8 w-8" aria-hidden="true" />
+            </div>
+            <p className="text-lg font-semibold">Payment received</p>
+            <p className="text-sm text-muted-foreground">
+              Balance updated. Closing…
+            </p>
+          </div>
         ) : (
           <div className="space-y-4">
             <div className="flex justify-center">
               <QRCodeCanvas value={invoice} size={256} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 min-w-0">
               <Label>BOLT11 invoice</Label>
-              <div className="flex gap-2">
-                <Input value={invoice} readOnly className="font-mono text-xs" />
-                <Button variant="outline" size="icon" onClick={copy} aria-label="Copy invoice">
+              <div className="flex gap-2 min-w-0">
+                <Input
+                  value={invoice}
+                  readOnly
+                  className="font-mono text-xs flex-1 min-w-0"
+                />
+                <Button variant="outline" size="icon" onClick={copy} aria-label="Copy invoice" className="shrink-0">
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Balance updates within ~15 seconds of payment.
+                Waiting for payment… this dialog closes automatically once the
+                wallet confirms.
               </p>
             </div>
             <Button variant="outline" onClick={reset} className="w-full">

@@ -30,6 +30,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePersona, usePersonaPosts } from "@/hooks/usePersona";
 import { usePersonaPublish } from "@/hooks/usePersonaPublish";
 import { usePpqInference } from "@/hooks/usePpqInference";
+import { useRegisterPersonaLightningAddress } from "@/hooks/useRegisterPersonaLightningAddress";
 import { useWallet } from "@/hooks/useWallet";
 import { buildPersonaPostTemplate } from "@/lib/personaPost";
 import { nip19 } from "nostr-tools";
@@ -632,16 +633,83 @@ const Dashboard = () => {
           }}
         />
       )}
-      {walletSeed && personaConfig ? (
-        <WalletDialog
+      {walletSeed && personaConfig && persona.data ? (
+        <PersonaWalletDialog
           wallet={wallet}
           open={walletOpen}
           onOpenChange={setWalletOpen}
           personaName={personaConfig.name}
+          backupEvent={persona.data.event}
+          envelope={persona.data.envelope}
+          npub={npub}
         />
       ) : null}
     </div>
   );
 };
+
+/**
+ * Persona-aware wrapper around `<WalletDialog />`. Calling the
+ * registration hook requires a loaded persona context, so we
+ * encapsulate that here and only mount when the persona is ready.
+ */
+function PersonaWalletDialog({
+  wallet,
+  open,
+  onOpenChange,
+  personaName,
+  backupEvent,
+  envelope,
+  npub,
+}: {
+  wallet: ReturnType<typeof useWallet>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  personaName: string;
+  backupEvent: import("@nostrify/nostrify").NostrEvent;
+  envelope: import("@/lib/persona").PhoenixEnvelope;
+  npub: string;
+}) {
+  const { toast } = useToast();
+  const register = useRegisterPersonaLightningAddress({
+    backupEvent,
+    envelope,
+    npub,
+  });
+
+  return (
+    <WalletDialog
+      wallet={wallet}
+      open={open}
+      onOpenChange={onOpenChange}
+      personaName={personaName}
+      registerLightningAddress={{
+        onSubmit: (baseUsername) => {
+          register.mutate(
+            { baseUsername },
+            {
+              onSuccess: (resolved) => {
+                toast({
+                  title: "Lightning Address registered",
+                  description: resolved.lightningAddress,
+                });
+                wallet.refreshInfo();
+              },
+              onError: (err) => {
+                toast({
+                  title: "Registration failed",
+                  description: err.message,
+                  variant: "destructive",
+                });
+              },
+            },
+          );
+        },
+        isPending: register.isPending,
+        suggestedUsername: envelope.persona.username ?? envelope.persona.name,
+      }}
+    />
+  );
+}
 
 export default Dashboard;

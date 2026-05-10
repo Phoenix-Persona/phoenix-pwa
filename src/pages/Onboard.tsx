@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/useToast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 
 import {
   buildEncryptedPersonaTemplate,
@@ -61,8 +62,17 @@ import {
   generatePersonaKeypair,
   signWithPersona,
 } from "@/lib/personaKey";
-import { generateMnemonic } from "@/lib/wallet/client";
+import {
+  connectWallet,
+  disconnectWallet,
+  generateMnemonic,
+} from "@/lib/wallet/client";
 import { DEFAULT_AUTO_TOPUP_CONFIG } from "@/lib/wallet/types";
+import {
+  registerLightningAddressWithRetry,
+  slugifyForUsername,
+  isValidLightningUsername,
+} from "@/lib/wallet/lightningAddress";
 
 type WizardStep = "details" | "picture";
 
@@ -78,6 +88,11 @@ const Onboard = () => {
 
   // Details
   const [name, setName] = useState("Voice of Rwanda");
+  // Username drives the spark.money LN address. Auto-derives from
+  // `name` while untouched; once the user edits it, we stop syncing
+  // (tracked by `usernameDirty`).
+  const [username, setUsername] = useState(slugifyForUsername("Voice of Rwanda"));
+  const [usernameDirty, setUsernameDirty] = useState(false);
   const [bio, setBio] = useState(
     "An AI-assisted voice. Press freedom, civil society, the long memory."
   );
@@ -93,11 +108,42 @@ const Onboard = () => {
 
   const [publishing, setPublishing] = useState(false);
 
+  // Live availability hint for the username field. Debounced HTTP probe
+  // against the public LUD-16 endpoint. The mint path's authoritative
+  // SDK check still runs and fixes any race against this preview.
+  const availability = useUsernameAvailability(username);
+
+  // Auto-sync username from the display name until the user takes
+  // control of it. Single source of truth: changing `name` updates
+  // `username` *only* if `usernameDirty` is false.
+  function onNameChange(next: string) {
+    setName(next);
+    if (!usernameDirty) {
+      setUsername(slugifyForUsername(next));
+    }
+  }
+
+  function onUsernameChange(next: string) {
+    // Constrain to LN-address characters as the user types — strip
+    // anything that wouldn't survive the registration step anyway.
+    const cleaned = next.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    setUsername(cleaned);
+    setUsernameDirty(true);
+  }
+
   function goNext() {
     if (!name.trim()) {
       toast({
-        title: "Name required",
+        title: "Display name required",
         description: "Give the persona a name before continuing.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (username && !isValidLightningUsername(username)) {
+      toast({
+        title: "Invalid username",
+        description: "Usernames must start with a letter or digit and contain only lowercase letters, digits, and hyphens.",
         variant: "destructive",
       });
       return;
@@ -121,11 +167,57 @@ const Onboard = () => {
       // encrypted payload (PROJECT.md §5.2). Updates reuse this same
       // d-tag so addressable-event semantics replace prior revisions.
       const dTag = generatePersonaDTag();
+      const trimmedName = name.trim() || "Untitled";
+      const baseUsername = (username || slugifyForUsername(trimmedName)).trim();
+
+      // Mint a fresh BIP-39 mnemonic for the persona's Spark wallet.
+      // Stored only inside the encrypted envelope; recoverable on any
+      // device with the user's signer (PROJECT.md §7.1).
+      const mnemonic = await generateMnemonic();
+
+      // Connect to the SDK with the new mnemonic and try to register
+      // a Lightning Address on `spark.money`. The address is the
+      // persona's public donate handle — best-effort: if registration
+      // fails (network, namespace exhaustion), we still mint the
+      // persona, just without a public address. The user can retry
+      // later from the wallet panel.
+      let lightningAddress: string | undefined;
+      let lnurl: string | undefined;
+      let resolvedUsername: string | undefined;
+      try {
+        const handle = await connectWallet({ mnemonic });
+        try {
+          const ln = await registerLightningAddressWithRetry(handle, {
+            baseUsername,
+            description: `Donations to ${trimmedName}`,
+            fallbackBase: "persona",
+          });
+          lightningAddress = ln.lightningAddress;
+          lnurl = ln.lnurl;
+          resolvedUsername = ln.username;
+        } finally {
+          await disconnectWallet(handle).catch(() => undefined);
+        }
+      } catch (err) {
+        toast({
+          title: "Lightning Address skipped",
+          description:
+            err instanceof Error
+              ? err.message
+              : "Could not register the persona's Lightning Address. The persona will mint without a public donate handle.",
+          variant: "destructive",
+        });
+      }
+
+      const finalUsername = resolvedUsername ?? (isValidLightningUsername(baseUsername) ? baseUsername : undefined);
+
       const persona: Persona = {
         pubkey: kp.hex.pk,
         nsec: kp.nsec,
         dTag,
-        name: name.trim() || "Untitled",
+        name: trimmedName,
+        username: finalUsername,
+        display_name: trimmedName,
         system_prompt: systemPrompt,
         voice_id: voiceId,
         languages: parseList(languagesInput, ["en"]),
@@ -136,13 +228,11 @@ const Onboard = () => {
         created_at: Math.floor(Date.now() / 1000),
       };
 
-      // Mint a fresh BIP-39 mnemonic for the persona's Spark wallet.
-      // Stored only inside the encrypted envelope; recoverable on any
-      // device with the user's signer (PROJECT.md §7.1).
-      const mnemonic = await generateMnemonic();
       const wallet: PersonaWallet = {
         kind: "spark",
         seed: mnemonic,
+        lightning_address: lightningAddress,
+        lnurl,
         auto_topup: {
           enabled: DEFAULT_AUTO_TOPUP_CONFIG.enabled,
           threshold_usd: DEFAULT_AUTO_TOPUP_CONFIG.thresholdUsd,
@@ -173,14 +263,23 @@ const Onboard = () => {
       await nostr.event(signed, { signal: AbortSignal.timeout(8000) });
 
       // 3. Publish a public kind 0 profile so the persona's feed is
-      //    browsable from any Nostr client.
+      //    browsable from any Nostr client. Mapping:
+      //      kind 0 `name`         ← persona.username (slug; LUD-16 LHS)
+      //      kind 0 `display_name` ← persona.display_name (rich)
+      //      kind 0 `lud16`        ← persona.wallet.lightning_address
       const kind0Content: Record<string, unknown> = {
-        name: persona.name,
-        display_name: persona.name,
+        name: persona.username ?? persona.name,
+        display_name: persona.display_name ?? persona.name,
         about: bio,
         picture: pictureUrl || "",
         bot: true,
       };
+      if (lightningAddress) {
+        // LUD-16 (https://github.com/lnurl/luds/blob/luds/16.md): the
+        // human-readable lightning address, used by Nostr clients for
+        // the zap button.
+        kind0Content.lud16 = lightningAddress;
+      }
       // Phoenix-namespace extension: the canonical reference image
       // (PROJECT.md §5.1). Same URL as the picture for V1.
       if (pictureUrl) {
@@ -202,10 +301,13 @@ const Onboard = () => {
 
       // Optimistic cache updates so the user doesn't have to reload to
       // see the new persona in /my-personas or its kind 0 metadata.
+      // Include `wallet` so the Dashboard the navigate() lands on can
+      // wire up the wallet hook immediately without a relay refetch.
       const envelope: PhoenixEnvelope = {
         app: PHOENIX_PAYLOAD_APP,
         version: PHOENIX_PAYLOAD_VERSION,
         persona,
+        wallet,
         model_prefs: DEFAULT_MODEL_PREFS,
       };
       const newRecord = {
@@ -351,15 +453,37 @@ const Onboard = () => {
               {step === "details" ? (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="persona-name">Name</Label>
+                    <Label htmlFor="persona-name">Display name</Label>
                     <Input
                       id="persona-name"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => onNameChange(e.target.value)}
                       placeholder="Voice of Rwanda"
                       className="bg-background/60"
                       autoFocus
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Shown in posts and on the persona's public profile.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="persona-username">Username</Label>
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        id="persona-username"
+                        value={username}
+                        onChange={(e) => onUsernameChange(e.target.value)}
+                        placeholder="voice-of-rwanda"
+                        className="bg-background/60 font-mono text-sm"
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                      <span className="text-sm text-muted-foreground whitespace-nowrap">
+                        @spark.money
+                      </span>
+                    </div>
+                    <UsernameAvailabilityHint state={availability} />
                   </div>
 
                   <div className="space-y-2">
@@ -509,6 +633,58 @@ function parseList(raw: string, fallback: string[]): string[] {
 
 function truncate(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, n).trimEnd() + "…";
+}
+
+function UsernameAvailabilityHint({
+  state,
+}: {
+  state: ReturnType<typeof useUsernameAvailability>;
+}) {
+  // Stable layout: render a one-line hint at all states so the form
+  // doesn't shift when status changes. Color carries the signal.
+  switch (state.status) {
+    case "idle":
+      return (
+        <p className="text-xs text-muted-foreground">
+          URL-friendly handle. Becomes the persona's Lightning Address — donors
+          zap <code className="font-mono">username@spark.money</code>.
+        </p>
+      );
+    case "invalid":
+      return (
+        <p className="text-xs text-amber-600 dark:text-amber-500">
+          Lowercase letters, digits, and hyphens only — must start with a letter
+          or digit.
+        </p>
+      );
+    case "checking":
+      return (
+        <p className="text-xs text-muted-foreground">
+          Checking <code className="font-mono">{state.username}@spark.money</code>…
+        </p>
+      );
+    case "available":
+      return (
+        <p className="text-xs text-emerald-600 dark:text-emerald-500">
+          <code className="font-mono">{state.username}@spark.money</code> is
+          available.
+        </p>
+      );
+    case "taken":
+      return (
+        <p className="text-xs text-amber-600 dark:text-amber-500">
+          <code className="font-mono">{state.username}@spark.money</code> is
+          taken — we'll append a short random suffix on mint.
+        </p>
+      );
+    case "error":
+      return (
+        <p className="text-xs text-muted-foreground">
+          Couldn't reach the LNURL host — we'll try registration directly during
+          mint.
+        </p>
+      );
+  }
 }
 
 export default Onboard;
