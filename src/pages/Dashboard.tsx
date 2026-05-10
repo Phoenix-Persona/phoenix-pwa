@@ -16,6 +16,7 @@ import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
 import { PersonaActionsMenu } from "@/components/PersonaActionsMenu";
 import { DashboardComposerCard } from "@/components/persona/DashboardComposerCard";
 import { PersonaHero } from "@/components/persona/PersonaHero";
+import { PostWizardDialog } from "@/components/persona/PostWizardDialog";
 import { PostCard } from "@/components/PostCard";
 import { PostListSkeleton } from "@/components/Skeletons";
 import { VideoComposerDialog } from "@/components/VideoComposerDialog";
@@ -59,6 +60,7 @@ const Dashboard = () => {
   const picture = sanitizeHttpUrl(author.data?.metadata?.picture);
 
   const [raw, setRaw] = useState("");
+  const [postWizardOpen, setPostWizardOpen] = useState(false);
   // Open state for the video composer modal. Mounted alongside the
   // Generate video button so it carries the current `raw` / sources /
   // hints when launched.
@@ -311,6 +313,7 @@ const Dashboard = () => {
                 setHintsInput("");
               }}
               onStyle={onStyle}
+              onOpenPostWizard={() => setPostWizardOpen(true)}
               onPost={onPost}
               onOpenVideo={() => setVideoDialogOpen(true)}
               // Research-panel injection: append to the existing
@@ -319,14 +322,7 @@ const Dashboard = () => {
               // voice). Both helpers dedupe so re-clicking the same
               // result doesn't duplicate.
               onAppendSource={(url) =>
-                setSourcesInput((prev) => {
-                  const parts = prev
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean);
-                  if (parts.includes(url)) return prev;
-                  return parts.length === 0 ? url : `${prev.trimEnd().replace(/,$/, "")}, ${url}`;
-                })
+                setSourcesInput((prev) => appendSourceUrls(prev, [url]))
               }
               onAppendIdea={(text) =>
                 setRaw((prev) =>
@@ -395,6 +391,22 @@ const Dashboard = () => {
           }}
         />
       )}
+      {personaConfig ? (
+        <PostWizardDialog
+          key={`${npub}:${postWizardOpen ? "open" : "closed"}`}
+          open={postWizardOpen}
+          onOpenChange={setPostWizardOpen}
+          persona={personaConfig}
+          model={stylingModel}
+          walletSeed={walletSeed}
+          onUseDraft={(draft, sourceUrls) => {
+            setRaw(draft);
+            setSourcesInput((prev) => appendSourceUrls(prev, sourceUrls));
+            wallet.refreshPpqBalance();
+            wallet.refreshInfo();
+          }}
+        />
+      ) : null}
       {walletSeed && personaConfig ? (
         <WalletDialog
           wallet={wallet}
@@ -409,3 +421,21 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
+function appendSourceUrls(current: string, urls: string[]): string {
+  const existing = current
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean);
+  const seen = new Set(existing.map((url) => url.toLowerCase()));
+  const next = [...existing];
+
+  for (const url of urls) {
+    const trimmed = url.trim();
+    if (!trimmed || seen.has(trimmed.toLowerCase())) continue;
+    next.push(trimmed);
+    seen.add(trimmed.toLowerCase());
+  }
+
+  return next.join(", ");
+}

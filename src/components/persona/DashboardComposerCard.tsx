@@ -23,6 +23,7 @@ interface DashboardComposerCardProps {
   onHintsInputChange: (value: string) => void;
   onDiscard: () => void;
   onStyle: () => void;
+  onOpenPostWizard: () => void;
   onPost: () => void;
   onOpenVideo: () => void;
   /**
@@ -56,6 +57,7 @@ export function DashboardComposerCard({
   onHintsInputChange,
   onDiscard,
   onStyle,
+  onOpenPostWizard,
   onPost,
   onOpenVideo,
   onAppendSource,
@@ -69,6 +71,10 @@ export function DashboardComposerCard({
   const styleTitle = !walletSeed
     ? "Mint a new persona to enable AI styling"
     : "Rewrite the idea in the persona's voice (PPQ chat)";
+  const wizardDisabled = isStyling || isPublishing || !walletSeed;
+  const wizardTitle = !walletSeed
+    ? "Mint a new persona to enable the post wizard"
+    : "Build a post with an AI-guided wizard";
 
   const crossPostBanner = showCrossPost ? (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-rw-sky/25 bg-rw-sky/5 px-4 py-2.5 text-xs">
@@ -173,6 +179,16 @@ export function DashboardComposerCard({
                 Discard
               </Button>
               <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onOpenPostWizard}
+                  disabled={wizardDisabled}
+                  title={wizardTitle}
+                >
+                  <Sparkles className="mr-2 size-4" aria-hidden="true" />
+                  Post Wizard
+                </Button>
                 <Button
                   onClick={onStyle}
                   disabled={styleDisabled}
