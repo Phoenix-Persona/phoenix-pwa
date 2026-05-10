@@ -33,8 +33,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { downloadTextFile } from "@/lib/downloadFile";
 import { encryptNsec } from "@/lib/nip49Storage";
 import { useToast } from "@/hooks/useToast";
+
+import { Capacitor } from "@capacitor/core";
 
 interface DownloadBackupDialogProps {
   /** The user's nsec (bech32) — only available for nsec-type logins. */
@@ -90,20 +93,18 @@ export function DownloadBackupDialog({
       }
       const ncryptsec = encryptNsec(decoded.data, passphrase);
 
-      // Trigger file download in-browser.
-      const blob = new Blob([ncryptsec], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = exportFilename();
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(url);
+      // Web: anchor-click download → browser's downloads folder.
+      // Native: Capacitor Filesystem write → app Documents directory
+      // (visible in iOS Files app and Android's app-scoped documents).
+      // The `<a download>` trick doesn't work in Capacitor WebView, so the
+      // helper picks the right path automatically.
+      await downloadTextFile(exportFilename(), ncryptsec);
 
       toast({
         title: "Backup saved",
-        description: "Store this file somewhere safe and offline.",
+        description: Capacitor.isNativePlatform()
+          ? "Saved to your Files app under Documents. Move it somewhere safe and offline."
+          : "Store this file somewhere safe and offline.",
       });
       setOpen(false);
       reset();

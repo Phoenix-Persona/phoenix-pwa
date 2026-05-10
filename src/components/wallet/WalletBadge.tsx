@@ -23,8 +23,11 @@ export function WalletBadge({ wallet, onClick }: WalletBadgeProps) {
     return <Skeleton className="h-9 w-28" />;
   }
   if (!wallet.handle) {
+    // Inactive state — the wallet hook lazy-connects when the dialog opens
+    // (`useOperatorWallet(walletOpen)`), so the badge MUST stay clickable
+    // here. Clicking flips walletOpen → enables the hook → connect kicks off.
     return (
-      <Button variant="outline" size="sm" onClick={onClick} disabled>
+      <Button variant="outline" size="sm" onClick={onClick}>
         <Zap className="h-4 w-4 mr-1" /> Wallet
       </Button>
     );

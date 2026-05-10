@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { impactLight, notificationError, notificationSuccess } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
 import { useAuthor } from "@/hooks/useAuthor";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -101,6 +102,7 @@ const Dashboard = () => {
   }
 
   async function onPost() {
+    impactLight();
     try {
       const result = await composer.publishTextOnly({
         text: raw,
@@ -109,11 +111,13 @@ const Dashboard = () => {
       if (!result) return;
 
       if (result.crossPost === "sent") {
+        notificationSuccess();
         toast({
           title: "Published",
           description: "Live on relays and dispatched to your cross-post webhook.",
         });
       } else if (result.crossPost === "failed") {
+        notificationError();
         toast({
           title: "Cross-post failed",
           description: `Posted to relays, but the webhook returned: ${
@@ -122,6 +126,7 @@ const Dashboard = () => {
           variant: "destructive",
         });
       } else {
+        notificationSuccess();
         toast({ title: "Published", description: "Post is live on relays." });
       }
 
@@ -129,6 +134,7 @@ const Dashboard = () => {
       setSourcesInput("");
       setHintsInput("");
     } catch (e) {
+      notificationError();
       toast({
         title: "Publish failed",
         description: e instanceof Error ? e.message : "Unknown error",

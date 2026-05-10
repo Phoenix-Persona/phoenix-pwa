@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { QRCodeCanvas } from "@/components/ui/qrcode";
+import { impactLight, notificationSuccess } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
 import type { UseWalletResult } from "@/hooks/useWallet";
 
@@ -61,6 +62,7 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
   function copy() {
     if (!invoice) return;
     navigator.clipboard.writeText(invoice);
+    impactLight();
     toast({ title: "Invoice copied" });
   }
 
@@ -94,6 +96,7 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
 
           wallet.refreshInfo();
           wallet.refreshPayments();
+          notificationSuccess();
           const sats = Number(p.amount);
           toast({
             title: "Payment received",
