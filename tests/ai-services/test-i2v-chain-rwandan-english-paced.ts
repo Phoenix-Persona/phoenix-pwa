@@ -156,25 +156,34 @@ async function main(): Promise<void> {
 
   /* pre-flight */
   header("0. Pre-flight balance check");
-  const balance = await getBalance(ppq.credit_id);
-  const balanceUsd = balance.balance_usd;
-  if (typeof balanceUsd === "number") {
-    console.log(`  ppq balance:     ${fmtMoney(balanceUsd)}`);
+  if (!ppq.credit_id) {
     console.log(
-      `  required:        ≥ ${fmtMoney(PREFLIGHT_USD_REQUIRED)} (covers ~${numClips} × 10s clips)`,
+      `  Using PPQ_API_KEY from env — no credit_id available, balance check skipped.`,
     );
-    if (balanceUsd < PREFLIGHT_USD_REQUIRED) {
-      const need = (PREFLIGHT_USD_REQUIRED - balanceUsd).toFixed(2);
-      throw new Error(
-        `Insufficient ppq.ai credit. Top up at least $${need} more:\n\n` +
-          `  npx tsx tests/ai-services/top-up-ppq-with-lightning.ts --usd ${Math.ceil(parseFloat(need))}`,
-      );
-    }
+    console.log(
+      `  (If you hit "insufficient credit" mid-run, top up via ppq.ai's dashboard.)`,
+    );
   } else {
-    console.warn(
-      "  Could not parse ppq.ai balance — proceeding anyway. Raw payload:",
-    );
-    console.warn(JSON.stringify(balance.raw, null, 2));
+    const balance = await getBalance(ppq.credit_id);
+    const balanceUsd = balance.balance_usd;
+    if (typeof balanceUsd === "number") {
+      console.log(`  ppq balance:     ${fmtMoney(balanceUsd)}`);
+      console.log(
+        `  required:        ≥ ${fmtMoney(PREFLIGHT_USD_REQUIRED)} (covers ~${numClips} × 10s clips)`,
+      );
+      if (balanceUsd < PREFLIGHT_USD_REQUIRED) {
+        const need = (PREFLIGHT_USD_REQUIRED - balanceUsd).toFixed(2);
+        throw new Error(
+          `Insufficient ppq.ai credit. Top up at least $${need} more:\n\n` +
+            `  npx tsx tests/ai-services/top-up-ppq-with-lightning.ts --usd ${Math.ceil(parseFloat(need))}`,
+        );
+      }
+    } else {
+      console.warn(
+        "  Could not parse ppq.ai balance — proceeding anyway. Raw payload:",
+      );
+      console.warn(JSON.stringify(balance.raw, null, 2));
+    }
   }
 
   /* preview */

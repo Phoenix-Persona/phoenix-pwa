@@ -23,14 +23,44 @@ export const SEED_IMAGE_DEFAULT =
 
 /* ---------- ppq account ---------- */
 
+/**
+ * The shape returned by loadPpqAccount. `credit_id` may be empty when
+ * the api_key came from PPQ_API_KEY env (e.g. when ppq.ai handed you
+ * direct credits without a credit_id). Callers should guard balance
+ * checks on `credit_id ? getBalance(credit_id) : skip`.
+ */
 export interface PpqAccountFile {
   credit_id: string;
   api_key: string;
 }
 
+/**
+ * Resolve the ppq.ai credentials, in order of precedence:
+ *
+ *   1. `PPQ_API_KEY` env var (with optional `PPQ_CREDIT_ID`). This is
+ *      the path for users who have a directly-issued api_key (free
+ *      credits from ppq.ai's team) and don't want a credit_id-backed
+ *      account file.
+ *   2. The file at `accountPath` (typically tests/ai-services/.account.json),
+ *      which carries both credit_id and api_key from a self-served
+ *      `POST /accounts/create`.
+ *
+ * Either path returns the same shape; callers shouldn't care which
+ * source produced it.
+ */
 export async function loadPpqAccount(
   accountPath: string,
 ): Promise<PpqAccountFile> {
+  // Env wins — supports the "free credits, no account file" path.
+  const envKey = process.env.PPQ_API_KEY;
+  if (envKey && envKey.length > 0) {
+    return {
+      api_key: envKey,
+      credit_id: process.env.PPQ_CREDIT_ID ?? "",
+    };
+  }
+
+  // Fall back to the local account file.
   try {
     const raw = await fs.readFile(accountPath, "utf8");
     const parsed = JSON.parse(raw) as PpqAccountFile;
@@ -39,8 +69,12 @@ export async function loadPpqAccount(
     /* fall through */
   }
   throw new Error(
-    `No ppq.ai account at ${accountPath}. Run ` +
-      `\`npx tsx tests/ai-services/test-all-ppq-services-e2e.ts\` once.`,
+    `No ppq.ai credentials found.\n\n` +
+      `Either:\n` +
+      `  • Set PPQ_API_KEY in dev/.env (use this if ppq.ai gave you a\n` +
+      `    direct api_key for free credits), OR\n` +
+      `  • Run \`npx tsx tests/ai-services/test-all-ppq-services-e2e.ts\` once\n` +
+      `    to mint a credit_id-backed account at ${accountPath}.`,
   );
 }
 
