@@ -53,8 +53,10 @@ import { useMyPersonas, usePersonaActivityStats } from "@/hooks/usePersona";
 import { useDeletePersona } from "@/hooks/useDeletePersona";
 import { useToast } from "@/hooks/useToast";
 import {
+  clearSessionUnlocked,
   clearUserNcryptsec,
   hasUserNcryptsec,
+  NOSTR_LOGIN_STORAGE_KEY,
 } from "@/lib/nip49Storage";
 
 const Settings = () => {
@@ -82,15 +84,20 @@ const Settings = () => {
       : null;
 
   function handleLockNow() {
-    // Clear the Nostrify session — the next signer use prompts for the
-    // passphrase via <UnlockGate>. Keeps the ncryptsec parked.
+    // Clear the Nostrify session AND the per-tab session flag. The
+    // <UnlockGate> reactively computes its `needsUnlock` state from
+    // `logins.length` so removing the login here causes the modal
+    // to render IMMEDIATELY over whatever route the user is on —
+    // no route change, no remount, no lost scroll/form state. They
+    // re-enter the passphrase and the modal hides without disturbing
+    // the page underneath.
     const current = logins[0];
     if (current) removeLogin(current.id);
+    clearSessionUnlocked();
     toast({
       title: "Locked",
-      description: "Re-enter your passphrase to continue.",
+      description: "Enter your passphrase to unlock.",
     });
-    navigate("/");
   }
 
   function handleForgetDevice() {
@@ -98,14 +105,25 @@ const Settings = () => {
       "Forget this device? You'll need your nsec backup to sign in again on this browser. Personas survive — they're stored on relays."
     );
     if (!ok) return;
+
+    // Clear synchronously, then hard-reload to root. Hard reload is
+    // intentional — it drops Nostrify's in-memory login state, the
+    // React Query cache (keyed on the prior user pubkey), the Spark
+    // SDK handle, and all React state, leaving a clean slate for
+    // the next sign-in. Soft navigate would leak prior-user data
+    // through caches.
+    //
+    // We bypass Nostrify's removeLogin and write to nostr:login
+    // directly — removeLogin's localStorage flush is async via a
+    // useEffect, which races the page reload.
     clearUserNcryptsec();
-    const current = logins[0];
-    if (current) removeLogin(current.id);
-    toast({
-      title: "Device forgotten",
-      description: "The encrypted key has been cleared from this browser.",
-    });
-    navigate("/");
+    clearSessionUnlocked();
+    try {
+      window.localStorage.removeItem(NOSTR_LOGIN_STORAGE_KEY);
+    } catch {
+      /* best effort */
+    }
+    window.location.assign("/");
   }
 
   return (
