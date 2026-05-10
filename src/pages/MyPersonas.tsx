@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useMyPersonas, usePersonaActivityStats } from "@/hooks/usePersona";
-import { sanitizeHttpUrl } from "@/lib/url";
+import { sanitizeHttpsUrl } from "@/lib/url";
 
 const MyPersonas = () => {
   useSeoMeta({ title: "My personas — Zuka" });
@@ -79,7 +79,7 @@ const MyPersonas = () => {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {data.map(({ event, envelope, npub }, idx) => {
               const persona = envelope.persona;
-              const picture = sanitizeHttpUrl(persona.reference_image_url);
+              const picture = sanitizeHttpsUrl(persona.reference_image_url);
               // Rotate accent colors so the grid doesn't feel monochrome.
               const accent = idx % 3 === 0
                 ? "from-imigongo-clay to-imigongo-ochre"

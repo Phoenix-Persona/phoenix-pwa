@@ -151,16 +151,15 @@ describe("nip49Storage — clearStaleNostrLoginIfLocked", () => {
     expect(nostrLoginValue()).toBe(before);
   });
 
-  it("leaves nostr:login alone when this tab is already unlocked", () => {
+  it("clears nostr:login even when this tab is already unlocked", () => {
     const sk = generateSecretKey();
     storeUserNcryptsec(encryptNsec(sk, "pw", TEST_LOG_N));
     seedNostrLogin();
     markSessionUnlocked();
-    const before = nostrLoginValue();
 
     clearStaleNostrLoginIfLocked();
 
-    expect(nostrLoginValue()).toBe(before);
+    expect(nostrLoginValue()).toBeNull();
   });
 
   it("is idempotent — multiple calls in the locked-and-stale state stay cleared", () => {

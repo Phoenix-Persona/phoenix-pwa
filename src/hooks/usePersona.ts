@@ -47,10 +47,12 @@ import { useCurrentUser } from "./useCurrentUser";
 type CacheEntry = PhoenixEnvelope | "not-phoenix";
 const decryptCache = new Map<string, CacheEntry>();
 
-/** Test-only: allow the cache to be cleared between tests. */
-export function __clearPersonaDecryptCache(): void {
+export function clearPersonaDecryptCache(): void {
   decryptCache.clear();
 }
+
+/** Test-only backwards-compatible alias. */
+export const __clearPersonaDecryptCache = clearPersonaDecryptCache;
 
 async function decryptWithCache(
   ev: NostrEvent,

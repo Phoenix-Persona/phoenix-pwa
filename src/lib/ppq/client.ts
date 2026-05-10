@@ -39,6 +39,10 @@ function readEnvBase(): string {
   return readEnv("VITE_PPQ_BASE_URL") ?? DEFAULT_BASE_URL;
 }
 
+function isPpqDebugEnabled(): boolean {
+  return readEnv("VITE_PPQ_DEBUG") === "1";
+}
+
 /**
  * Optional override — useful for tests, staging, or routing through a
  * passthrough proxy if CORS becomes an issue. Pass to any client function
@@ -80,16 +84,19 @@ export async function request<T>(
   }
 
   const startTs = Date.now();
-  console.log(
-    `%c[ppq] →%c ${method} ${path}`,
-    "color:#7a4f1c;font-weight:bold",
-    "",
-    init.body && !(init.body instanceof FormData)
-      ? summarizeRequestBody(init.body)
-      : init.body instanceof FormData
-        ? "(multipart)"
-        : "(no body)",
-  );
+  const debug = isPpqDebugEnabled();
+  if (debug) {
+    console.log(
+      `%c[ppq] →%c ${method} ${path}`,
+      "color:#7a4f1c;font-weight:bold",
+      "",
+      init.body && !(init.body instanceof FormData)
+        ? summarizeRequestBody(init.body)
+        : init.body instanceof FormData
+          ? "(multipart)"
+          : "(no body)",
+    );
+  }
 
   const res = await fetch(url, {
     method,
@@ -108,19 +115,23 @@ export async function request<T>(
     } catch {
       // keep as text
     }
-    console.error(
-      `[ppq] ✗ ${method} ${path} → ${res.status} (${elapsed}ms)`,
-      parsed,
-    );
+    if (debug) {
+      console.error(
+        `[ppq] ✗ ${method} ${path} → ${res.status} (${elapsed}ms)`,
+        summarizeRequestBody(parsed),
+      );
+    }
     const fallbackMessage =
       summarizePpqError(parsed) ?? `ppq.ai request failed (${res.status})`;
     throw new PpqError(fallbackMessage, res.status, parsed);
   }
-  console.log(
-    `%c[ppq] ✓%c ${method} ${path} → ${res.status} (${elapsed}ms)`,
-    "color:#1f7a1f;font-weight:bold",
-    "",
-  );
+  if (debug) {
+    console.log(
+      `%c[ppq] ✓%c ${method} ${path} → ${res.status} (${elapsed}ms)`,
+      "color:#1f7a1f;font-weight:bold",
+      "",
+    );
+  }
 
   // Some endpoints (TTS, signed video URLs) return non-JSON. Caller opts in.
   if (init.raw) return { data: res as unknown as T, status: res.status };

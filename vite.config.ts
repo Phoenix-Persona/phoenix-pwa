@@ -48,13 +48,33 @@ function loadMergedViteEnv(mode: string): Record<string, string> {
   return merged;
 }
 
+const BLOCKED_PRODUCTION_CLIENT_SECRETS = [
+  "VITE_APP_USER_NSEC",
+  "VITE_PPQ_API_KEY",
+  "VITE_PPQ_CREDIT_ID",
+  "VITE_WALLET_SEED",
+] as const;
+
+function mergedViteEnvForDefine(mode: string): string {
+  const env = loadMergedViteEnv(mode);
+  if (mode === "production") {
+    const present = BLOCKED_PRODUCTION_CLIENT_SECRETS.filter((key) => env[key]);
+    if (present.length > 0) {
+      throw new Error(
+        `Refusing production build with client-exposed secret env vars: ${present.join(", ")}`,
+      );
+    }
+  }
+  return JSON.stringify(env);
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   // envDir not set → Vite auto-loads root `.env` into `import.meta.env`.
   // dev/.env is layered in via __PHOENIX_ENV__ (see define below) so
   // both locations work without forcing a key-migration on teammates.
   define: {
-    __PHOENIX_ENV__: JSON.stringify(loadMergedViteEnv(mode)),
+    __PHOENIX_ENV__: mergedViteEnvForDefine(mode),
   },
   server: {
     host: "::",

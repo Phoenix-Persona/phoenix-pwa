@@ -35,7 +35,7 @@ import { useWallet } from "@/hooks/useWallet";
 import { useUpdateWalletAutoTopup } from "@/hooks/useUpdateWalletAutoTopup";
 import { featureFlags } from "@/lib/features";
 import { npubToHex } from "@/lib/nostrIds";
-import { sanitizeHttpUrl } from "@/lib/url";
+import { sanitizeHttpsUrl } from "@/lib/url";
 import { autoTopupConfigFromPersisted } from "@/lib/wallet/types";
 
 const Dashboard = () => {
@@ -62,7 +62,7 @@ const Dashboard = () => {
   const personaHex = useMemo(() => npubToHex(npub), [npub]);
   const author = useAuthor(personaHex ?? undefined);
   const publicBio = author.data?.metadata?.about ?? "";
-  const picture = sanitizeHttpUrl(author.data?.metadata?.picture);
+  const picture = sanitizeHttpsUrl(author.data?.metadata?.picture);
 
   const [raw, setRaw] = useState("");
   const [postWizardOpen, setPostWizardOpen] = useState(false);

@@ -44,14 +44,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLoggedInAccounts } from "@/hooks/useLoggedInAccounts";
+import { clearPersonaDecryptCache } from "@/hooks/usePersona";
 import { impactHeavy, notificationWarning } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
 import {
   clearSessionUnlocked,
+  clearPersistedNostrLogin,
   clearUserNcryptsec,
   hasUserNcryptsec,
-  NOSTR_LOGIN_STORAGE_KEY,
 } from "@/lib/nip49Storage";
+import { clearAllVideoChains } from "@/lib/video/chainStore";
 
 const Settings = () => {
   useSeoMeta({ title: "Settings — Zuka" });
@@ -85,36 +87,35 @@ const Settings = () => {
     const current = logins[0];
     if (current) removeLogin(current.id);
     clearSessionUnlocked();
+    clearPersistedNostrLogin();
     toast({
       title: "Locked",
       description: "Enter your passphrase to unlock.",
     });
   }
 
-  function handleForgetDevice() {
+  async function handleForgetDevice() {
     const ok = window.confirm(
-      "Forget this device? You'll need your nsec backup to sign in again on this browser. Personas survive — they're stored on relays."
+      "Forget this device? You'll need your encrypted key backup to sign in again on this browser. Personas survive — they're stored on relays."
     );
     if (!ok) return;
     impactHeavy();
 
-    // Clear synchronously, then hard-reload to root. Hard reload is
+    // Clear local state, then hard-reload to root. Hard reload is
     // intentional — it drops Nostrify's in-memory login state, the
     // React Query cache (keyed on the prior user pubkey), the Spark
     // SDK handle, and all React state, leaving a clean slate for
     // the next sign-in. Soft navigate would leak prior-user data
     // through caches.
     //
-    // We bypass Nostrify's removeLogin and write to nostr:login
-    // directly — removeLogin's localStorage flush is async via a
-    // useEffect, which races the page reload.
+    // We bypass Nostrify's removeLogin and clear nostr:login directly
+    // because removeLogin's localStorage flush is async via a useEffect,
+    // which races the page reload.
     clearUserNcryptsec();
     clearSessionUnlocked();
-    try {
-      window.localStorage.removeItem(NOSTR_LOGIN_STORAGE_KEY);
-    } catch {
-      /* best effort */
-    }
+    clearPersistedNostrLogin();
+    clearPersonaDecryptCache();
+    await clearAllVideoChains();
     window.location.assign("/");
   }
 
@@ -210,9 +211,9 @@ const Settings = () => {
                               <AlertDialogTitle>Forget this device?</AlertDialogTitle>
                               <AlertDialogDescription>
                                 The encrypted key parked on this browser will be
-                                cleared. You'll need your nsec backup to sign in
-                                again here. Personas you've already published
-                                survive on relays.
+                                cleared. You'll need your encrypted key backup
+                                to sign in again here. Personas you've already
+                                published survive on relays.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>

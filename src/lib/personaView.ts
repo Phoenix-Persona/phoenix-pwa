@@ -2,7 +2,7 @@ import type { NostrMetadata } from "@nostrify/nostrify";
 
 import { genUserName } from "@/lib/genUserName";
 import type { Persona } from "@/lib/persona";
-import { sanitizeHttpUrl } from "@/lib/url";
+import { sanitizeHttpsUrl } from "@/lib/url";
 
 export interface PersonaDisplayProfile {
   displayName: string;
@@ -13,7 +13,7 @@ export interface PersonaDisplayProfile {
 export function safePersonaPictureUrl(
   raw: string | null | undefined,
 ): string | null {
-  return sanitizeHttpUrl(raw);
+  return sanitizeHttpsUrl(raw);
 }
 
 export function backupPersonaPictureUrl(

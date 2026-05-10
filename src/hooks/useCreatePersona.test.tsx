@@ -201,6 +201,35 @@ describe("useCreatePersona", () => {
     expect(mocks.nostrEvent).toHaveBeenCalledTimes(2);
   });
 
+  it("returns a profile warning when the public profile publish fails after backup success", async () => {
+    mocks.nostrEvent
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("profile relay timeout"));
+    const { result } = renderHook(() => useCreatePersona(), { wrapper });
+
+    await act(async () => {
+      const created = await result.current.mutateAsync({
+        name: "Voice",
+        username: "public-voice",
+        lightningUsername: "donate-voice",
+        bio: "Bio",
+        systemPrompt: "System",
+      });
+
+      expect(created.npub).toBe("npub1persona");
+      expect(created.profileWarning).toContain("profile relay timeout");
+    });
+
+    expect(mocks.nostrEvent).toHaveBeenCalledTimes(2);
+    expect(
+      queryClient.getQueryData(queryKeys.persona.detail("npub1persona", "operator-pubkey")),
+    ).toEqual(
+      expect.objectContaining({
+        event: expect.objectContaining({ id: "backup-event-id" }),
+      }),
+    );
+  });
+
   it("fails persona creation when the requested Lightning Address is taken", async () => {
     mocks.registerLightningAddressWithRetry.mockRejectedValue(
       new LightningUsernameTakenError("donate-voice"),

@@ -10,7 +10,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar.tsx';
 import { useLoggedInAccounts, type Account } from '@/hooks/useLoggedInAccounts';
 import { genUserName } from '@/lib/genUserName';
-import { sanitizeHttpUrl } from '@/lib/url';
+import { sanitizeHttpsUrl } from '@/lib/url';
 
 interface AccountSwitcherProps {
   onAddAccountClick: () => void;
@@ -31,7 +31,7 @@ export function AccountSwitcher({ onAddAccountClick }: AccountSwitcherProps) {
         <button className='flex items-center gap-2 h-10 p-1 pr-2.5 rounded-full hover:bg-accent transition-all text-foreground'>
           <Avatar className='w-8 h-8'>
             <AvatarImage
-              src={sanitizeHttpUrl(currentUser.metadata.picture) ?? undefined}
+              src={sanitizeHttpsUrl(currentUser.metadata.picture) ?? undefined}
               alt={getDisplayName(currentUser)}
               crossOrigin="anonymous"
             />
@@ -50,7 +50,7 @@ export function AccountSwitcher({ onAddAccountClick }: AccountSwitcherProps) {
           >
             <Avatar className='w-8 h-8'>
               <AvatarImage
-                src={sanitizeHttpUrl(user.metadata.picture) ?? undefined}
+                src={sanitizeHttpsUrl(user.metadata.picture) ?? undefined}
                 alt={getDisplayName(user)}
                 crossOrigin="anonymous"
               />

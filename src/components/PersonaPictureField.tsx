@@ -31,7 +31,7 @@ import { useToast } from "@/hooks/useToast";
 import { generatePollinationsImage } from "@/lib/pollinations/client";
 import { PpqError } from "@/lib/ppq/types";
 import { withNoTextOverlay } from "@/lib/visualPromptGuards";
-import { sanitizeHttpUrl } from "@/lib/url";
+import { sanitizeHttpsUrl } from "@/lib/url";
 import { cn } from "@/lib/utils";
 
 interface PersonaPictureFieldProps {
@@ -244,7 +244,7 @@ export function PersonaPictureField({
   }
 
   const busy = upload.isPending || generating;
-  const previewUrl = sanitizeHttpUrl(value);
+  const previewUrl = sanitizeHttpsUrl(value);
 
   // User-facing label for each stage of the generate pipeline.
   const stageLabel: { button: string; detail: string } = (() => {

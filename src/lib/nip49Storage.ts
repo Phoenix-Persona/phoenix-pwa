@@ -32,9 +32,9 @@ const STORAGE_KEY = "zuka:user:ncryptsec";
 
 /**
  * Per-tab session flag — set when the user has unlocked or completed
- * a fresh signup in this tab. Lives in `sessionStorage` so it survives
- * F5 reloads in the same tab, but a brand-new tab gets `null` and
- * triggers the unlock prompt.
+ * a fresh signup in this tab. The active signer may stay in memory for
+ * this tab, but persisted Nostrify login state is still cleared so a
+ * refresh/new tab triggers the unlock prompt.
  *
  * Used by `main.tsx` to decide whether to clear Nostrify's persisted
  * nsec login on page load — see the pre-render hook there.
@@ -187,10 +187,8 @@ function safeSessionStorage(): Storage | null {
 }
 
 /**
- * Mark this tab as "unlocked" — the user has either entered the
+ * Mark this live tab as "unlocked" — the user has either entered the
  * passphrase via `<UnlockGate>` or just completed a fresh signup.
- * Lives in sessionStorage so it survives F5 in the same tab but
- * brand-new tabs see `null` and re-prompt.
  */
 export function markSessionUnlocked(): void {
   const storage = safeSessionStorage();
@@ -216,16 +214,24 @@ export function clearSessionUnlocked(): void {
   storage.removeItem(SESSION_UNLOCK_KEY);
 }
 
+export function clearPersistedNostrLogin(): void {
+  try {
+    window.localStorage.removeItem(NOSTR_LOGIN_STORAGE_KEY);
+  } catch {
+    /* best effort */
+  }
+}
+
 /**
  * Pre-render hook called from `main.tsx` BEFORE React boots.
  *
- * If the user has an at-rest ncryptsec on this device AND this tab
- * hasn't unlocked yet, clear Nostrify's persisted login from
- * localStorage. Without this, Nostrify hydrates the prior session's
- * nsec on every page load and the unlock gate never fires.
+ * If the user has an at-rest ncryptsec on this device, clear
+ * Nostrify's persisted login from localStorage. Without this,
+ * Nostrify hydrates the prior session's nsec on every page load and
+ * the unlock gate never fires.
  *
- * The function is idempotent: if no ncryptsec is parked, or the tab
- * is already unlocked, it does nothing.
+ * The function is idempotent: if no ncryptsec is parked, it does
+ * nothing; otherwise repeated clears are harmless.
  *
  * Safe to call multiple times (e.g. via React 18 strict-mode double-
  * mount semantics) — both reads and the conditional write are
@@ -234,11 +240,5 @@ export function clearSessionUnlocked(): void {
 export function clearStaleNostrLoginIfLocked(): void {
   if (typeof window === "undefined") return;
   if (!hasUserNcryptsec()) return;
-  if (isSessionUnlocked()) return;
-
-  try {
-    window.localStorage.removeItem(NOSTR_LOGIN_STORAGE_KEY);
-  } catch {
-    /* best effort */
-  }
+  clearPersistedNostrLogin();
 }

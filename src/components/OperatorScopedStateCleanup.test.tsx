@@ -10,10 +10,15 @@ const mocks = vi.hoisted(() => ({
   currentUser: {
     user: { pubkey: "operator-old" } as { pubkey: string } | undefined,
   },
+  clearPersonaDecryptCache: vi.fn(),
 }));
 
 vi.mock("@/hooks/useCurrentUser", () => ({
   useCurrentUser: () => mocks.currentUser,
+}));
+
+vi.mock("@/hooks/usePersona", () => ({
+  clearPersonaDecryptCache: mocks.clearPersonaDecryptCache,
 }));
 
 function renderWithClient(client: QueryClient) {
@@ -28,6 +33,7 @@ describe("OperatorScopedStateCleanup", () => {
   beforeEach(() => {
     window.localStorage.clear();
     mocks.currentUser.user = { pubkey: "operator-old" };
+    mocks.clearPersonaDecryptCache.mockClear();
   });
 
   it("hard-clears the legacy global PPQ account cache on mount", async () => {
@@ -68,5 +74,6 @@ describe("OperatorScopedStateCleanup", () => {
     expect(
       client.getQueryData(queryKeys.wallet.payments("operator:operator-old")),
     ).toBeUndefined();
+    expect(mocks.clearPersonaDecryptCache).toHaveBeenCalledTimes(1);
   });
 });

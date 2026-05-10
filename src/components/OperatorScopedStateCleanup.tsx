@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { clearPersonaDecryptCache } from "@/hooks/usePersona";
 import { clearLegacyPpqAccountStorage } from "@/lib/ppq/storage";
 import { queryKeys } from "@/lib/queryKeys";
 
@@ -25,6 +26,7 @@ export function OperatorScopedStateCleanup() {
       });
       qc.removeQueries({ queryKey: queryKeys.persona.allMine() });
       qc.removeQueries({ queryKey: queryKeys.persona.allDetails() });
+      clearPersonaDecryptCache();
     }
 
     previousPubkey.current = pubkey;

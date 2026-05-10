@@ -1,21 +1,18 @@
 /**
  * UnlockGate — gates the app behind the user's NIP-49 passphrase.
  *
- * The tab-aware session boundary works as a two-step coordination
- * with `main.tsx`:
+ * The encrypted-session boundary works as a two-step coordination with
+ * `main.tsx`:
  *
  *   1. `main.tsx` runs `clearStaleNostrLoginIfLocked()` BEFORE React
- *      boots. If a `zuka:user:ncryptsec` is parked AND this tab
- *      hasn't been unlocked (no `zuka:session-unlocked` flag in
- *      sessionStorage), it clears `nostr:login` from localStorage
- *      so Nostrify hydrates with empty logins.
+ *      boots. If a `zuka:user:ncryptsec` is parked, it clears
+ *      `nostr:login` from localStorage so Nostrify hydrates with
+ *      empty logins.
  *   2. `<UnlockGate>` renders the unlock modal whenever
  *      `hasUserNcryptsec()` AND `logins.length === 0`. After a
- *      successful unlock, it sets the session flag — same-tab F5
- *      reloads keep the flag and skip the prompt.
+ *      successful unlock, it sets the session flag for the live tab.
  *
- * Same-tab refresh = same session = no re-prompt. New tab or after
- * an explicit "Lock now" / "Forget device" = no flag = re-prompt.
+ * Refresh/new tab = no persisted active nsec = re-prompt.
  *
  * The previous design relied on a `beforeunload` handler to clear
  * `nostr:login` on tab close — that doesn't work reliably (mobile
@@ -26,7 +23,7 @@
  * threat-model boundary.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Lock } from "lucide-react";
 import { nip19 } from "nostr-tools";
 import { useNostrLogin } from "@nostrify/react/login";
@@ -38,13 +35,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLoginActions } from "@/hooks/useLoginActions";
 import {
   clearSessionUnlocked,
+  clearPersistedNostrLogin,
   clearUserNcryptsec,
   decryptNcryptsec,
   hasUserNcryptsec,
   loadUserNcryptsec,
   markSessionUnlocked,
-  NOSTR_LOGIN_STORAGE_KEY,
 } from "@/lib/nip49Storage";
+import { clearPersonaDecryptCache } from "@/hooks/usePersona";
+import { clearAllVideoChains } from "@/lib/video/chainStore";
 
 interface UnlockGateProps {
   children: React.ReactNode;
@@ -70,6 +69,13 @@ export function UnlockGate({ children }: UnlockGateProps) {
   const [unlocking, setUnlocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!hasUserNcryptsec() || logins.length === 0) return;
+    clearPersistedNostrLogin();
+    const id = window.setTimeout(clearPersistedNostrLogin, 0);
+    return () => window.clearTimeout(id);
+  }, [logins.length]);
+
   async function handleUnlock(e: React.FormEvent) {
     e.preventDefault();
     if (!passphrase) return;
@@ -90,8 +96,8 @@ export function UnlockGate({ children }: UnlockGateProps) {
       const skBytes = decryptNcryptsec(ncryptsec, passphrase);
       const nsec = nip19.nsecEncode(skBytes);
       login.nsec(nsec);
-      // Mark this tab as unlocked so future F5 reloads in the same
-      // tab don't re-prompt. New tabs get no flag and re-prompt.
+      // Mark this live tab as unlocked. The persisted Nostrify nsec is
+      // still cleared, so refresh/new tab re-prompts.
       markSessionUnlocked();
       setPassphrase("");
       setError(null);
@@ -102,14 +108,14 @@ export function UnlockGate({ children }: UnlockGateProps) {
     }
   }
 
-  function handleForgetDevice() {
+  async function handleForgetDevice() {
     const ok = window.confirm(
-      "Forget this device? You'll need your nsec backup to use Zuka on this browser again. Personas survive — they're stored on relays."
+      "Forget this device? You'll need your encrypted key backup to use Zuka on this browser again. Personas survive — they're stored on relays."
     );
     if (!ok) return;
 
-    // Clear all the zuka- and nostr-side state for the active user
-    // synchronously, THEN hard-reload to root. Hard reload because:
+    // Clear all the zuka- and nostr-side state for the active user,
+    // then hard-reload to root. Hard reload because:
     //   1. Drops Nostrify's in-memory login state (otherwise stale
     //      until next state cycle).
     //   2. Drops React Query caches keyed on the prior user.
@@ -121,11 +127,9 @@ export function UnlockGate({ children }: UnlockGateProps) {
     // those are app preferences, not personal data.
     clearUserNcryptsec();
     clearSessionUnlocked();
-    try {
-      window.localStorage.removeItem(NOSTR_LOGIN_STORAGE_KEY);
-    } catch {
-      /* best effort */
-    }
+    clearPersistedNostrLogin();
+    clearPersonaDecryptCache();
+    await clearAllVideoChains();
     window.location.assign("/");
   }
 

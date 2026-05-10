@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Download,
   Upload,
-  Eye,
-  EyeOff,
   Key,
   Lock,
   ChevronDown,
@@ -34,14 +32,15 @@ import {
 import { useNostrPublish } from '@/hooks/useNostrPublish';
 import { useUploadFile } from '@/hooks/useUploadFile';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { generateSecretKey, getPublicKey, nip19 } from 'nostr-tools';
+import { downloadTextFile } from '@/lib/downloadFile';
+import { generateSecretKey, nip19 } from 'nostr-tools';
 
 interface AuthDialogProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type Step = 'welcome' | 'generate' | 'secure' | 'passphrase' | 'profile' | 'login' | 'login-passphrase' | 'connect' | 'import-backup';
+type Step = 'welcome' | 'generate' | 'passphrase' | 'profile' | 'login' | 'login-passphrase' | 'connect' | 'import-backup';
 
 const validateNsec = (nsec: string) => /^nsec1[a-zA-Z0-9]{58}$/.test(nsec);
 const validateBunkerUri = (uri: string) => uri.startsWith('bunker://');
@@ -63,24 +62,9 @@ function isMobileDevice(): boolean {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
-/** Download an nsec to a text file — same behavior as the previous SignupDialog. */
-function downloadNsecFile(nsec: string) {
-  const decoded = nip19.decode(nsec);
-  if (decoded.type !== 'nsec') throw new Error('Invalid nsec key');
-  const pubkey = getPublicKey(decoded.data);
-  const npub = nip19.npubEncode(pubkey);
-  const filename = `nostr-${location.hostname.replaceAll(/\./g, '-')}-${npub.slice(5, 9)}.nsec.txt`;
-
-  const blob = new Blob([nsec], { type: 'text/plain; charset=utf-8' });
-  const url = globalThis.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  globalThis.URL.revokeObjectURL(url);
-  document.body.removeChild(a);
+function signupBackupFilename(): string {
+  const stamp = new Date().toISOString().slice(0, 10);
+  return `zuka-backup-${stamp}.ncryptsec`;
 }
 
 const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
@@ -88,7 +72,6 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
 
   // Signup state
   const [nsec, setNsec] = useState('');
-  const [showKey, setShowKey] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [profileData, setProfileData] = useState({ name: '', about: '', picture: '' });
 
@@ -167,7 +150,6 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
       setStep('welcome');
       setNsec('');
       setLoginNsec('');
-      setShowKey(false);
       setIsGenerating(false);
       setIsLoggingIn(false);
       setLoginError('');
@@ -294,26 +276,9 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
     setTimeout(() => {
       const sk = generateSecretKey();
       setNsec(nip19.nsecEncode(sk));
-      setStep('secure');
+      setStep('passphrase');
       setIsGenerating(false);
     }, 750);
-  };
-
-  // Signup: download the nsec to a file and move on to the passphrase step.
-  // The Nostrify login is deferred until the passphrase step has encrypted
-  // and stored the ncryptsec — that way the at-rest backup exists before
-  // the plaintext nsec lands in Nostrify's localStorage.
-  const downloadAndProceed = () => {
-    try {
-      downloadNsecFile(nsec);
-      setStep('passphrase');
-    } catch {
-      toast({
-        title: 'Download failed',
-        description: 'Could not download the key file. Please copy it manually.',
-        variant: 'destructive',
-      });
-    }
   };
 
   // Signup: encrypt the nsec at rest, store the ncryptsec, then start
@@ -335,11 +300,12 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
       const decoded = nip19.decode(nsec);
       if (decoded.type !== 'nsec') throw new Error('Invalid nsec');
       const ncryptsec = encryptNsec(decoded.data, passphrase);
+      await downloadTextFile(signupBackupFilename(), ncryptsec);
       storeUserNcryptsec(ncryptsec);
       // Now safe to log in — the at-rest backup is in place.
       login.nsec(nsec);
-      // Same tab is now considered "unlocked" — F5 reloads won't
-      // re-prompt, but a new tab will (no sessionStorage flag).
+      // Same in-memory tab session is unlocked. The persisted Nostrify
+      // nsec is cleared by UnlockGate so refresh/new tab re-prompts.
       markSessionUnlocked();
       setPassphrase('');
       setPassphraseConfirm('');
@@ -353,11 +319,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  // Login: validate the entered nsec, then route through the
-  // optional at-rest-encryption step. The user can either wrap the
-  // pasted nsec with a passphrase (gets the same UnlockGate
-  // experience as fresh-Phoenix-generated accounts) or skip and
-  // log in with the nsec sitting in plaintext localStorage.
+  // Login: validate the entered nsec, then require at-rest encryption.
   const handleLogin = () => {
     if (!loginNsec.trim()) {
       setLoginError('Enter your secret key.');
@@ -375,7 +337,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
     setStep('login-passphrase');
   };
 
-  // Login → optional passphrase: encrypt the pasted nsec at rest with
+  // Login → passphrase: encrypt the pasted nsec at rest with
   // the chosen passphrase, install the ncryptsec, log in. Mirrors the
   // signup-passphrase path; the only difference is the nsec source.
   const handleLoginPassphraseSubmit = async () => {
@@ -408,24 +370,6 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
     } finally {
       setEncryptingPassphrase(false);
     }
-  };
-
-  // Login → skip: log in without wrapping. Same as the original
-  // handleLogin behaviour. The user opted out of at-rest encryption.
-  const handleLoginSkipPassphrase = () => {
-    setIsLoggingIn(true);
-    // Yield so the spinner paints before the synchronous login.
-    setTimeout(() => {
-      try {
-        login.nsec(loginNsec);
-        setLoginNsec('');
-        onClose();
-      } catch {
-        setLoginError("Couldn't log in with this key.");
-        setIsLoggingIn(false);
-        setStep('login');
-      }
-    }, 50);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -561,8 +505,6 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
         return 'Welcome';
       case 'generate':
         return 'Create account';
-      case 'secure':
-        return 'Save your key';
       case 'passphrase':
         return 'Set a passphrase';
       case 'profile':
@@ -670,52 +612,6 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
             </div>
           )}
 
-          {/* Secure step — show + download nsec. */}
-          {step === 'secure' && (
-            <div className="space-y-4">
-              <div className="flex size-14 bg-primary/10 rounded-full items-center justify-center mx-auto">
-                <Key className="w-7 h-7 text-primary" />
-              </div>
-
-              <p className="text-sm text-muted-foreground text-center">
-                Store your key somewhere safe. You'll need it to log in again.
-              </p>
-
-              <div className="relative">
-                <Input
-                  type={showKey ? 'text' : 'password'}
-                  value={nsec}
-                  readOnly
-                  className="pr-10 font-mono"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                  onClick={() => setShowKey(!showKey)}
-                >
-                  {showKey ? (
-                    <EyeOff className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </Button>
-              </div>
-
-              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
-                <p className="text-xs text-amber-900 dark:text-amber-300">
-                  This key is your only way to access your account. If you lose it, you lose the account.
-                </p>
-              </div>
-
-              <Button onClick={downloadAndProceed} className="w-full h-12">
-                <Download className="w-4 h-4 mr-2" />
-                Download &amp; continue
-              </Button>
-            </div>
-          )}
-
           {/* Passphrase step — NIP-49 encrypt the nsec at rest. */}
           {step === 'passphrase' && (
             <div className="space-y-4">
@@ -725,7 +621,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
 
               <p className="text-sm text-muted-foreground text-center leading-relaxed">
                 Set a passphrase. Zuka will use it to encrypt your key
-                on this device, and ask for it once per browser session.
+                on this device and save an encrypted backup file.
               </p>
 
               <div className="space-y-1.5">
@@ -772,7 +668,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
               <p className="text-[11px] text-muted-foreground leading-relaxed">
                 At least 12 characters. Zuka can't recover this for you —
                 write it down somewhere offline. Losing the passphrase means
-                you must restore from your nsec backup file.
+                you must restore from your encrypted backup file.
               </p>
 
               <Button
@@ -786,7 +682,10 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
                     Encrypting…
                   </>
                 ) : (
-                  'Encrypt & continue'
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Encrypt, download backup & continue
+                  </>
                 )}
               </Button>
             </div>
@@ -964,11 +863,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
             </div>
           )}
 
-          {/* Login-passphrase step — optional at-rest encryption for a
-              pasted nsec. User can either set a passphrase (gets the
-              same UnlockGate experience as fresh-Phoenix-generated
-              accounts) or skip and log in with the nsec sitting in
-              plaintext localStorage (BYO behavior). */}
+          {/* Login-passphrase step — required at-rest encryption for pasted nsecs. */}
           {step === 'login-passphrase' && (
             <div className="space-y-4">
               <div className="flex size-14 bg-primary/10 rounded-full items-center justify-center mx-auto">
@@ -976,10 +871,8 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
               </div>
 
               <p className="text-sm text-muted-foreground text-center leading-relaxed">
-                Optional: set a passphrase and Zuka will encrypt your
-                key on this device. You'll re-enter the passphrase
-                once per browser session. Skip if you'd rather keep
-                the key accessible without one.
+                Set a passphrase and Zuka will encrypt your key on this
+                device before logging in.
               </p>
 
               <div className="space-y-1.5">
@@ -1040,22 +933,6 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
                   </>
                 ) : (
                   'Encrypt & continue'
-                )}
-              </Button>
-
-              <Button
-                variant="ghost"
-                onClick={handleLoginSkipPassphrase}
-                disabled={encryptingPassphrase || isLoggingIn}
-                className="w-full"
-              >
-                {isLoggingIn ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Logging in…
-                  </>
-                ) : (
-                  'Skip — log in without encryption'
                 )}
               </Button>
 

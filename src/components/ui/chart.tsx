@@ -90,28 +90,51 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null
   }
 
+  const css = Object.entries(THEMES)
+    .map(([theme, prefix]) => {
+      const declarations = colorConfig
+        .map(([key, itemConfig]) => {
+          if (!isSafeCssIdentifier(key)) return null
+          const color =
+            itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ??
+            itemConfig.color
+          if (!color || !isSafeCssColor(color)) return null
+          return `  --color-${key}: ${color};`
+        })
+        .filter(Boolean)
+        .join("\n")
+      if (!declarations) return null
+      return `
+${prefix} [data-chart=${id}] {
+${declarations}
+}
+`
+    })
+    .filter(Boolean)
+    .join("\n")
+
+  if (!css) {
+    return null
+  }
+
   return (
     <style
       dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color =
-      itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ??
-      itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
-  })
-  .join("\n")}
-}
-`
-          )
-          .join("\n"),
+        __html: css,
       }}
     />
   )
+}
+
+function isSafeCssIdentifier(value: string): boolean {
+  return /^[a-zA-Z_][a-zA-Z0-9_-]*$/.test(value)
+}
+
+function isSafeCssColor(value: string): boolean {
+  if (typeof CSS === "undefined" || typeof CSS.supports !== "function") {
+    return /^#(?:[0-9a-fA-F]{3,8})$/.test(value)
+  }
+  return CSS.supports("color", value)
 }
 
 const ChartTooltip = RechartsPrimitive.Tooltip

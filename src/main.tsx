@@ -43,19 +43,15 @@ async function boot() {
   // `secureStorage` migrates it to the OS keystore as part of this read.
   await hydrateUserNcryptsec();
 
-  // Run BEFORE React renders. If a Phoenix-managed ncryptsec is parked
-  // AND this tab hasn't unlocked yet (no sessionStorage flag), clear
-  // Nostrify's persisted login so the unlock gate fires on first paint
-  // instead of being shadowed by a stale session.
+  // Run BEFORE React renders. If a Phoenix-managed ncryptsec is parked,
+  // clear Nostrify's persisted login so the unlock gate fires on first
+  // paint instead of being shadowed by a stale session.
   //
   // Necessary because NostrLoginProvider stores the plaintext nsec to
   // localStorage (`nostr:login`) on every state change and rehydrates
   // from it on next page load. Without this clear, the user is never
   // re-prompted across page loads — the very thing the at-rest layer is
   // supposed to enforce.
-  //
-  // Same-tab F5 reload preserves the sessionStorage flag, so this becomes
-  // a no-op and the user stays logged in.
   clearStaleNostrLoginIfLocked();
 
   try {
