@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WalletPanel } from "./WalletPanel";
+import { WalletDialog } from "./WalletDialog";
 import type { UseWalletResult } from "@/hooks/useWallet";
 
 vi.mock("@/hooks/useToast", () => ({
@@ -176,13 +177,13 @@ describe("WalletPanel", () => {
     renderWallet(wallet, { onAutoTopupSave });
 
     activateTab(/ai credits/i);
-    fireEvent.change(screen.getByLabelText(/threshold usd/i), {
+    fireEvent.change(screen.getByLabelText(/auto below/i), {
       target: { value: "7" },
     });
-    fireEvent.change(screen.getByLabelText(/top-up amount usd/i), {
+    fireEvent.change(screen.getByLabelText(/^buy$/i), {
       target: { value: "15" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /save auto top-up/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() =>
       expect(wallet.setAutoTopup).toHaveBeenCalledWith({
@@ -198,12 +199,24 @@ describe("WalletPanel", () => {
     });
   });
 
+  it("renders compact PPQ top-up controls", () => {
+    renderWallet();
+
+    activateTab(/ai credits/i);
+
+    expect(screen.getByLabelText(/auto below/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^buy$/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/buy ppq credits from this persona's lightning wallet/i),
+    ).not.toBeInTheDocument();
+  });
+
   it("manually tops up PPQ credits with a specific USD amount", async () => {
     const wallet = makeWallet();
     renderWallet(wallet);
 
     activateTab(/ai credits/i);
-    fireEvent.change(screen.getByLabelText(/manual top-up amount/i), {
+    fireEvent.change(screen.getByLabelText(/manual top-up/i), {
       target: { value: "20" },
     });
     fireEvent.click(screen.getByRole("button", { name: /top up now/i }));
@@ -220,5 +233,25 @@ describe("WalletPanel", () => {
     expect(screen.getByText("claude-sonnet-4.5")).toBeInTheDocument();
     expect(screen.getByText("$0.0123")).toBeInTheDocument();
     expect(screen.queryByText(/1,500 sats/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("WalletDialog", () => {
+  it("bounds wallet content to a scrollable dialog body", () => {
+    render(
+      <MemoryRouter>
+        <WalletDialog
+          wallet={makeWallet()}
+          open
+          onOpenChange={vi.fn()}
+          personaName="Voice"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("dialog")).toHaveClass("max-h-[min(90vh,760px)]");
+    expect(screen.getByTestId("wallet-dialog-body")).toHaveClass(
+      "overflow-y-auto",
+    );
   });
 });

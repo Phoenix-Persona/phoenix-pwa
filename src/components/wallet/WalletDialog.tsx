@@ -34,7 +34,7 @@ export function WalletDialog({
 }: WalletDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="grid max-h-[min(90vh,760px)] max-w-lg grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
         <DialogHeader>
           <DialogTitle>
             {personaName ? `${personaName}'s wallet` : "Wallet"}
@@ -44,11 +44,16 @@ export function WalletDialog({
             inference is paid from here automatically.
           </DialogDescription>
         </DialogHeader>
-        <WalletPanel
-          wallet={wallet}
-          editPersonaHref={editPersonaHref}
-          onAutoTopupSave={onAutoTopupSave}
-        />
+        <div
+          data-testid="wallet-dialog-body"
+          className="min-h-0 overflow-y-auto pr-1"
+        >
+          <WalletPanel
+            wallet={wallet}
+            editPersonaHref={editPersonaHref}
+            onAutoTopupSave={onAutoTopupSave}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -197,7 +197,7 @@ export function WalletPanel({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <Tabs defaultValue="lightning" className="gap-4">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="lightning">Lightning</TabsTrigger>
@@ -300,7 +300,7 @@ export function WalletPanel({
           <RecentActivity payments={wallet.payments} />
         </TabsContent>
 
-        <TabsContent value="ppq" className="mt-0 space-y-5">
+        <TabsContent value="ppq" className="mt-0 space-y-3">
           {/* PPQ credits + auto-topup */}
           <section>
             <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
@@ -334,15 +334,9 @@ export function WalletPanel({
             ) : null}
           </section>
 
-          <section className="space-y-3 rounded-md border bg-muted/20 p-3">
+          <section className="space-y-2 rounded-md border bg-muted/20 p-2.5">
             <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium">Auto top-up</p>
-                <p className="text-xs text-muted-foreground">
-                  Buy PPQ credits from this persona's Lightning wallet when the
-                  balance gets low.
-                </p>
-              </div>
+              <p className="text-sm font-medium">Top-ups</p>
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="ppq-auto-topup-enabled"
@@ -352,13 +346,15 @@ export function WalletPanel({
                   }
                 />
                 <Label htmlFor="ppq-auto-topup-enabled" className="text-sm">
-                  Enabled
+                  Auto
                 </Label>
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
               <div className="space-y-1.5">
-                <Label htmlFor="ppq-auto-threshold">Threshold USD</Label>
+                <Label htmlFor="ppq-auto-threshold" className="text-xs">
+                  Auto below
+                </Label>
                 <Input
                   id="ppq-auto-threshold"
                   type="number"
@@ -366,11 +362,14 @@ export function WalletPanel({
                   step="0.01"
                   inputMode="decimal"
                   value={thresholdInput}
+                  className="h-8"
                   onChange={(event) => setThresholdInput(event.target.value)}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="ppq-auto-amount">Top-up amount USD</Label>
+                <Label htmlFor="ppq-auto-amount" className="text-xs">
+                  Buy
+                </Label>
                 <Input
                   id="ppq-auto-amount"
                   type="number"
@@ -378,34 +377,27 @@ export function WalletPanel({
                   step="0.01"
                   inputMode="decimal"
                   value={topupAmountInput}
+                  className="h-8"
                   onChange={(event) => setTopupAmountInput(event.target.value)}
                 />
               </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={saveAutoTopup}
+                disabled={isSavingAutoTopup}
+                className="col-span-2 h-8 sm:col-span-1"
+              >
+                {isSavingAutoTopup ? "Saving..." : "Save"}
+              </Button>
             </div>
             {autoTopupError ? (
               <p className="text-xs text-destructive">{autoTopupError}</p>
             ) : null}
-            <Button
-              type="button"
-              size="sm"
-              onClick={saveAutoTopup}
-              disabled={isSavingAutoTopup}
-            >
-              {isSavingAutoTopup ? "Saving..." : "Save auto top-up"}
-            </Button>
-          </section>
-
-          <section className="space-y-3 rounded-md border bg-muted/20 p-3">
-            <div>
-              <p className="text-sm font-medium">Manual top-up</p>
-              <p className="text-xs text-muted-foreground">
-                Buy a specific amount of PPQ credits now.
-              </p>
-            </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <div className="min-w-0 flex-1 space-y-1.5">
-                <Label htmlFor="ppq-manual-amount">
-                  Manual top-up amount
+                <Label htmlFor="ppq-manual-amount" className="text-xs">
+                  Manual top-up
                 </Label>
                 <Input
                   id="ppq-manual-amount"
@@ -414,12 +406,14 @@ export function WalletPanel({
                   step="0.01"
                   inputMode="decimal"
                   value={manualTopupInput}
+                  className="h-8"
                   onChange={(event) => setManualTopupInput(event.target.value)}
                 />
               </div>
               <Button
                 type="button"
-                className="self-end"
+                size="sm"
+                className="h-8 self-end"
                 onClick={runManualTopup}
                 disabled={wallet.isManualTopupRunning}
               >
