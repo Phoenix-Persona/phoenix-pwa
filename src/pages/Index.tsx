@@ -222,10 +222,12 @@ const Index = () => {
               <div className="h-1 w-24 flag-underline rounded-full" />
               <div className="rounded-2xl bg-card border border-imigongo-clay/15 shadow-sm p-6 max-w-2xl">
                 <p className="text-lg text-foreground leading-relaxed">
-                  The launch persona speaks from Rwanda. The aesthetic is{" "}
-                  <em className="font-display text-imigongo-clay">Imigongo</em> —
-                  traditional Rwandan geometric art. Every persona inherits the
-                  visual heritage of its region.
+                  The launch persona speaks from Rwanda — for journalists who
+                  can&rsquo;t put their face on a story, activists whose
+                  families would pay the price of a tweet, civil-society
+                  voices working where one wrong sentence ends a career or a
+                  life. The same architecture extends to every region with the
+                  same problem.
                 </p>
               </div>
             </div>
@@ -391,7 +393,7 @@ const Index = () => {
               <ul className="space-y-2 text-sm">
                 <li>
                   <a
-                    href="https://github.com/Phoenix-Persona/phoenix-pwa"
+                    href="https://github.com/zuka-org/zuka-pwa"
                     target="_blank"
                     rel="noreferrer"
                     className="hover:text-rw-gold transition-colors"

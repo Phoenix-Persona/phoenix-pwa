@@ -18,7 +18,7 @@ description: |
   (NIP-44) and published as kind 30078 events — restoreable from any device
   with your nsec. Fresh-Phoenix-generated keys are wrapped at rest with
   NIP-49 and require a passphrase to unlock.
-repository: https://github.com/Phoenix-Persona/phoenix-pwa
+repository: https://github.com/zuka-org/zuka-pwa
 website: https://zuka.live
 icon: ./public/icon-512.png
 tags:
