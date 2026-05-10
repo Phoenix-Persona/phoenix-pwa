@@ -24,8 +24,6 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
-import { useNostr } from "@nostrify/react";
-import { useQueryClient } from "@tanstack/react-query";
 
 import { AppHeader } from "@/components/AppHeader";
 import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
@@ -42,36 +40,11 @@ import {
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/useToast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCreatePersona } from "@/hooks/useCreatePersona";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 
-import {
-  buildEncryptedPersonaTemplate,
-  DEFAULT_MODEL_PREFS,
-  generatePersonaDTag,
-  PHOENIX_PAYLOAD_APP,
-  PHOENIX_PAYLOAD_VERSION,
-  type Persona,
-  type PersonaWallet,
-  type PhoenixEnvelope,
-} from "@/lib/persona";
-import {
-  encryptPhoenixEnvelope,
-  type Nip44Signer,
-} from "@/lib/personaCrypto";
-import {
-  generatePersonaKeypair,
-  signWithPersona,
-} from "@/lib/personaKey";
-import {
-  connectWallet,
-  disconnectWallet,
-  generateMnemonic,
-} from "@/lib/wallet/client";
-import { DEFAULT_AUTO_TOPUP_CONFIG } from "@/lib/wallet/types";
-import { buildPersonaProfileMetadata } from "@/lib/personaProfile";
 import { parseCommaList } from "@/lib/text";
 import {
-  registerLightningAddressWithRetry,
   slugifyForUsername,
   isValidLightningUsername,
 } from "@/lib/wallet/lightningAddress";
@@ -82,9 +55,8 @@ const Onboard = () => {
   useSeoMeta({ title: "Create a persona — Zuka" });
   const navigate = useNavigate();
   const { user } = useCurrentUser();
-  const { nostr } = useNostr();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const createPersona = useCreatePersona();
 
   const [step, setStep] = useState<WizardStep>("details");
 
@@ -108,7 +80,7 @@ const Onboard = () => {
   // Picture
   const [pictureUrl, setPictureUrl] = useState("");
 
-  const [publishing, setPublishing] = useState(false);
+  const publishing = createPersona.isPending;
 
   // Live availability hint for the username field. Debounced HTTP probe
   // against the public LUD-16 endpoint. The mint path's authoritative
@@ -162,166 +134,31 @@ const Onboard = () => {
       });
       return;
     }
-    setPublishing(true);
     try {
-      const kp = generatePersonaKeypair();
-      // Generate the stable d-tag once and store it inside the
-      // encrypted payload (PROJECT.md §5.2). Updates reuse this same
-      // d-tag so addressable-event semantics replace prior revisions.
-      const dTag = generatePersonaDTag();
-      const trimmedName = name.trim() || "Untitled";
-      const baseUsername = (username || slugifyForUsername(trimmedName)).trim();
+      const result = await createPersona.mutateAsync({
+        name,
+        username,
+        bio,
+        systemPrompt,
+        voiceId,
+        languages: parseCommaList(languagesInput, ["en"]),
+        tags: parseCommaList(tagsInput, []),
+        pictureUrl: pictureUrl || undefined,
+      });
 
-      // Mint a fresh BIP-39 mnemonic for the persona's Spark wallet.
-      // Stored only inside the encrypted envelope; recoverable on any
-      // device with the user's signer (PROJECT.md §7.1).
-      const mnemonic = await generateMnemonic();
-
-      // Connect to the SDK with the new mnemonic and try to register
-      // a Lightning Address on `spark.money`. The address is the
-      // persona's public donate handle — best-effort: if registration
-      // fails (network, namespace exhaustion), we still mint the
-      // persona, just without a public address. The user can retry
-      // later from the wallet panel.
-      let lightningAddress: string | undefined;
-      let lnurl: string | undefined;
-      let resolvedUsername: string | undefined;
-      try {
-        const handle = await connectWallet({ mnemonic });
-        try {
-          const ln = await registerLightningAddressWithRetry(handle, {
-            baseUsername,
-            description: `Donations to ${trimmedName}`,
-            fallbackBase: "persona",
-          });
-          lightningAddress = ln.lightningAddress;
-          lnurl = ln.lnurl;
-          resolvedUsername = ln.username;
-        } finally {
-          await disconnectWallet(handle).catch(() => undefined);
-        }
-      } catch (err) {
+      if (result.warning) {
         toast({
           title: "Lightning Address skipped",
-          description:
-            err instanceof Error
-              ? err.message
-              : "Could not register the persona's Lightning Address. The persona will mint without a public donate handle.",
+          description: result.warning,
           variant: "destructive",
         });
       }
 
-      const finalUsername = resolvedUsername ?? (isValidLightningUsername(baseUsername) ? baseUsername : undefined);
-
-      const persona: Persona = {
-        pubkey: kp.hex.pk,
-        nsec: kp.nsec,
-        dTag,
-        name: trimmedName,
-        username: finalUsername,
-        display_name: trimmedName,
-        system_prompt: systemPrompt,
-        voice_id: voiceId,
-        languages: parseCommaList(languagesInput, ["en"]),
-        tags: parseCommaList(tagsInput, []),
-        // The picture doubles as the canonical reference image used
-        // by future post-image generation for likeness consistency.
-        reference_image_url: pictureUrl || undefined,
-        created_at: Math.floor(Date.now() / 1000),
-      };
-
-      const wallet: PersonaWallet = {
-        kind: "spark",
-        seed: mnemonic,
-        lightning_address: lightningAddress,
-        lnurl,
-        auto_topup: {
-          enabled: DEFAULT_AUTO_TOPUP_CONFIG.enabled,
-          threshold_usd: DEFAULT_AUTO_TOPUP_CONFIG.thresholdUsd,
-          target_usd: DEFAULT_AUTO_TOPUP_CONFIG.targetUsd,
-        },
-      };
-
-      const signer = user.signer as unknown as Nip44Signer;
-
-      // 1. Encrypt the Phoenix envelope (user self-encryption).
-      const ciphertext = await encryptPhoenixEnvelope(
-        {
-          persona,
-          wallet,
-          model_prefs: DEFAULT_MODEL_PREFS,
-        },
-        user.pubkey,
-        signer
-      );
-
-      // 2. Build + sign — d-tag mirrors persona.dTag so addressable
-      //    replacement works on update.
-      const personaTemplate = buildEncryptedPersonaTemplate({
-        dTag,
-        encryptedContent: ciphertext,
-      });
-      const signed = await user.signer.signEvent(personaTemplate);
-      await nostr.event(signed, { signal: AbortSignal.timeout(8000) });
-
-      // 3. Publish a public kind 0 profile so the persona's feed is
-      //    browsable from any Nostr client. Mapping:
-      //      kind 0 `name`         ← persona.username (slug; LUD-16 LHS)
-      //      kind 0 `display_name` ← persona.display_name (rich)
-      //      kind 0 `lud16`        ← persona.wallet.lightning_address
-      const kind0Content = buildPersonaProfileMetadata({
-        name: persona.name,
-        username: persona.username,
-        displayName: persona.display_name ?? persona.name,
-        bio,
-        pictureUrl: pictureUrl || undefined,
-        lightningAddress,
-      });
-      const profileEvent = signWithPersona(
-        {
-          kind: 0,
-          created_at: Math.floor(Date.now() / 1000),
-          tags: [],
-          content: JSON.stringify(kind0Content),
-        },
-        kp
-      );
-      await nostr.event(profileEvent, { signal: AbortSignal.timeout(8000) });
-
-      // Optimistic cache updates so the user doesn't have to reload to
-      // see the new persona in /my-personas or its kind 0 metadata.
-      // Include `wallet` so the Dashboard the navigate() lands on can
-      // wire up the wallet hook immediately without a relay refetch.
-      const envelope: PhoenixEnvelope = {
-        app: PHOENIX_PAYLOAD_APP,
-        version: PHOENIX_PAYLOAD_VERSION,
-        persona,
-        wallet,
-        model_prefs: DEFAULT_MODEL_PREFS,
-      };
-      const newRecord = {
-        event: signed,
-        envelope,
-        npub: kp.npub,
-      };
-      queryClient.setQueryData(
-        ["phoenix-my-personas", user.pubkey],
-        (old: typeof newRecord[] | undefined) => {
-          const existing = old ?? [];
-          if (existing.some((r) => r.event.id === signed.id)) return existing;
-          return [newRecord, ...existing];
-        }
-      );
-      queryClient.setQueryData(["nostr", "author", kp.hex.pk], {
-        event: profileEvent,
-        metadata: kind0Content,
-      });
-
       toast({
         title: "Persona published",
-        description: `${persona.name} is live and private to you.`,
+        description: `${result.envelope.persona.name} is live and private to you.`,
       });
-      navigate(`/dashboard/${kp.npub}`);
+      navigate(`/dashboard/${result.npub}`);
     } catch (e) {
       toast({
         title: "Publish failed",
@@ -331,8 +168,6 @@ const Onboard = () => {
             : "Could not publish persona event to relays.",
         variant: "destructive",
       });
-    } finally {
-      setPublishing(false);
     }
   }
 
