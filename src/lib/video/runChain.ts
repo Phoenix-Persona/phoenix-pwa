@@ -18,6 +18,7 @@ import {
   submitVideo,
 } from "@/lib/ppq/client";
 
+import { fmtBytes, fmtMs, vlog, vwarn } from "./log";
 import type { ScriptSegment } from "./generateMonologueScript";
 
 export interface ClipResult {
@@ -84,10 +85,25 @@ export async function runChain(args: RunChainArgs): Promise<ClipResult[]> {
   const results: ClipResult[] = [];
   let currentImageUrl = args.seedImageUrl;
 
+  vlog("chain", `start: ${segments.length} clips on ${model}`, {
+    aspect,
+    quality,
+    seedImageUrl: args.seedImageUrl,
+  });
+
   for (let i = 0; i < segments.length; i++) {
     if (signal?.aborted) throw abortError();
     const segment = segments[i];
+    const clipNum = `${i + 1}/${segments.length}`;
+    const tClip = Date.now();
 
+    vlog("chain", `clip ${clipNum} submitting`, {
+      model,
+      label: segment.label,
+      duration: segment.duration ?? DEFAULT_DURATION,
+      conditioningImage: currentImageUrl,
+      dialogPreview: segment.dialog.slice(0, 100),
+    });
     onPhase?.({
       type: "clip-submit",
       index: i,
@@ -111,23 +127,40 @@ export async function runChain(args: RunChainArgs): Promise<ClipResult[]> {
       },
       { signal },
     );
+    vlog("chain", `clip ${clipNum} submitted`, {
+      jobId: submitted.id,
+      estimatedCost: submitted.estimated_cost,
+    });
 
     const completed = await pollUntilDone({
       apiKey,
       jobId: submitted.id,
       signal,
-      onStatus: (status) =>
+      onStatus: (status) => {
+        vlog("chain", `clip ${clipNum} status: ${status}`);
         onPhase?.({
           type: "clip-poll",
           index: i,
           total: segments.length,
           status,
-        }),
+        });
+      },
+    });
+    vlog("chain", `clip ${clipNum} completed`, {
+      url: completed.url,
+      cost: completed.cost,
     });
 
     // Fetch the MP4 bytes once — they get used for both the next
     // segment's frame grab AND the final ffmpeg.wasm stitch.
+    const tDownload = Date.now();
     const blob = await fetchBlob(completed.url, signal);
+    vlog(
+      "chain",
+      `clip ${clipNum} mp4 downloaded in ${fmtMs(Date.now() - tDownload)}`,
+      { size: fmtBytes(blob.size) },
+    );
+
     const result: ClipResult = {
       id: submitted.id,
       url: completed.url,
@@ -141,10 +174,15 @@ export async function runChain(args: RunChainArgs): Promise<ClipResult[]> {
       total: segments.length,
       clip: result,
     });
+    vlog(
+      "chain",
+      `clip ${clipNum} end-to-end in ${fmtMs(Date.now() - tClip)}`,
+    );
 
     // If this isn't the last clip, prepare the next conditioning image
     // by extracting + uploading the last frame.
     if (i < segments.length - 1) {
+      vlog("chain", `clip ${clipNum} extracting last frame for next clip`);
       onPhase?.({
         type: "frame-extract",
         index: i,
@@ -155,22 +193,42 @@ export async function runChain(args: RunChainArgs): Promise<ClipResult[]> {
       // canvas tainting issue when the source is an object URL.
       const objectUrl = URL.createObjectURL(blob);
       try {
+        const tFrame = Date.now();
         const frameBlob = await extract(objectUrl, signal);
+        vlog(
+          "chain",
+          `frame extracted in ${fmtMs(Date.now() - tFrame)}`,
+          { size: fmtBytes(frameBlob.size) },
+        );
         onPhase?.({
           type: "frame-upload",
           index: i,
           total: segments.length,
         });
+        const tUpload = Date.now();
         currentImageUrl = await uploadFrame(
           frameBlob,
           `frame-${i + 1}.png`,
         );
+        vlog(
+          "chain",
+          `frame uploaded in ${fmtMs(Date.now() - tUpload)}`,
+          { url: currentImageUrl },
+        );
+      } catch (err) {
+        vwarn(
+          "chain",
+          `clip ${clipNum} frame-extract/upload failed:`,
+          err,
+        );
+        throw err;
       } finally {
         URL.revokeObjectURL(objectUrl);
       }
     }
   }
 
+  vlog("chain", `chain complete: ${results.length} clips`);
   return results;
 }
 

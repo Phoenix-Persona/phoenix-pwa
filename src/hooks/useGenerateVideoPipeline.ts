@@ -4,8 +4,8 @@
  * Phases (in roughly the order they fire):
  *
  *   idle                 →  user hasn't started; dialog just opened
- *   preview-generating   →  gpt-image-1 conditioned on the persona's
- *                           reference image
+ *   preview-generating   →  grok-imagine-edit conditioned on the
+ *                           persona's reference image
  *   preview-ready        →  preview blob URL is rendered; user can
  *                           regenerate or accept + pick duration
  *   uploading-seed       →  pushing the preview to Blossom so ppq.ai
@@ -42,6 +42,7 @@ import {
   generateMonologueScript,
   type ScriptSegment,
 } from "@/lib/video/generateMonologueScript";
+import { fmtBytes, fmtMs, verror, vlog } from "@/lib/video/log";
 import { runChain, type ClipResult } from "@/lib/video/runChain";
 import { stitchClips, type StitchProgress } from "@/lib/video/stitchClips";
 import { extractUrlFromTags } from "@/lib/video/uploadBlobToBlossom";
@@ -53,6 +54,17 @@ const SEEDANCE_MODEL = "seedance-2-fast";
 const SEEDANCE_ASPECT = "9:16" as const;
 const SEEDANCE_QUALITY = "720p";
 const SEGMENT_SECS = 10;
+
+/**
+ * Image model used for the preview/seed-frame generation.
+ *
+ * `gpt-image-1` returned 502 ("No providers available for this model")
+ * for image_url i2i requests on ppq.ai — same provider_error shape we
+ * hit on Veo's i2v route. `grok-imagine-edit` is the model the
+ * `probe-image-gen-with-input-image.ts` cascade landed on as the
+ * working image-edit primitive.
+ */
+const PREVIEW_IMAGE_MODEL = "grok-imagine-edit";
 
 /** Same Seedance-friendly world block we use in the CLI tests. */
 const WORLD_BLOCK_PREFIX =
@@ -112,8 +124,8 @@ export interface UseGenerateVideoPipelineArgs {
   /** Optional style hints — passed to the script LLM. */
   hints?: string;
   /**
-   * Persona's avatar URL — used as input to the gpt-image-1 preview
-   * so the generated face matches the established persona.
+   * Persona's avatar URL — used as input to the grok-imagine-edit
+   * preview so the generated face matches the established persona.
    */
   personaAvatarUrl?: string;
 }
@@ -184,10 +196,12 @@ export function useGenerateVideoPipeline(
         err.name === "AbortError"
       ) {
         // User-initiated cancel — surface as idle, not error.
+        vlog("pipeline", "cancelled by user");
         setPhase({ type: "idle" });
         return;
       }
       const message = err instanceof Error ? err.message : String(err);
+      verror("pipeline", "FAILED:", message, err);
       setPhase({ type: "error", message, cause: err });
     },
     [],
@@ -199,13 +213,23 @@ export function useGenerateVideoPipeline(
     abortRef.current = new AbortController();
     const { signal } = abortRef.current;
 
+    vlog("pipeline", "phase → preview-generating", {
+      model: PREVIEW_IMAGE_MODEL,
+      hasAvatar: Boolean(personaAvatarUrl),
+      ideaLen: idea.length,
+    });
     setPhase({ type: "preview-generating" });
+    const t0 = Date.now();
     try {
       const acct = account ?? (await ensureAccount());
+      vlog("pipeline", "preview: ppq account ready", {
+        hasCreditId: Boolean(acct.credit_id),
+        keyPrefix: acct.api_key.slice(0, 8) + "…",
+      });
       const res = await generateImage(
         acct.api_key,
         {
-          model: "gpt-image-1",
+          model: PREVIEW_IMAGE_MODEL,
           prompt: buildPreviewPrompt(persona, idea, hints),
           // Use the persona's avatar so the generated face matches.
           ...(personaAvatarUrl ? { image_url: personaAvatarUrl } : {}),
@@ -219,6 +243,11 @@ export function useGenerateVideoPipeline(
       if (!previewUrl) {
         throw new Error("Preview image generation returned no URL");
       }
+      vlog(
+        "pipeline",
+        `preview ready in ${fmtMs(Date.now() - t0)}`,
+        { previewUrl, cost: res.cost },
+      );
       setPhase({ type: "preview-ready", previewUrl });
     } catch (err) {
       fail(err);
@@ -252,6 +281,12 @@ export function useGenerateVideoPipeline(
       abortRef.current = new AbortController();
       const { signal } = abortRef.current;
 
+      const tStart = Date.now();
+      vlog("pipeline", "phase → uploading-seed", {
+        totalDurationSecs,
+        segmentSecs: SEGMENT_SECS,
+        previewUrl,
+      });
       try {
         const acct = account ?? (await ensureAccount());
 
@@ -261,6 +296,7 @@ export function useGenerateVideoPipeline(
         // permanent for the chain and (b) own a stable URL we can
         // also use as the visible thumbnail.
         setPhase({ type: "uploading-seed", previewUrl });
+        const tUpload = Date.now();
         const seedImageUrl = await fetchAndUploadAsBlossom({
           sourceUrl: previewUrl,
           filename: "preview-seed.png",
@@ -268,9 +304,19 @@ export function useGenerateVideoPipeline(
           uploadFn: (file) => upload.mutateAsync(file),
           signal,
         });
+        vlog(
+          "pipeline",
+          `seed uploaded in ${fmtMs(Date.now() - tUpload)}`,
+          { seedImageUrl },
+        );
 
         // 2. Script.
+        vlog("pipeline", "phase → scripting", {
+          model: "claude-sonnet-4.5",
+          numSegments: Math.ceil(totalDurationSecs / SEGMENT_SECS),
+        });
         setPhase({ type: "scripting", previewUrl, seedImageUrl });
+        const tScript = Date.now();
         const segments = await generateMonologueScript({
           apiKey: acct.api_key,
           persona,
@@ -281,10 +327,19 @@ export function useGenerateVideoPipeline(
           segmentSecs: SEGMENT_SECS,
           signal,
         });
+        vlog(
+          "pipeline",
+          `script ready (${segments.length} segments) in ${fmtMs(Date.now() - tScript)}`,
+          segments.map((s) => ({ label: s.label, words: s.dialog.split(/\s+/).length })),
+        );
 
         // 3. Chain — submit clip, poll, extract last frame, upload,
         // feed into next clip's image_url. Each completed clip's MP4
         // is also kept in-memory for ffmpeg stitching at the end.
+        vlog("pipeline", "phase → clip-generating (chain start)", {
+          model: SEEDANCE_MODEL,
+          numClips: segments.length,
+        });
         setPhase({
           type: "clip-generating",
           previewUrl,
@@ -293,6 +348,7 @@ export function useGenerateVideoPipeline(
           currentIndex: 0,
           completedClips: [],
         });
+        const tChain = Date.now();
         const completedClips = await runChain({
           apiKey: acct.api_key,
           model: SEEDANCE_MODEL,
@@ -342,12 +398,32 @@ export function useGenerateVideoPipeline(
           signal,
         });
 
+        vlog(
+          "pipeline",
+          `chain done (${completedClips.length} clips) in ${fmtMs(Date.now() - tChain)}`,
+          completedClips.map((c, i) => ({
+            i,
+            url: c.url,
+            blobBytes: fmtBytes(c.blob.size),
+            cost: c.costUsd,
+          })),
+        );
+
         // 4. Stitch all clips into one MP4 via ffmpeg.wasm.
+        const totalInputBytes = completedClips.reduce(
+          (sum, c) => sum + c.blob.size,
+          0,
+        );
+        vlog("pipeline", "phase → stitching", {
+          numClips: completedClips.length,
+          totalInputSize: fmtBytes(totalInputBytes),
+        });
         setPhase({
           type: "stitching",
           segments,
           completedClips,
         });
+        const tStitch = Date.now();
         const stitchedBlob = await stitchClips({
           clips: completedClips.map((c) => c.blob),
           onProgress: (p: StitchProgress) =>
@@ -358,8 +434,14 @@ export function useGenerateVideoPipeline(
             ),
           signal,
         });
+        vlog(
+          "pipeline",
+          `stitched in ${fmtMs(Date.now() - tStitch)}`,
+          { outputSize: fmtBytes(stitchedBlob.size) },
+        );
 
         // 5. Upload the stitched MP4 to Blossom.
+        vlog("pipeline", "phase → uploading-stitched");
         setPhase({
           type: "uploading-stitched",
           segments,
@@ -368,16 +450,25 @@ export function useGenerateVideoPipeline(
         const stitchedFile = new File([stitchedBlob], "stitched.mp4", {
           type: "video/mp4",
         });
+        const tUploadStitched = Date.now();
         const stitchedTags = await upload.mutateAsync(stitchedFile);
         const stitchedUrl = extractUrlFromTags(stitchedTags);
         if (!stitchedUrl) {
+          verror("pipeline", "blossom returned no url tag", { stitchedTags });
           throw new Error(
             "Blossom upload of stitched MP4 returned tags without a URL",
           );
         }
+        vlog(
+          "pipeline",
+          `stitched uploaded in ${fmtMs(Date.now() - tUploadStitched)}`,
+          { stitchedUrl },
+        );
 
         // 6. Draft a caption.
+        vlog("pipeline", "phase → captioning");
         setPhase({ type: "captioning", segments, stitchedUrl });
+        const tCaption = Date.now();
         const captionDraft = await generateCaption({
           apiKey: acct.api_key,
           persona,
@@ -386,7 +477,15 @@ export function useGenerateVideoPipeline(
           segments,
           signal,
         });
+        vlog(
+          "pipeline",
+          `caption draft (${captionDraft.length} chars) in ${fmtMs(Date.now() - tCaption)}`,
+        );
 
+        vlog(
+          "pipeline",
+          `phase → ready-to-post · total elapsed ${fmtMs(Date.now() - tStart)}`,
+        );
         setPhase({
           type: "ready-to-post",
           segments,
@@ -418,6 +517,12 @@ export function useGenerateVideoPipeline(
       const { stitchedUrl } = current;
 
       try {
+        vlog("pipeline", "phase → publishing", {
+          captionLen: editedCaption.length,
+          stitchedUrl,
+          numTags: persona.tags.length,
+          numSources: sources?.length ?? 0,
+        });
         setPhase({ type: "publishing", stitchedUrl });
         const template = buildPersonaPostTemplate({
           text: editedCaption,
@@ -425,10 +530,16 @@ export function useGenerateVideoPipeline(
           sources,
           media: { url: stitchedUrl, mimeType: "video/mp4" },
         });
+        const tPublish = Date.now();
         const event = await personaPublish.mutateAsync({
           personaNsec: persona.nsec,
           template,
         });
+        vlog(
+          "pipeline",
+          `phase → done · published in ${fmtMs(Date.now() - tPublish)}`,
+          { eventId: event.id },
+        );
         setPhase({ type: "done", stitchedUrl, eventId: event.id });
         toast({
           title: "Posted",
@@ -488,7 +599,7 @@ function buildPreviewPrompt(
 }
 
 /**
- * Fetch a remote image (e.g. ppq.ai's signed gpt-image-1 URL) and
+ * Fetch a remote image (e.g. ppq.ai's signed image-gen URL) and
  * re-upload its bytes to Blossom so we own a stable URL the chain
  * can use as `image_url` without worrying about TTL expiry.
  */

@@ -54,7 +54,7 @@ export interface VideoComposerDialogProps {
   sourcesInput: string;
   /** The Dashboard "Style hints" textarea content. */
   hintsInput: string;
-  /** Persona's avatar — feeds the gpt-image-1 preview as `image_url`. */
+  /** Persona's avatar — feeds the grok-imagine-edit preview as `image_url`. */
   personaAvatarUrl?: string;
   /** Called once a kind 1 has been published; Dashboard refetches posts. */
   onPublished?: () => void;
@@ -200,7 +200,7 @@ function PhaseView(props: {
       return (
         <BusyBlock
           title="Drawing a preview frame…"
-          subtitle="gpt-image-1 with the persona's avatar as input. ~10s."
+          subtitle="grok-imagine-edit with the persona's avatar as input. ~10s."
         />
       );
 
@@ -297,7 +297,11 @@ function PhaseView(props: {
 
     case "error":
       return (
-        <ErrorBlock message={phase.message} onRetry={onRegeneratePreview} />
+        <ErrorBlock
+          message={phase.message}
+          cause={phase.cause}
+          onRetry={onRegeneratePreview}
+        />
       );
   }
 }
@@ -636,8 +640,27 @@ function BusyBlock(props: {
   );
 }
 
-function ErrorBlock(props: { message: string; onRetry: () => void }) {
-  const { message, onRetry } = props;
+function ErrorBlock(props: {
+  message: string;
+  cause?: unknown;
+  onRetry: () => void;
+}) {
+  const { message, cause, onRetry } = props;
+  // Pull useful diagnostics out of any error-shaped cause: HTTP status,
+  // ppq.ai's `body.error.{message,type}` payload, or the raw stack.
+  const c = cause as
+    | {
+        status?: number;
+        body?: { error?: { message?: string; type?: string } } | unknown;
+        stack?: string;
+      }
+    | undefined;
+  const status = typeof c?.status === "number" ? c.status : undefined;
+  const ppqErr =
+    c?.body && typeof c.body === "object" && "error" in c.body
+      ? (c.body as { error?: { message?: string; type?: string } }).error
+      : undefined;
+
   return (
     <div className="space-y-3">
       <h3 className="font-display text-xl font-medium tracking-tight text-destructive">
@@ -646,6 +669,35 @@ function ErrorBlock(props: { message: string; onRetry: () => void }) {
       <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
         {message}
       </p>
+      {(status || ppqErr) && (
+        <div className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs space-y-1 font-mono">
+          {status && (
+            <div>
+              <span className="text-muted-foreground">HTTP:</span> {status}
+            </div>
+          )}
+          {ppqErr?.type && (
+            <div>
+              <span className="text-muted-foreground">type:</span>{" "}
+              {ppqErr.type}
+            </div>
+          )}
+          {ppqErr?.message && (
+            <div>
+              <span className="text-muted-foreground">api:</span>{" "}
+              {ppqErr.message}
+            </div>
+          )}
+        </div>
+      )}
+      <details className="text-xs text-muted-foreground">
+        <summary className="cursor-pointer select-none">
+          Full diagnostics (open DevTools console for grep'able [video:*] logs)
+        </summary>
+        <pre className="mt-2 p-2 bg-muted/30 rounded overflow-auto max-h-48 whitespace-pre-wrap break-all">
+          {c?.stack ?? JSON.stringify(c, null, 2) ?? "(no detail)"}
+        </pre>
+      </details>
       <div className="flex justify-end pt-1">
         <Button variant="outline" onClick={onRetry}>
           <RefreshCcw className="size-4 mr-2" aria-hidden="true" />

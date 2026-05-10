@@ -21,6 +21,8 @@
  * returned Blob; this function cleans up its own internal one.
  */
 
+import { fmtBytes, vlog, vwarn } from "./log";
+
 export interface ExtractLastFrameOptions {
   /** Seconds before video end to sample. Default 0.1. */
   epsilonSecs?: number;
@@ -39,13 +41,23 @@ export async function extractLastFrame(
   const { signal } = opts;
   if (signal?.aborted) throw abortError();
 
+  // If the URL is already an object URL (preferred — runChain passes one
+  // it already owns to avoid double-fetching), skip the network round-trip.
+  if (videoUrl.startsWith("blob:")) {
+    vlog("frame", "using existing object URL (no fetch)");
+    return await captureFrameFromObjectUrl(videoUrl, opts);
+  }
+
   // 1. Fetch into a Blob so we don't taint the canvas on cross-origin
   // ppq.ai signed URLs.
+  vlog("frame", "fetching video bytes from", videoUrl);
   const res = await fetch(videoUrl, { signal });
   if (!res.ok) {
+    vwarn("frame", `fetch failed ${res.status}`, videoUrl);
     throw new Error(`extractLastFrame: fetch failed ${res.status}`);
   }
   const videoBlob = await res.blob();
+  vlog("frame", `video fetched`, { size: fmtBytes(videoBlob.size) });
   const objectUrl = URL.createObjectURL(videoBlob);
 
   try {
