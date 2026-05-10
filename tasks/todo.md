@@ -121,34 +121,45 @@ If pressed for time at hour +20, trim voice-gen to a hardcoded sample or push za
 
 ## Stream C — Derek (Nostr + Frontend)
 
-**Owns:** `/dev/persona-crypto`, `/dev/operator`, `/dev/publish`, `/dev/feed` (specs in `dev/STREAMS.md` §C1–C4)
-**Leads:** `/dev/persona-create`, `/dev/persona-restore` (composite, §C5–C6)
+**Owns:** persona-crypto, user identity, publish, feed (originally specced as `/dev/*` harnesses in `dev/STREAMS.md` §C1–C4 — implemented directly as integrated UI; the harness step was bypassed in favor of shipping the real pages).
+**Leads:** persona-create wizard, persona-restore (composite, §C5–C6).
 
 ### Phase 0 — Spike (3h)
-- [ ] Spike — Nostr crypto (NIP-44 self / NIP-49 / kind 30078) — ~1h
-- [x] Spike — Breez Spark SDK in browser (variant choice, init, invoice, pay) — landed via Jim's PR #2 (headless wallet shipped to `src/lib/wallet/`)
+- [x] Spike — Nostr crypto (NIP-44 self / NIP-49 / kind 30078) — `spikes/nostr-breeze/nostr/round-trip.test.ts`
+- [x] Spike — Breez Spark SDK in browser (Jim's PR #2)
 - [x] Nostr crypto spike documented in `docs/spike-nostr.md`
+- [ ] Live-relay verification runbook (5 min with Anaïse — owed)
+- [ ] Mobile NIP-49 latency on Anaïse's phone (owed; affects WebWorker decision)
 
-### Phase 1 — Independent harnesses (12h)
-- [ ] **`/dev/persona-crypto`** (C1, ~3h) — adapt existing `src/lib/persona*` to PROJECT.md §5.2 schema; full round-trip
-- [ ] **`/dev/operator`** (C2, ~3h) — fresh keypair / NIP-07 / NIP-46 / paste; NIP-49 backup/restore
-- [ ] **`/dev/publish`** (C3, ~3h) — kind 1 publish with full attribution tags
-- [ ] **`/dev/feed`** (C4, ~3h) — render persona profile + posts + zap receipts from a pubkey
+### Phase 1 — Independent harnesses (skipped; built directly as integrated UI)
+- [x] persona-crypto adapted to PROJECT.md §5.2 schema, full round-trip — `src/lib/persona*`, `src/hooks/usePersona*`
+- [x] User identity: NIP-07 / NIP-46 / paste / fresh-Phoenix-NIP-49 — `AuthDialog.tsx` + `nip49Storage.ts` + `<UnlockGate>`
+- [x] kind 1 publish with attribution tags — `personaPost.ts` + `usePersonaPublish`
+- [x] Render persona profile + posts — `PersonaFeed.tsx` (zap receipts pending Topher's stream B5)
 
-### Phase 2 — Composite harnesses (8h)
-- [ ] **`/dev/persona-create`** (C5, ~5h) — full wizard composing agent + wallet + persona-crypto + image-gen + voice-gen
-- [ ] **`/dev/persona-restore`** (C6, ~3h) — operator login → load all kind 30078 → present persona list
+### Phase 2 — Composite (most of this is shipped as integrated UI; some parts depend on Jim/Topher)
+- [x] persona-create flow — two-step Onboard wizard (Details → Picture → Mint) with PPQ image gen / Blossom upload
+- [x] persona-restore flow — sign in fresh, scan-and-decrypt re-hydrates personas, NostrSync invalidates caches on user/relay change
+- [ ] Wizard agent harness (`pi-agent-core` interview) — V2 per PROJECT.md §6, deferred
+- [ ] Composer wired to PPQ styling — Jim seam
+- [ ] Inline post-image generation — Jim seam
+- [ ] Empty-wallet UX (sticky banner + disabled buttons) — Jim seam
 
-### Phase 3 — Main UI integration (5h)
-- [ ] `Onboard.tsx` ← `<CharacterCreator>` from C5
-- [ ] `MyPersonas.tsx` ← `<PersonaList>` from C6
-- [ ] `PersonaFeed.tsx` ← `<PersonaProfileHeader>` + `<PersonaPostList>` + `<ZapReceiptCard>` (C4 + B5)
-- [ ] `Verify.tsx` rebuilt against the §5 schema
-- [ ] PWA polish: install prompt, service worker, manifest icons (if time)
+### Phase 3 — Main UI integration
+- [x] `Onboard.tsx` — form-based wizard with profile picture step (PR #3)
+- [x] `MyPersonas.tsx` — list with profile-picture avatars + 3-dot Edit/Delete menu (PR #3)
+- [x] `PersonaFeed.tsx` — public profile header + posts (zap receipts pending Topher)
+- [x] `Verify.tsx` rebuilt — real client-side signature checks, post counts, profile timestamp (PR #3)
+- [x] `Settings.tsx` — Account (Lock now / Forget device / Change passphrase / Download backup) + Relays (NIP-65 manager) + Personas (PR #3)
+- [x] `EditPersona.tsx` — same-d-tag re-publish for name / bio / picture / system prompt / tags / languages (PR #3)
+- [x] AuthDialog NIP-49 import — kill-and-resurrect inverse of download-backup (PR #3)
+- [ ] PWA polish: install prompt, service worker, manifest icons — current branch
+- [ ] Mobile QA: 360 / 414 / 768 px on iPhone Safari + Android Chrome
 
-### Phase 4 — Demo prep (1h)
-- [ ] Kill-and-resurrect rehearsal: device A logs in, posts; device B picks up via nsec restore
-- [ ] Persona nsec backups on multiple devices
+### Phase 4 — Demo prep
+- [ ] Kill-and-resurrect rehearsal: Device A logs in, posts; Device B drops in `.ncryptsec` and resumes
+- [ ] Persona nsec backups on multiple devices (exercises export/import round-trip)
+- [ ] PWA install demonstrated on Anaïse's phone
 
 ---
 

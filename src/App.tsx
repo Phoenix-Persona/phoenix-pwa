@@ -14,6 +14,7 @@ import { AppProvider } from '@/components/AppProvider';
 import { AppConfig } from '@/contexts/AppContext';
 import { APP_RELAYS } from '@/lib/appRelays';
 import { UnlockGate } from '@/components/UnlockGate';
+import { InstallBanner } from '@/components/InstallBanner';
 import AppRouter from './AppRouter';
 const head = createHead({
   plugins: [
@@ -60,6 +61,7 @@ export function App() {
                     <AppRouter />
                   </UnlockGate>
                 </Suspense>
+                <InstallBanner />
               </TooltipProvider>
             </NostrProvider>
           </NostrLoginProvider>
