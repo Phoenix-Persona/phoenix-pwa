@@ -30,6 +30,7 @@ export function AppRouter() {
         {/* Developer harnesses. */}
         <Route path="/dev/wallet" element={<WalletHarness />} />
         <Route path="/dev/inference-pay" element={<InferencePayHarness />} />
+        <Route path="/dev/ppq-pay" element={<InferencePayHarness />} />
         {/* NIP-19 catch-all stays at the root for raw npub/note/naddr URLs */}
         <Route path="/:nip19" element={<NIP19Page />} />
         <Route path="*" element={<NotFound />} />
