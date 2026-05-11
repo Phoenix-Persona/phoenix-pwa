@@ -82,7 +82,7 @@ export function App() {
 }
 ```
 
-### 4. Wire Up `NWCProvider` in `src/test/TestApp.tsx` (if tests need it)
+### 4. Wire Up `NWCProvider` in `test/vitest/TestApp.tsx` (if tests need it)
 
 If you're writing tests that mount components depending on NWC/zap/wallet hooks, wrap `TestApp`'s provider tree the same way:
 

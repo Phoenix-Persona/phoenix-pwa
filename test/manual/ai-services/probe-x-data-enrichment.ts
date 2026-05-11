@@ -4,7 +4,7 @@
  * endpoints return structured tweet data and that our adapter maps
  * them to `SearchResult[]` correctly.
  *
- *   tsx tests/ai-services/probe-x-data-enrichment.ts
+ *   tsx test/manual/ai-services/probe-x-data-enrichment.ts
  */
 
 import "../_shared/loadEnv";

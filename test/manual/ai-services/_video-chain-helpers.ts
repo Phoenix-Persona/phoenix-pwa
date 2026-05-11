@@ -41,7 +41,7 @@ export interface PpqAccountFile {
  *      the path for users who have a directly-issued api_key (free
  *      credits from ppq.ai's team) and don't want a credit_id-backed
  *      account file.
- *   2. The file at `accountPath` (typically tests/ai-services/.account.json),
+ *   2. The file at `accountPath` (typically test/manual/ai-services/.account.json),
  *      which carries both credit_id and api_key from a self-served
  *      `POST /accounts/create`.
  *
@@ -73,7 +73,7 @@ export async function loadPpqAccount(
       `Either:\n` +
       `  • Set PPQ_API_KEY in dev/.env (use this if ppq.ai gave you a\n` +
       `    direct api_key for free credits), OR\n` +
-      `  • Run \`npx tsx tests/ai-services/test-all-ppq-services-e2e.ts\` once\n` +
+      `  • Run \`npx tsx test/manual/ai-services/test-all-ppq-services-e2e.ts\` once\n` +
       `    to mint a credit_id-backed account at ${accountPath}.`,
   );
 }

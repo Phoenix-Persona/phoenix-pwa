@@ -6,7 +6,7 @@
  * (Veo 3). Each step is interactive (y/n) so you can run a subset.
  *
  * Run:
- *   npx tsx tests/ai-services/test-all-ppq-services-e2e.ts
+ *   npx tsx test/manual/ai-services/test-all-ppq-services-e2e.ts
  *
  * Flags:
  *   --reset            Wipe the persisted account before starting
@@ -19,7 +19,7 @@
  *   PPQ_IMAGE_MODEL    Override the image model (default: first listed)
  *   PPQ_VIDEO_MODEL    Override the video model (default: first listed Veo 3)
  *
- * The persisted account is written to tests/ai-services/.account.json.
+ * The persisted account is written to test/manual/ai-services/.account.json.
  * That file is gitignored — but it grants spending power, so don't commit it.
  */
 

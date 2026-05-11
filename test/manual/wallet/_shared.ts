@@ -1,5 +1,5 @@
 /**
- * Shared helpers for the `tests/wallet/*.ts` integration scripts.
+ * Shared helpers for the `test/manual/wallet/*.ts` integration scripts.
  *
  * These scripts run in plain Node and exercise live infrastructure (Breez
  * Spark + ppq.ai). The shared module owns:
@@ -146,7 +146,7 @@ export async function loadPersonaOrFail(
   const stored = await loadStoredPersona();
   if (!stored) {
     throw new Error(
-      "No persona envelope on disk. Run `npx tsx tests/wallet/bootstrap-spark-wallet-e2e.ts` first.",
+      "No persona envelope on disk. Run `npx tsx test/manual/wallet/bootstrap-spark-wallet-e2e.ts` first.",
     );
   }
   const signer = buildSigner(operator.nsec);
@@ -163,7 +163,7 @@ export async function loadPersonaOrFail(
   return envelope;
 }
 
-/* ---------- ppq.ai account (shared with tests/ai-services) ---------- */
+/* ---------- ppq.ai account (shared with test/manual/ai-services) ---------- */
 
 export interface PpqAccountFile {
   credit_id: string;

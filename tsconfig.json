@@ -22,8 +22,9 @@
     "tsBuildInfoFile": "./.tsbuildinfo",
 
     "paths": {
+      "@/test/*": ["./test/vitest/*"],
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "spikes"]
+  "include": ["src", "test/vitest", "spikes"]
 }

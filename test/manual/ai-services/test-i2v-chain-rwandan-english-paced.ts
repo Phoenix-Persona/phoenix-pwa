@@ -14,10 +14,10 @@
  *     this script headlessly.
  *
  * Run:
- *   npx tsx tests/ai-services/test-i2v-chain-rwandan-english-paced.ts
- *   npx tsx tests/ai-services/test-i2v-chain-rwandan-english-paced.ts --yes
+ *   npx tsx test/manual/ai-services/test-i2v-chain-rwandan-english-paced.ts
+ *   npx tsx test/manual/ai-services/test-i2v-chain-rwandan-english-paced.ts --yes
  *
- * Requires `ffmpeg` on `$PATH` and tests/ai-services/.account.json.
+ * Requires `ffmpeg` on `$PATH` and test/manual/ai-services/.account.json.
  *
  * Cost: ~4 × $1 = ~$4 on seedance-2-fast at 10s clips. Pre-flight gate
  * at $6.
@@ -175,7 +175,7 @@ async function main(): Promise<void> {
         const need = (PREFLIGHT_USD_REQUIRED - balanceUsd).toFixed(2);
         throw new Error(
           `Insufficient ppq.ai credit. Top up at least $${need} more:\n\n` +
-            `  npx tsx tests/ai-services/top-up-ppq-with-lightning.ts --usd ${Math.ceil(parseFloat(need))}`,
+            `  npx tsx test/manual/ai-services/top-up-ppq-with-lightning.ts --usd ${Math.ceil(parseFloat(need))}`,
         );
       }
     } else {

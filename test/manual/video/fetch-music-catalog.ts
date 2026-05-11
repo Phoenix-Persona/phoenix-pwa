@@ -7,7 +7,7 @@
  * and prints the first event it sees (with parsed tags + content).
  *
  * Run:
- *   tsx tests/video/fetch-music-catalog.ts
+ *   tsx test/manual/video/fetch-music-catalog.ts
  *
  * Optional flags:
  *   --relay <url>        add a relay (repeatable)

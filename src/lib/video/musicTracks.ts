@@ -9,7 +9,7 @@
  * Each `track` tag has the shape
  *   ["track", url, label, mime, sha256, size]
  *
- * Run `tsx tests/video/fetch-music-catalog.ts` to refresh from the
+ * Run `tsx test/manual/video/fetch-music-catalog.ts` to refresh from the
  * latest published version of the event when the curator updates it.
  *
  * The `id` we use is the file's sha256 hash (the Blossom blob

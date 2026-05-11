@@ -47,7 +47,7 @@
  * Schema: PROJECT.md §5.2 inner-payload structure.
  * Privacy override: tags-on-the-envelope follow the existing untrackable
  * design rather than §5.2 which would tag-leak Phoenix usage.
- * See tasks/derek-plan.md "Locked decisions" §2.
+ * See `dev/PROJECT.md` §5.
  */
 
 import { z } from "zod";

@@ -21,10 +21,10 @@
  * Seedance hold continuity across 3 sequential i2v hops?
  *
  * Run:
- *   npx tsx tests/ai-services/test-i2v-chain-rwandan-monologue.ts
+ *   npx tsx test/manual/ai-services/test-i2v-chain-rwandan-monologue.ts
  *
  * Loads `dev/.env`. Requires `ffmpeg` on `$PATH` and a populated
- * tests/ai-services/.account.json.
+ * test/manual/ai-services/.account.json.
  *
  * Cost: ~4 × $0.50 = ~$2 on seedance-2-fast. Pre-flight gate at $4.
  *
@@ -174,8 +174,8 @@ async function loadPpqAccount(): Promise<PpqAccountFile> {
     /* fall through */
   }
   throw new Error(
-    "No ppq.ai account at tests/ai-services/.account.json. Run " +
-      "`npx tsx tests/ai-services/test-all-ppq-services-e2e.ts` once.",
+    "No ppq.ai account at test/manual/ai-services/.account.json. Run " +
+      "`npx tsx test/manual/ai-services/test-all-ppq-services-e2e.ts` once.",
   );
 }
 
@@ -456,7 +456,7 @@ async function main(): Promise<void> {
       const need = (PREFLIGHT_USD_REQUIRED - balanceUsd).toFixed(2);
       throw new Error(
         `Insufficient ppq.ai credit. Top up at least $${need} more:\n\n` +
-          `  npx tsx tests/ai-services/top-up-ppq-with-lightning.ts --usd ${Math.ceil(parseFloat(need))}`,
+          `  npx tsx test/manual/ai-services/top-up-ppq-with-lightning.ts --usd ${Math.ceil(parseFloat(need))}`,
       );
     }
   } else {

@@ -48,7 +48,8 @@ Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, Vite, shadcn/
   - Top-level: `persona.ts`, `personaCrypto.ts`, `personaKey.ts`, `personaPost.ts`, `appRelays.ts`, `appBlossom.ts`, `nip49Storage.ts`, `genUserName.ts`, `polyfills.ts`, `utils.ts`, `env.ts`.
 - `/src/contexts/` — React context providers (`AppContext`).
 - `/src/dev/` — dev harnesses for slice-by-slice testing (`WalletHarness`, `InferencePayHarness`). Routed under `/dev/*` in `AppRouter.tsx`.
-- `/src/test/` — testing utilities including the `TestApp` wrapper.
+- `/test/vitest/` — Vitest setup and testing utilities including the `TestApp` wrapper.
+- `/test/manual/` — manual and E2E Node scripts for wallet, PPQ, and media workflows.
 - `/public/` — static assets.
 - `App.tsx` — **already configured** with `QueryClientProvider`, `NostrProvider`, `UnheadProvider`, `AppProvider`, `NostrLoginProvider`. **Read before editing**; changes are rarely needed.
 - `AppRouter.tsx` — React Router configuration. The catch-all `/:nip19` route handles all NIP-19 identifiers (see the `nip19-routing` skill).
@@ -69,7 +70,7 @@ The assistant's behavior is defined by this file (`AGENTS.md`). Edit it directly
 
 1. **Always review existing NIPs first.** Use the NIP index tool, then read candidate NIPs in detail. The goal is to find the closest existing solution.
 2. **Prefer extending existing NIPs** over creating custom kinds, even if it requires minor schema compromises. Custom kinds fragment the ecosystem.
-3. **When existing NIPs are close but not perfect**, use the existing kind as the base and add domain-specific tags. Document extensions in `NIP.md`.
+3. **When existing NIPs are close but not perfect**, use the existing kind as the base and add domain-specific tags. Document extensions in `docs/NIP.md`.
 4. **Only generate a new kind** when no existing NIP covers the core functionality, the data structure is fundamentally different, or the use case needs different storage characteristics (regular/replaceable/addressable).
 5. **If a tool to generate a new kind number is available, you MUST use it** — don't pick an arbitrary number.
 6. **Custom kinds MUST include a NIP-31 `alt` tag** with a human-readable description.
@@ -96,9 +97,9 @@ Kinds below 1000 are "legacy"; their storage behavior is per-kind (e.g. kind 1 i
 - **Empty content is fine.** `content: ""` is idiomatic for tag-only events.
 - If you need to filter by a field, it **must** be a tag — relays don't index content.
 
-### NIP.md
+### docs/NIP.md
 
-`NIP.md` documents any custom kinds/schemas this project defines. If the file doesn't exist, this project has no custom kinds. **Whenever you generate a new kind or change a custom schema, create or update `NIP.md`.**
+`docs/NIP.md` documents any custom kinds/schemas this project defines. If the file doesn't exist, this project has no custom kinds. **Whenever you generate a new kind or change a custom schema, create or update `docs/NIP.md`.**
 
 ### Nostr Security Model
 

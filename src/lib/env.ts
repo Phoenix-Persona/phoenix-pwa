@@ -7,9 +7,9 @@
  *     leaning on `import.meta.env` because Vite's `define`-based env
  *     injection only does literal replacement, and our calls do dynamic
  *     `import.meta.env[name]` access which doesn't get substituted.
- *   - Node integration tests under `tests/`, where Vite isn't in the
+ *   - Node integration tests under `test/manual/`, where Vite isn't in the
  *     loop and the value lives on `process.env` (populated by
- *     `tests/_shared/loadEnv.ts` from both .env locations).
+ *     `test/manual/_shared/loadEnv.ts` from both .env locations).
  *
  * Resolution order: __PHOENIX_ENV__ → import.meta.env (defensive
  * secondary, in case some downstream tool sets it directly) → process.env.

@@ -21,13 +21,13 @@ echo 'VITE_BREEZ_API_KEY=your_key' >> .env
 
 ```bash
 # First time on a machine — mints wallet + persona + first topup
-npx tsx tests/wallet/bootstrap-spark-wallet-e2e.ts
+npx tsx test/manual/wallet/bootstrap-spark-wallet-e2e.ts
 
 # Top up the existing wallet by an arbitrary amount
-npx tsx tests/wallet/fund-spark-wallet-with-sats.ts --amount-sats 10000
+npx tsx test/manual/wallet/fund-spark-wallet-with-sats.ts --amount-sats 10000
 
 # Reuses the persisted state — hello world + off-switch + forced topup
-npx tsx tests/wallet/test-auto-topup-and-inference.ts
+npx tsx test/manual/wallet/test-auto-topup-and-inference.ts
 ```
 
 ## Useful flags
@@ -68,7 +68,7 @@ end. Use this to sanity-check your wiring — the shape of each block, and
 the `✓` lines, is what you should expect.
 
 ```text
-$ npx tsx tests/wallet/test-auto-topup-and-inference.ts
+$ npx tsx test/manual/wallet/test-auto-topup-and-inference.ts
 Breez SDK: Node.js storage automatically enabled
 Phoenix wallet — auto-topup + inference test
 
@@ -125,9 +125,9 @@ first.
 
 | File | What it holds |
 | --- | --- |
-| `tests/wallet/.operator.json` | Operator nsec used to (de)crypt the envelope |
-| `tests/wallet/.persona.json` | Encrypted PhoenixEnvelope (the kind-30078 ciphertext) |
-| `tests/ai-services/.account.json` | ppq.ai credentials, shared with the AI walkthrough |
+| `test/manual/wallet/.operator.json` | Operator nsec used to (de)crypt the envelope |
+| `test/manual/wallet/.persona.json` | Encrypted PhoenixEnvelope (the kind-30078 ciphertext) |
+| `test/manual/ai-services/.account.json` | ppq.ai credentials, shared with the AI walkthrough |
 
 All three files are mode `0600` and gitignored. They grant spending power
 — never commit. The Breez SDK also creates a `phoenix-wallet/` directory

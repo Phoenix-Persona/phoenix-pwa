@@ -1,43 +1,40 @@
 /**
- * Single-purpose probe: does ppq.ai's Seedance accept image-to-video
- * AND produce audio (lip-synced speech)?
+ * Single-purpose probe: does ppq.ai's Veo 3 Fast accept image-to-video
+ * when the conditioning image is on a properly-hosted public CDN
+ * (not a fly-by-night file bin like uguu.se)?
  *
- * We've established two things from earlier probes:
- *   - Veo on ppq.ai is the only model with native lip-sync audio, but
- *     `image_url` returns 502 ("No providers available for this model").
- *   - Kling 3.0 / Kling 2.1 Master accept i2v but produce silent video.
- *
- * Open question: Seedance 2 — ByteDance's latest video model — may or
- * may not have native audio on ppq.ai's route. This probe finds out.
+ * Earlier runs against `veo3-fast` returned 502 ("No providers available
+ * for this model") with a uguu.se URL. The hypothesis under test: maybe
+ * ppq.ai's worker silently rejected the image source rather than the
+ * model genuinely lacking i2v support.
  *
  * What this script does:
- *   1. Pre-flight balance print (no gate).
- *   2. Submits ONE i2v video gen job to seedance-2 with a hard-coded
- *      DigitalOcean Spaces CDN image URL and a prompt that explicitly
- *      asks the woman to SAY "hello world" out loud.
+ *   1. Pre-flight balance check.
+ *   2. Submits ONE video gen job to the chosen model with the chosen
+ *      `image_url`.
  *   3. Polls until completed / failed.
- *   4. Prints the result URL — open it and check if there's audio.
+ *   4. Prints the result URL (or the failure verbatim).
  *
- * No clip 1, no ffmpeg, no upload chain, no caching. Pure probe.
+ * No clip 1, no ffmpeg, no upload chain, no caching. Just leg 2 in
+ * isolation with a URL we trust.
  *
  * Run:
- *   npx tsx tests/ai-services/probe-seedance-i2v-with-speech.ts
- *   npx tsx tests/ai-services/probe-seedance-i2v-with-speech.ts --model seedance-2-fast
+ *   npx tsx test/manual/ai-services/probe-veo-i2v-with-public-cdn.ts
+ *   npx tsx test/manual/ai-services/probe-veo-i2v-with-public-cdn.ts --model kling-3.0
  *
  * Flags:
- *   --model <id>          Default `seedance-2-fast` (cheap + quick for
- *                         iteration). Promote to `seedance-2` for hero
- *                         renders, or `seedance-v1-lite` for the
- *                         older variant.
+ *   --model <id>          Default `veo3-fast`. Try `kling-3.0`,
+ *                         `runway-gen4`, etc. via --model.
  *   --no-image            Submit WITHOUT image_url (text-to-video only).
- *                         Use to disprove the "image URL is the problem"
- *                         hypothesis on this model.
+ *                         Use this to disprove the "image URL is the
+ *                         problem" hypothesis — if the same model also
+ *                         502s text-only, the route is broken.
  *   --image-url <url>     Override the conditioning image. Default:
  *                         https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/last-frame.png
- *   --prompt <text>       Override the speech prompt.
+ *   --prompt <text>       Override the prompt.
  *   --aspect <ratio>      "9:16" (default), "16:9", "1:1".
  *   --duration <secs>     Default 5.
- *   --quality <q>         Default "720p".
+ *   --quality <q>         Default depends on model (Veo: "720p", Kling: "standard").
  */
 
 import "../_shared/loadEnv";
@@ -68,38 +65,41 @@ function flagValue(name: string): string | undefined {
 const DEFAULT_IMAGE_URL =
   "https://cascdr-chads-stay-winning.nyc3.cdn.digitaloceanspaces.com/last-frame.png";
 
-/**
- * Minimal speech prompt — just enough to test if the model produces
- * audio at all. Explicit about (a) the character continuing from the
- * conditioning image, (b) speaking aloud, (c) the exact words.
- */
 const DEFAULT_PROMPT =
-  `The same young Rwandan woman from the input image, in the same calm ` +
-  `sage-green home office, same cream linen blouse, same lighting, same ` +
-  `posture. She looks directly into the camera, smiles warmly, and ` +
-  `clearly speaks the words: "Hello, world." Her lips move in sync with ` +
-  `the spoken audio. Camera holds steady at eye level, medium close-up. ` +
-  `9:16 vertical, cinematic, photorealistic.`;
-
-const TEXT_ONLY_PROMPT =
-  `A young Rwandan woman in a calm sage-green home office, late afternoon ` +
-  `golden window light. She looks directly into the camera, smiles warmly, ` +
-  `and clearly speaks the words: "Hello, world." Her lips move in sync ` +
-  `with the spoken audio. Camera holds steady at eye level, medium ` +
-  `close-up. 9:16 vertical, cinematic, photorealistic.`;
+  `The same young Rwandan woman in the same calm sage-green home office, ` +
+  `same cream linen blouse, same lighting, same posture as the conditioning ` +
+  `image. Her expression turns serious and she speaks directly into the camera ` +
+  `in clear English with a gentle Rwandan accent: "For too long, corruption ` +
+  `inside our government has stolen what was promised to ordinary Rwandans. ` +
+  `We deserve transparency." Camera holds rock-steady at eye level, medium ` +
+  `close-up. 9:16 vertical. Cinematic, photorealistic, soft natural lighting.`;
 
 const flags = {
-  // Default to -fast: same i2v + audio capability as seedance-2, but
-  // cheaper and faster for iteration. Promote to `seedance-2` only for
-  // hero / final renders.
-  model: flagValue("model") ?? "seedance-2-fast",
+  model: flagValue("model") ?? "veo3-fast",
   noImage: argv.includes("--no-image"),
   imageUrl: flagValue("image-url") ?? DEFAULT_IMAGE_URL,
   prompt: flagValue("prompt") ?? DEFAULT_PROMPT,
   aspect: (flagValue("aspect") ?? "9:16") as "9:16" | "16:9" | "1:1",
   duration: Number(flagValue("duration") ?? "5"),
-  quality: flagValue("quality") ?? "720p",
+  quality: flagValue("quality"),
 };
+
+// Text-only fallback prompt — used when --no-image is set so the prompt
+// doesn't reference a conditioning image that wasn't provided.
+const TEXT_ONLY_PROMPT =
+  `A young Rwandan woman in her early thirties, warm brown skin, ` +
+  `natural hair in a low bun, cream linen blouse, sits in a calm ` +
+  `sage-green home office. Late afternoon golden window light from her ` +
+  `left. She looks directly into the camera and speaks in clear English ` +
+  `with a gentle Rwandan accent: "Hello, my name is Imani. I am a ` +
+  `journalist from Kigali." Camera holds rock-steady, medium close-up. ` +
+  `9:16 vertical, cinematic, photorealistic, soft natural lighting.`;
+
+// Per-model default quality if the user didn't specify one.
+function defaultQualityFor(model: string): string {
+  if (/^kling/.test(model)) return "standard";
+  return "720p";
+}
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PPQ_ACCOUNT_PATH = path.join(SCRIPT_DIR, ".account.json");
@@ -120,8 +120,8 @@ async function loadPpqAccount(): Promise<PpqAccountFile> {
     /* fall through */
   }
   throw new Error(
-    "No ppq.ai account at tests/ai-services/.account.json. Run " +
-      "`npx tsx tests/ai-services/test-all-ppq-services-e2e.ts` once.",
+    "No ppq.ai account at test/manual/ai-services/.account.json. Run " +
+      "`npx tsx test/manual/ai-services/test-all-ppq-services-e2e.ts` once.",
   );
 }
 
@@ -135,14 +135,14 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 /* ---------- main ---------- */
 
 async function main(): Promise<void> {
-  // Swap to text-only prompt if --no-image and the user didn't override.
+  // If --no-image is set, swap the prompt for the text-only variant
+  // (unless the user passed an explicit --prompt override).
   const userOverrodePrompt = flagValue("prompt") !== undefined;
   const promptToUse =
     flags.noImage && !userOverrodePrompt ? TEXT_ONLY_PROMPT : flags.prompt;
 
   const mode = flags.noImage ? "TEXT-TO-VIDEO (no image_url)" : "IMAGE-TO-VIDEO";
-  console.log(`ppq.ai Seedance probe — ${mode}`);
-  console.log("(does Seedance produce lip-synced audio?)");
+  console.log(`ppq.ai probe — ${mode}`);
   console.log("");
   console.log(`  model:       ${flags.model}`);
   if (flags.noImage) {
@@ -152,7 +152,8 @@ async function main(): Promise<void> {
   }
   console.log(`  aspect:      ${flags.aspect}`);
   console.log(`  duration:    ${flags.duration}s`);
-  console.log(`  quality:     ${flags.quality}`);
+  const quality = flags.quality ?? defaultQualityFor(flags.model);
+  console.log(`  quality:     ${quality}`);
   console.log("");
   console.log("  prompt:");
   for (const line of promptToUse.split("\n")) console.log(`  | ${line}`);
@@ -160,6 +161,8 @@ async function main(): Promise<void> {
 
   const ppq = await loadPpqAccount();
 
+  // Pre-flight: just print balance, don't gate. This is a probe — the
+  // user has already paid and they want signal fast.
   try {
     const bal = await getBalance(ppq.credit_id);
     console.log(`  ppq balance: ${fmtMoney(bal.balance_usd)}`);
@@ -173,7 +176,7 @@ async function main(): Promise<void> {
     prompt: promptToUse,
     aspect_ratio: flags.aspect,
     duration: flags.duration,
-    quality: flags.quality,
+    quality,
     ...(flags.noImage ? {} : { image_url: flags.imageUrl }),
   });
   console.log(`  job id:        ${submitted.id}`);
@@ -201,19 +204,17 @@ async function main(): Promise<void> {
     }
     if (status.status === "completed") {
       const url = status.data?.url;
-      console.log(`\n\n  ✓ ${flags.model} accepted ${flags.noImage ? "t2v" : "i2v"}.`);
+      console.log(`\n\n  ✓ ${flags.model} accepted i2v with this CDN.`);
       console.log(`  ✓ video url:   ${url}`);
       if (status.cost !== undefined) {
         console.log(`  ✓ cost:        ${fmtMoney(status.cost)}`);
       }
       console.log("");
-      console.log("  Open the file. Three things to check:");
-      console.log("    1. Does it have audio at all? (the test signal)");
-      console.log("    2. If yes — does she say 'hello world'? (lip-sync)");
-      console.log("    3. Does the conditioning image's character carry?");
-      console.log("");
-      console.log("  If audio is present + lip-synced, Seedance is the answer");
-      console.log("  to the multi-clip continuity-with-audio problem on ppq.ai.");
+      console.log("  Check the file: does it have audio? If yes — the");
+      console.log("  earlier 502/404 wasn't about Veo's i2v capability,");
+      console.log("  it was about the upload host. If no — confirms Veo");
+      console.log("  on ppq.ai is silent on i2v even when it accepts the");
+      console.log("  request.");
       return;
     }
     if (status.status === "failed") {

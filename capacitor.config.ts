@@ -3,7 +3,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 /**
  * Zuka native wrapper config.
  *
- * Locked decisions (see tasks/derek-plan.md "Capacitor Android wrapper"):
+ * Locked decisions from the original Capacitor Android wrapper plan:
  *   - appId: live.zuka.app — reverse-DNS of zuka.live; permanent once
  *     published, do NOT change after first store submission.
  *   - appName: Zuka.

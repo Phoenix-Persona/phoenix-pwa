@@ -21,7 +21,7 @@
  * + setting continuity across the seam from a conditioning frame.
  * `-fast` over `seedance-2` for dev iteration speed and lower cost;
  * promote to `seedance-2` only for hero / final renders. See
- * `tests/ai-services/probe-seedance-i2v-with-speech.ts` for the
+ * `test/manual/ai-services/probe-seedance-i2v-with-speech.ts` for the
  * minimum-reproducible test that established this.
  *
  * Override via `model` on the request to use any other catalog id.

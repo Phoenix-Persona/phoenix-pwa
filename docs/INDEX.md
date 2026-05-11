@@ -18,6 +18,7 @@ these docs distill or extend it for engineers reading code.
 | [`THREAT-MODEL.md`](./THREAT-MODEL.md) | What Zuka protects, what it doesn't, where secrets live. Mirrors `PROJECT.md` §3. |
 | [`SCOPE.md`](./SCOPE.md) | V1 / V1.5 / V2 / out-of-scope checklist. Mirrors `PROJECT.md` §8. |
 | [`GLOSSARY.md`](./GLOSSARY.md) | Vocabulary: user keypair, persona keypair, PPQ, pi-mono, NIP-44/49/57/78, etc. |
+| [`NIP.md`](./NIP.md) | Custom Nostr event kinds and schemas defined by Zuka. |
 
 ## Third-party guides
 

@@ -24,12 +24,12 @@
  *   6. Prints the absolute output path so the user can play it.
  *
  * Run:
- *   tsx tests/video/mix-background-music.ts
+ *   tsx test/manual/video/mix-background-music.ts
  *
  * Tweak:
- *   tsx tests/video/mix-background-music.ts --music-vol 0.10 --voice-vol 1.0
- *   tsx tests/video/mix-background-music.ts --music-vol 0.20
- *   tsx tests/video/mix-background-music.ts \
+ *   tsx test/manual/video/mix-background-music.ts --music-vol 0.10 --voice-vol 1.0
+ *   tsx test/manual/video/mix-background-music.ts --music-vol 0.20
+ *   tsx test/manual/video/mix-background-music.ts \
  *     --video <url-or-path> --music <url-or-path>
  *
  * Defaults match the assets the user pasted while spec'ing this
@@ -131,14 +131,14 @@ function printHelp(): void {
   console.log(`mix-background-music.ts — soft music bed under a talking-head clip
 
 Usage:
-  tsx tests/video/mix-background-music.ts [flags]
+  tsx test/manual/video/mix-background-music.ts [flags]
 
 Flags:
   --video <url|path>     input video (default: the user's test mp4)
   --music <url|path>     input music (default: the user's lofi-beat-30s)
   --music-vol <0..2>     music volume multiplier (default 0.15)
   --voice-vol <0..2>     voice volume multiplier (default 1.0)
-  --output <path>        output mp4 (default tests/video/.out/mixed.mp4)
+  --output <path>        output mp4 (default test/manual/video/.out/mixed.mp4)
   --fresh                ignore the download cache, re-fetch
   --help, -h             this message
 `);

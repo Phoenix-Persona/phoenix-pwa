@@ -14,17 +14,17 @@
  *   5. Run a single `runAutoTopupOnce` pass against ppq.ai to validate the
  *      default-on auto-topup wiring end-to-end.
  *
- * After a successful run, `tests/wallet/test-auto-topup-and-inference.ts`
+ * After a successful run, `test/manual/wallet/test-auto-topup-and-inference.ts`
  * can pick up the persisted persona + wallet without minting fresh state.
  *
  * Run:
- *   npx tsx tests/wallet/bootstrap-spark-wallet-e2e.ts
+ *   npx tsx test/manual/wallet/bootstrap-spark-wallet-e2e.ts
  *
  * Loads `.env` automatically; just put your `VITE_BREEZ_API_KEY` there.
  *
  * Persisted state (gitignored, mode 0600):
- *   tests/wallet/.operator.json   — operator nsec used to (de)crypt the envelope
- *   tests/wallet/.persona.json    — encrypted PhoenixEnvelope (kind-30078 ciphertext)
+ *   test/manual/wallet/.operator.json   — operator nsec used to (de)crypt the envelope
+ *   test/manual/wallet/.persona.json    — encrypted PhoenixEnvelope (kind-30078 ciphertext)
  *
  * Flags:
  *   --reset                   Wipe persona + operator on startup
@@ -276,7 +276,7 @@ async function receiveStep(state: WalletState): Promise<void> {
 async function ensurePpqAccount(): Promise<PpqAccountFile> {
   const existing = await loadPpqAccount();
   if (existing) {
-    console.log("Reusing ppq.ai account from tests/ai-services/.account.json");
+    console.log("Reusing ppq.ai account from test/manual/ai-services/.account.json");
     return existing;
   }
   console.log("Creating fresh ppq.ai account…");

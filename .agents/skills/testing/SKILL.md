@@ -21,18 +21,18 @@ If none of the above apply, stop — don't create a test file. Keep running the 
 
 ## Test setup
 
-The project uses **Vitest + jsdom** with **React Testing Library** and **jest-dom** matchers. Global setup lives in `src/test/setup.ts` and mocks these browser APIs that jsdom doesn't provide:
+The project uses **Vitest + jsdom** with **React Testing Library** and **jest-dom** matchers. Global setup lives in `test/vitest/setup.ts` and mocks these browser APIs that jsdom doesn't provide:
 
 - `window.matchMedia`
 - `window.scrollTo`
 - `IntersectionObserver`
 - `ResizeObserver`
 
-If your component needs another browser API, extend `src/test/setup.ts` rather than mocking per-file.
+If your component needs another browser API, extend `test/vitest/setup.ts` rather than mocking per-file.
 
 ## Writing a component test
 
-Wrap rendered components in `TestApp` (`src/test/TestApp.tsx`) so all context providers — `UnheadProvider`, `AppProvider`, `QueryClientProvider`, `NostrLoginProvider`, `NostrProvider`, `BrowserRouter` — are available. Without it, hooks like `useQuery`, `useNostr`, `useAppContext`, or `useNavigate` will throw.
+Wrap rendered components in `TestApp` (`test/vitest/TestApp.tsx`, importable as `@/test/TestApp`) so all context providers — `UnheadProvider`, `AppProvider`, `QueryClientProvider`, `NostrLoginProvider`, `NostrProvider`, `BrowserRouter` — are available. Without it, hooks like `useQuery`, `useNostr`, `useAppContext`, or `useNavigate` will throw.
 
 ```tsx
 import { describe, it, expect } from 'vitest';
@@ -67,7 +67,7 @@ describe('useMyHook', () => {
 });
 ```
 
-Files placed next to the code under test with the `.test.ts` / `.test.tsx` suffix are picked up automatically. For reference, see `src/test/ErrorBoundary.test.tsx`.
+Files placed next to the code under test with the `.test.ts` / `.test.tsx` suffix are picked up automatically. For reference, see `test/vitest/ErrorBoundary.test.tsx`.
 
 ## Running tests
 

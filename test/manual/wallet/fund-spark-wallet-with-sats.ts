@@ -7,9 +7,9 @@
  * wallet balance until the invoice settles or you Ctrl+C.
  *
  * Run:
- *   npx tsx tests/wallet/fund-spark-wallet-with-sats.ts            # prompts for amount
- *   npx tsx tests/wallet/fund-spark-wallet-with-sats.ts --amount-sats 10000
- *   npx tsx tests/wallet/fund-spark-wallet-with-sats.ts --amount-sats 10000 --memo "demo top-up"
+ *   npx tsx test/manual/wallet/fund-spark-wallet-with-sats.ts            # prompts for amount
+ *   npx tsx test/manual/wallet/fund-spark-wallet-with-sats.ts --amount-sats 10000
+ *   npx tsx test/manual/wallet/fund-spark-wallet-with-sats.ts --amount-sats 10000 --memo "demo top-up"
  *
  * Loads `.env` automatically.
  *
@@ -76,7 +76,7 @@ async function main(): Promise<void> {
     const operator = await loadOperator();
     if (!operator) {
       throw new Error(
-        "No operator key found. Run `npx tsx tests/wallet/bootstrap-spark-wallet-e2e.ts` first.",
+        "No operator key found. Run `npx tsx test/manual/wallet/bootstrap-spark-wallet-e2e.ts` first.",
       );
     }
     const envelope = await loadPersonaOrFail(operator);

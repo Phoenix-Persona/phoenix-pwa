@@ -47,7 +47,7 @@ npm run cap:build:android:release # signed release APK to android/app/build/outp
 
 - [`PROJECT.md`](./dev/PROJECT.md) — master plan (authoritative; read first)
 - [`AGENTS.md`](./AGENTS.md) — guidance for building on this codebase (Nostr conventions, security model, file patterns)
-- [`NIP.md`](./NIP.md) — custom Nostr event kinds defined by Zuka
+- [`NIP.md`](./docs/NIP.md) — custom Nostr event kinds defined by Zuka
 
 ## Team
 

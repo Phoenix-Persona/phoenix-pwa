@@ -1,8 +1,8 @@
 /**
  * Parallel runner for the two monologue test scripts:
  *
- *   1. tests/ai-services/test-i2v-chain-rwandan-english-paced.ts
- *   2. tests/ai-services/test-i2v-clip-rwandan-kinyarwanda.ts
+ *   1. test/manual/ai-services/test-i2v-chain-rwandan-english-paced.ts
+ *   2. test/manual/ai-services/test-i2v-clip-rwandan-kinyarwanda.ts
  *
  * Spawns both as child processes with `--yes` (so neither one prompts
  * for confirmation), tees their stdout/stderr to per-script log files
@@ -19,14 +19,14 @@
  * tail them separately or audit after the fact.
  *
  * Run:
- *   npx tsx tests/ai-services/run-monologue-tests-parallel.ts
- *   npx tsx tests/ai-services/run-monologue-tests-parallel.ts --only english
- *   npx tsx tests/ai-services/run-monologue-tests-parallel.ts --only kinyarwanda
+ *   npx tsx test/manual/ai-services/run-monologue-tests-parallel.ts
+ *   npx tsx test/manual/ai-services/run-monologue-tests-parallel.ts --only english
+ *   npx tsx test/manual/ai-services/run-monologue-tests-parallel.ts --only kinyarwanda
  *
  * Flags:
  *   --only <name>     Run just one of: "english" | "kinyarwanda".
  *   --log-dir <path>  Override log directory (default
- *                     tests/ai-services/.monologue-runs/<timestamp>).
+ *                     test/manual/ai-services/.monologue-runs/<timestamp>).
  */
 
 import "../_shared/loadEnv";

@@ -72,7 +72,7 @@ Set to `''` to ship with stats disabled.
 
 ### 5. Update `TestApp.tsx`
 
-In `src/test/TestApp.tsx`, add the field to the test default config. Use an empty string so tests don't hit a live provider:
+In `test/vitest/TestApp.tsx`, add the field to the test default config. Use an empty string so tests don't hit a live provider:
 
 ```typescript
 const defaultConfig: AppConfig = {

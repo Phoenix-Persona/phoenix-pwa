@@ -20,7 +20,7 @@
  *      the credit landed; otherwise it short-circuits to `null`.
  *
  * Run:
- *   npx tsx tests/wallet/test-auto-topup-and-inference.ts
+ *   npx tsx test/manual/wallet/test-auto-topup-and-inference.ts
  *
  * Loads `.env` automatically.
  *
@@ -100,7 +100,7 @@ async function preconditions(): Promise<{
   const operator = await loadOperator();
   if (!operator) {
     throw new Error(
-      "No operator key found. Run `npx tsx tests/wallet/bootstrap-spark-wallet-e2e.ts` first.",
+      "No operator key found. Run `npx tsx test/manual/wallet/bootstrap-spark-wallet-e2e.ts` first.",
     );
   }
   const envelope = await loadPersonaOrFail(operator);
@@ -113,7 +113,7 @@ async function preconditions(): Promise<{
   const ppq = await loadPpqAccount();
   if (!ppq) {
     throw new Error(
-      "No ppq.ai account found. Run bootstrap-spark-wallet-e2e and answer 'y' to the auto-topup step (or run tests/ai-services/test-all-ppq-services-e2e.ts).",
+      "No ppq.ai account found. Run bootstrap-spark-wallet-e2e and answer 'y' to the auto-topup step (or run test/manual/ai-services/test-all-ppq-services-e2e.ts).",
     );
   }
   console.log("Connecting Spark wallet…");

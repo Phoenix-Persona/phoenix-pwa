@@ -5,7 +5,7 @@
  * has produced the bare concat output. Splitting concat from music
  * mixing keeps each pass simple, lets the chain checkpoint between
  * them, and matches the shape of the test script at
- * `tests/video/mix-background-music.ts`.
+ * `test/manual/video/mix-background-music.ts`.
  *
  * Filtergraph (proven in the test script):
  *

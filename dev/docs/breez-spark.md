@@ -89,7 +89,7 @@ NWC. Zuka wires this once at persona creation by handing PPQ an
 NWC URL exposed by the Spark wallet — PPQ then pulls credit
 on-demand whenever the balance dips below a configured threshold. The
 end-to-end flow is exercised in
-`tests/wallet/test-auto-topup-and-inference.ts` on the
+`test/manual/wallet/test-auto-topup-and-inference.ts` on the
 `jc/add-spark-wallet` branch.
 
 ## Zuka integration points (per `jc/add-spark-wallet`)

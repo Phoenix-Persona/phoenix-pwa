@@ -14,7 +14,7 @@
  *   - "phoenix" / "client" tag  (would fingerprint the app)
  *   - persona name in alt tag   (would identify the persona)
  *
- * See tasks/derek-plan.md "Locked decisions" §2 (kind 1 posts).
+ * See `dev/PROJECT.md` for the operator/persona privacy model.
  */
 
 export interface PersonaPostInput {

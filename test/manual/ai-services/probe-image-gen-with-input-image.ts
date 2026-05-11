@@ -20,7 +20,7 @@
  * can cost ~$1-2 worst case.
  *
  * Run:
- *   npx tsx tests/ai-services/probe-image-gen-with-input-image.ts
+ *   npx tsx test/manual/ai-services/probe-image-gen-with-input-image.ts
  *
  * Flags:
  *   --model <id>          Test exactly ONE model (skips the cascade).
@@ -104,7 +104,7 @@ async function loadPpqAccount(): Promise<PpqAccountFile> {
   }
   throw new Error(
     "No ppq.ai credentials found. Set VITE_PPQ_API_KEY in .env or " +
-      "run tests/ai-services/test-all-ppq-services-e2e.ts once.",
+      "run test/manual/ai-services/test-all-ppq-services-e2e.ts once.",
   );
 }
 

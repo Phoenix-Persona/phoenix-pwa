@@ -13,7 +13,7 @@ const REPO_ROOT = path.resolve(__dirname);
 /**
  * Merge `VITE_`-prefixed keys from BOTH `<root>/.env` and
  * `<root>/dev/.env`, root-wins. Mirrors the Node test loader at
- * `tests/_shared/loadEnv.ts`, so a `VITE_PPQ_API_KEY` in the project
+ * `test/manual/_shared/loadEnv.ts`, so a `VITE_PPQ_API_KEY` in the project
  * root works for the browser bundle and the integration tests alike.
  *
  * Returned map gets injected via Vite's `define` as a global
@@ -162,7 +162,7 @@ export default defineConfig(({ mode }) => ({
   test: {
     globals: true,
     environment: "jsdom",
-    setupFiles: "./src/test/setup.ts",
+    setupFiles: "./test/vitest/setup.ts",
     exclude: [
       "**/node_modules/**",
       "**/dist/**",
@@ -178,6 +178,7 @@ export default defineConfig(({ mode }) => ({
   },
   resolve: {
     alias: {
+      "@/test": path.resolve(__dirname, "./test/vitest"),
       "@": path.resolve(__dirname, "./src"),
     },
   },

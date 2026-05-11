@@ -4,7 +4,7 @@
  * The SDK ships as a WebAssembly module that must be loaded with
  * `await initBreezSDK()` exactly once before any other SDK call. We expose
  * an idempotent helper so callers (the React app at boot, the integration
- * tests in `tests/wallet/`) can call it without bookkeeping.
+ * tests in `test/manual/wallet/`) can call it without bookkeeping.
  *
  * In Node (≥22) the same package supports `await import("@breeztech/breez-sdk-spark")`
  * and the default export is a no-op there — this helper handles that case

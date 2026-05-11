@@ -7,7 +7,7 @@
  * The transformation arrow between them carries the technical caption.
  *
  * Visual reflects the V1.5 product pivot: video is the primary content
- * format. See `tasks/derek-plan.md` "Cross-post + video composer".
+ * format. See the cross-post + video composer planning notes in `dev/plans/`.
  */
 
 import { ArrowRight, ArrowDown, FileText, Play } from "lucide-react";

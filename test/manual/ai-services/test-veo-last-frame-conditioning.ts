@@ -33,14 +33,14 @@
  * No stitching. The two clips are produced and printed independently.
  *
  * Run:
- *   npx tsx tests/ai-services/test-veo-last-frame-conditioning.ts
+ *   npx tsx test/manual/ai-services/test-veo-last-frame-conditioning.ts
  *
  * Loads `.env` automatically.
  *
  * Prereqs:
  *   - ffmpeg on your $PATH (the script extracts the last frame of clip 1
  *     so it can be passed as `image_url` to clip 2's i2v generation).
- *   - A ppq.ai account at tests/ai-services/.account.json (run
+ *   - A ppq.ai account at test/manual/ai-services/.account.json (run
  *     bootstrap-spark-wallet-e2e.ts or test-all-ppq-services-e2e.ts once
  *     to mint one).
  *
@@ -296,8 +296,8 @@ async function loadPpqAccount(): Promise<PpqAccountFile> {
     /* fall through */
   }
   throw new Error(
-    "No ppq.ai account found at tests/ai-services/.account.json. " +
-      "Run `npx tsx tests/ai-services/test-all-ppq-services-e2e.ts` once to mint one.",
+    "No ppq.ai account found at test/manual/ai-services/.account.json. " +
+      "Run `npx tsx test/manual/ai-services/test-all-ppq-services-e2e.ts` once to mint one.",
   );
 }
 
@@ -656,12 +656,12 @@ async function main(): Promise<void> {
           `need at least $${PREFLIGHT_USD_REQUIRED.toFixed(2)}.\n\n` +
           `Top up at least $${need} more. Recommended path (pay from any ` +
           `Lightning wallet, no Spark dependency):\n\n` +
-          `  npx tsx tests/ai-services/top-up-ppq-with-lightning.ts --usd ${Math.ceil(parseFloat(need))}\n\n` +
+          `  npx tsx test/manual/ai-services/top-up-ppq-with-lightning.ts --usd ${Math.ceil(parseFloat(need))}\n\n` +
           `Other options:\n` +
           `  • Already have sats in your Spark wallet?\n` +
-          `      npx tsx tests/wallet/test-auto-topup-and-inference.ts  (pushes Spark → ppq)\n` +
+          `      npx tsx test/manual/wallet/test-auto-topup-and-inference.ts  (pushes Spark → ppq)\n` +
           `  • Spark wallet empty? Fund it first:\n` +
-          `      npx tsx tests/wallet/fund-spark-wallet-with-sats.ts --amount-sats 10000`,
+          `      npx tsx test/manual/wallet/fund-spark-wallet-with-sats.ts --amount-sats 10000`,
       );
     }
   }
@@ -792,7 +792,7 @@ async function main(): Promise<void> {
       `${singletonModel} failed on i2v: ${msg}\n\n` +
         `Clip 1 (already paid for) is at: ${clip1.url}\n\n` +
         `Next-best singleton to try:\n` +
-        `  npx tsx tests/ai-services/test-veo-last-frame-conditioning.ts --model ${nextBest}`,
+        `  npx tsx test/manual/ai-services/test-veo-last-frame-conditioning.ts --model ${nextBest}`,
       { cause: err },
     );
   }

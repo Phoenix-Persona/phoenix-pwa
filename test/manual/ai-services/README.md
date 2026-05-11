@@ -56,7 +56,7 @@ spend on this run.
 ## Run it
 
 ```bash
-npx tsx tests/ai-services/test-all-ppq-services-e2e.ts
+npx tsx test/manual/ai-services/test-all-ppq-services-e2e.ts
 ```
 
 Useful flags:
@@ -69,7 +69,7 @@ Useful flags:
 
 ## Persisted credentials
 
-The api_key + credit_id are written to `tests/ai-services/.account.json`
+The api_key + credit_id are written to `test/manual/ai-services/.account.json`
 with mode `0600`. **That file is gitignored.** If you reuse the same
 account file across runs, your topups and balance carry over.
 
@@ -85,7 +85,7 @@ after image/video so you can audit spend.
 ## Last-frame conditioning continuity test
 
 ```bash
-npx tsx tests/ai-services/test-veo-last-frame-conditioning.ts
+npx tsx test/manual/ai-services/test-veo-last-frame-conditioning.ts
 ```
 
 Tests whether Veo 3.1 Fast preserves continuity across two clips when:
@@ -105,7 +105,7 @@ between clips: hair, lighting, posture, wardrobe should be identical.
 If the world drifts, more details need to migrate into the world block.
 
 State (clip MP4s, extracted frame, uploaded URL, job ids) caches under
-`tests/ai-services/.veo-last-frame/` so you can iterate on clip 2
+`test/manual/ai-services/.veo-last-frame/` so you can iterate on clip 2
 without paying for clip 1 twice. `--reset` wipes it.
 
 Useful flags:

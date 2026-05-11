@@ -200,13 +200,18 @@ shadcn CLI when upstream changes. App-specific UI lives one level up.
 | ----------------- | --------------------------------------------------------- |
 | `AppContext.ts`   | `AppConfig` shape + context. `RelayMetadata`, `BlossomServerMetadata`. |
 
-## `src/test/`
+## `test/vitest/`
 
 | File                    | What it does                                              |
 | ----------------------- | --------------------------------------------------------- |
 | `setup.ts`              | Vitest setup (jest-dom, jsdom).                           |
 | `TestApp.tsx`           | Wrapped provider tree for render tests.                   |
 | `ErrorBoundary.test.tsx`| Smoke test.                                               |
+
+## `test/manual/`
+
+Manual and E2E Node scripts for wallet, PPQ, and media workflows. These are
+run explicitly with `tsx`; they are not part of the Vitest suite.
 
 Production tests are colocated next to source: `App.test.tsx`,
 `lib/genUserName.test.ts`, `lib/persona.test.ts`. New tests should follow

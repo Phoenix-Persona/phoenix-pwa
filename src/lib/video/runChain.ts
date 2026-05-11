@@ -2,7 +2,7 @@
  * Browser-side i2v chain orchestrator.
  *
  * Mirrors the proven CLI pipeline at
- * `tests/ai-services/test-i2v-chain-rwandan-english-paced.ts`, but with:
+ * `test/manual/ai-services/test-i2v-chain-rwandan-english-paced.ts`, but with:
  *   - canvas-based last-frame extraction (no ffmpeg)
  *   - Blossom upload via the user's signer (no public file hosts)
  *   - injectable hooks for upload + frame-grab so the pure pipeline

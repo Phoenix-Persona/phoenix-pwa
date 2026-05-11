@@ -14,8 +14,8 @@
  * scaling to multi-clip Kinyarwanda monologues.
  *
  * Run:
- *   npx tsx tests/ai-services/test-i2v-clip-rwandan-kinyarwanda.ts
- *   npx tsx tests/ai-services/test-i2v-clip-rwandan-kinyarwanda.ts --yes
+ *   npx tsx test/manual/ai-services/test-i2v-clip-rwandan-kinyarwanda.ts
+ *   npx tsx test/manual/ai-services/test-i2v-clip-rwandan-kinyarwanda.ts --yes
  *
  * Cost: ~$1 at 10s on seedance-2-fast. Pre-flight gate at $2.
  *
@@ -153,7 +153,7 @@ async function main(): Promise<void> {
         const need = (PREFLIGHT_USD_REQUIRED - balanceUsd).toFixed(2);
         throw new Error(
           `Insufficient ppq.ai credit. Top up at least $${need} more:\n\n` +
-            `  npx tsx tests/ai-services/top-up-ppq-with-lightning.ts --usd ${Math.ceil(parseFloat(need))}`,
+            `  npx tsx test/manual/ai-services/top-up-ppq-with-lightning.ts --usd ${Math.ceil(parseFloat(need))}`,
         );
       }
     } else {

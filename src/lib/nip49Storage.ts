@@ -6,7 +6,7 @@
  * (NIP-07/NIP-46/paste) skip this entirely — their key custody is
  * whatever signer they brought.
  *
- * Locked decisions (tasks/derek-plan.md "Locked decisions" §1):
+ * Locked decisions:
  *   - scrypt log_n = 18 (≈400ms on desktop; balanced mobile vs security)
  *   - per-user (not per-persona) — persona nsecs already encrypted-at-rest
  *     inside the kind 30078 backup

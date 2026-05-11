@@ -14,8 +14,8 @@
  *     (e.g. Spark wallet is also lean).
  *
  * Run:
- *   npx tsx tests/ai-services/top-up-ppq-with-lightning.ts            # prompts for amount
- *   npx tsx tests/ai-services/top-up-ppq-with-lightning.ts --usd 5
+ *   npx tsx test/manual/ai-services/top-up-ppq-with-lightning.ts            # prompts for amount
+ *   npx tsx test/manual/ai-services/top-up-ppq-with-lightning.ts --usd 5
  *
  * Loads `dev/.env` automatically.
  *
@@ -97,8 +97,8 @@ async function loadPpqAccount(): Promise<PpqAccountFile> {
     /* fall through */
   }
   throw new Error(
-    "No ppq.ai account found at tests/ai-services/.account.json. " +
-      "Run `npx tsx tests/ai-services/test-all-ppq-services-e2e.ts` once to mint one.",
+    "No ppq.ai account found at test/manual/ai-services/.account.json. " +
+      "Run `npx tsx test/manual/ai-services/test-all-ppq-services-e2e.ts` once to mint one.",
   );
 }
 

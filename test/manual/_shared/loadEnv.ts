@@ -14,7 +14,7 @@
  * dotenv's default behavior is "first load wins" (no override), so a
  * key set in root `.env` is preserved when `dev/.env` is loaded after.
  *
- * `tsx tests/<dir>/<script>.ts` runs in plain Node where Vite isn't in
+ * `tsx test/manual/<dir>/<script>.ts` runs in plain Node where Vite isn't in
  * the loop, so this module is what bridges env-vs-`import.meta.env` for
  * the tests. Importing it at the top of a test script makes
  * `process.env` carry the same keys the browser bundle sees, so
