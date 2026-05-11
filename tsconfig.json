@@ -26,5 +26,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "test/vitest", "spikes"]
+  "include": ["src", "test/vitest", "test/integration", "spikes"]
 }

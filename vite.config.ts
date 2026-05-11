@@ -103,7 +103,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     wasm(),
-    nodePolyfills(),
+    ...(mode === "test" ? [] : [nodePolyfills()]),
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",

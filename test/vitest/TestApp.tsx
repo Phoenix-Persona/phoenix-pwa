@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createHead, UnheadProvider } from '@unhead/react/client';
-import { BrowserRouter } from 'react-router-dom';
-import { NostrLoginProvider } from '@nostrify/react/login';
+import { BrowserRouter, MemoryRouter } from 'react-router-dom';
+import { NostrLoginProvider, type NLoginStorage, type NLoginType } from '@nostrify/react/login';
 import { useMemo } from 'react';
 import NostrProvider from '@/components/NostrProvider';
 import { AppProvider } from '@/components/AppProvider';
@@ -10,46 +10,79 @@ import { createMemoryNostrLoginStorage } from '@/lib/nostrLoginStorage';
 
 interface TestAppProps {
   children: React.ReactNode;
+  initialRoute?: string;
+  relayUrls?: string[];
+  blossomServers?: string[];
+  defaultConfig?: AppConfig;
+  initialLogins?: NLoginType[];
+  loginStorage?: NLoginStorage;
+  loginStorageKey?: string;
+  appStorageKey?: string;
+  queryClient?: QueryClient;
 }
 
-export function TestApp({ children }: TestAppProps) {
-  const head = createHead();
-  const loginStorage = useMemo(() => createMemoryNostrLoginStorage(), []);
+export function TestApp({
+  children,
+  initialRoute,
+  relayUrls,
+  blossomServers,
+  defaultConfig,
+  initialLogins,
+  loginStorage,
+  loginStorageKey = 'test-login',
+  appStorageKey = 'test-app-config',
+  queryClient: providedQueryClient,
+}: TestAppProps) {
+  const head = useMemo(() => createHead(), []);
+  const resolvedLoginStorage = useMemo(() => {
+    const storage = loginStorage ?? createMemoryNostrLoginStorage();
+    if (initialLogins) {
+      storage.setItem(loginStorageKey, JSON.stringify(initialLogins));
+    }
+    return storage;
+  }, [initialLogins, loginStorage, loginStorageKey]);
 
-  const queryClient = new QueryClient({
+  const queryClient = useMemo(() => providedQueryClient ?? new QueryClient({
     defaultOptions: {
       queries: { retry: false },
       mutations: { retry: false },
     },
-  });
+  }), [providedQueryClient]);
 
-  const defaultConfig: AppConfig = {
+  const resolvedConfig: AppConfig = defaultConfig ?? {
     theme: 'light',
     relayMetadata: {
-      relays: [
-        { url: 'wss://relay.primal.net', read: true, write: true },
-      ],
+      relays: (relayUrls ?? ['wss://relay.primal.net'])
+        .map((url) => ({ url, read: true, write: true })),
       updatedAt: 0,
     },
     blossomServerMetadata: {
-      servers: ['https://blossom.primal.net/'],
+      servers: blossomServers ?? ['https://blossom.primal.net/'],
       updatedAt: 0,
     },
     useAppBlossomServers: true,
   };
 
+  const routedChildren = initialRoute ? (
+    <MemoryRouter initialEntries={[initialRoute]}>
+      {children}
+    </MemoryRouter>
+  ) : (
+    <BrowserRouter>
+      {children}
+    </BrowserRouter>
+  );
+
   return (
     <UnheadProvider head={head}>
-      <AppProvider storageKey='test-app-config' defaultConfig={defaultConfig}>
+      <AppProvider storageKey={appStorageKey} defaultConfig={resolvedConfig}>
         <QueryClientProvider client={queryClient}>
           <NostrLoginProvider
-            storageKey='test-login'
-            storage={loginStorage}
+            storageKey={loginStorageKey}
+            storage={resolvedLoginStorage}
           >
             <NostrProvider>
-              <BrowserRouter>
-                {children}
-              </BrowserRouter>
+              {routedChildren}
             </NostrProvider>
           </NostrLoginProvider>
         </QueryClientProvider>
