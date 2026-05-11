@@ -3,10 +3,10 @@
  *
  * Resolution priority (PROJECT.md §6 / `dev/.env.example`):
  *
- *   1. **Env override**: `VITE_PPQ_API_KEY` (+ optional
- *      `VITE_PPQ_CREDIT_ID`). Pins a known account; skips lookup and
- *      mint flows. Useful for dev so a fresh browser doesn't burn a
- *      brand-new PPQ account each time.
+ *   1. **Dev env override**: `VITE_PPQ_API_KEY` (+ optional
+ *      `VITE_PPQ_CREDIT_ID`). Pins a known account outside production;
+ *      production app flows ignore these values to avoid cross-operator
+ *      credential sharing.
  *   2. **Operator envelope** (`useOperatorEnvelope`): the encrypted
  *      kind-30078 backup carrying the operator's persistent PPQ
  *      credentials. Source of truth for production.
@@ -29,7 +29,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { readEnv } from "@/lib/env";
+import { readDevEnv } from "@/lib/env";
 import { createAccount, getBalance } from "@/lib/ppq/client";
 import type { PpqAccount } from "@/lib/ppq/types";
 import { queryKeys } from "@/lib/queryKeys";
@@ -38,16 +38,14 @@ import { useCurrentUser } from "./useCurrentUser";
 import { useOperatorEnvelope } from "./useOperatorEnvelope";
 
 /**
- * "Free credits" / pinned-account path: when `VITE_PPQ_API_KEY` is set
- * (in `.env` or `dev/.env`), surface that key as a virtual account and
- * skip the auto-create + envelope-write flows. Optional
- * `VITE_PPQ_CREDIT_ID` enables balance queries; when omitted, balance
- * lookup is skipped and inference still works.
+ * Dev-only "free credits" / pinned-account path. Production operator
+ * flows ignore these env pins so AI credentials cannot be shared across
+ * accounts by deployment configuration.
  */
 function envAccount(): PpqAccount | null {
-  const apiKey = readEnv("VITE_PPQ_API_KEY");
+  const apiKey = readDevEnv("VITE_PPQ_API_KEY");
   if (!apiKey) return null;
-  const creditId = readEnv("VITE_PPQ_CREDIT_ID") ?? "";
+  const creditId = readDevEnv("VITE_PPQ_CREDIT_ID") ?? "";
   return { api_key: apiKey, credit_id: creditId };
 }
 

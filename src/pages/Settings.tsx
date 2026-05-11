@@ -13,6 +13,7 @@
 
 import { useNavigate } from "react-router-dom";
 import { useSeoMeta } from "@unhead/react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Lock,
   LogOut,
@@ -44,16 +45,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLoggedInAccounts } from "@/hooks/useLoggedInAccounts";
-import { clearPersonaDecryptCache } from "@/hooks/usePersona";
 import { impactHeavy, notificationWarning } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
+import { hasUserNcryptsec } from "@/lib/nip49Storage";
 import {
-  clearSessionUnlocked,
-  clearPersistedNostrLogin,
-  clearUserNcryptsec,
-  hasUserNcryptsec,
-} from "@/lib/nip49Storage";
-import { clearAllVideoChains } from "@/lib/video/chainStore";
+  clearOperatorDeviceSecrets,
+  clearOperatorSessionState,
+} from "@/lib/operatorSessionState";
 
 const Settings = () => {
   useSeoMeta({ title: "Settings — Zuka" });
@@ -62,6 +60,7 @@ const Settings = () => {
   const { logins, removeLogin } = useNostrLogin();
   const { currentUser } = useLoggedInAccounts();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const userNpub = user ? nip19.npubEncode(user.pubkey) : "";
   const phoenixManaged = hasUserNcryptsec();
@@ -86,8 +85,7 @@ const Settings = () => {
     // the page underneath.
     const current = logins[0];
     if (current) removeLogin(current.id);
-    clearSessionUnlocked();
-    clearPersistedNostrLogin();
+    void clearOperatorSessionState(queryClient, user?.pubkey);
     toast({
       title: "Locked",
       description: "Enter your passphrase to unlock.",
@@ -111,11 +109,7 @@ const Settings = () => {
     // We bypass Nostrify's removeLogin and clear nostr:login directly
     // because removeLogin's localStorage flush is async via a useEffect,
     // which races the page reload.
-    clearUserNcryptsec();
-    clearSessionUnlocked();
-    clearPersistedNostrLogin();
-    clearPersonaDecryptCache();
-    await clearAllVideoChains();
+    await clearOperatorDeviceSecrets(queryClient, user?.pubkey);
     window.location.assign("/");
   }
 

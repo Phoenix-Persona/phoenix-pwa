@@ -3,9 +3,9 @@
  *
  * When the operator logs in and:
  *   - has no operator wallet seed on record yet, AND
- *   - hasn't pinned both `VITE_WALLET_SEED` + `VITE_PPQ_API_KEY` via
- *     env (in which case env override is sufficient and minting would
- *     just be noise),
+ *   - hasn't pinned both dev-only `VITE_WALLET_SEED` + `VITE_PPQ_API_KEY`
+ *     env values (in which case env override is sufficient and minting
+ *     would just be noise),
  *
  * this component fires `useOperatorEnvelope().mint()` once. The
  * resulting envelope carries a fresh BIP-39 wallet seed (no PPQ
@@ -31,11 +31,11 @@ import { useEffect, useRef } from "react";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useOperatorEnvelope } from "@/hooks/useOperatorEnvelope";
-import { readEnv } from "@/lib/env";
+import { readDevEnv } from "@/lib/env";
 
 function envOverrideComplete(): boolean {
   return Boolean(
-    readEnv("VITE_WALLET_SEED") && readEnv("VITE_PPQ_API_KEY"),
+    readDevEnv("VITE_WALLET_SEED") && readDevEnv("VITE_PPQ_API_KEY"),
   );
 }
 

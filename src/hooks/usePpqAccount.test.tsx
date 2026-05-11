@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => {
     createAccount: vi.fn(),
     getBalance: vi.fn(),
     readEnv: vi.fn(),
+    readDevEnv: vi.fn(),
     operator,
     currentUser: {
       user: { pubkey: "operator-pubkey" } as { pubkey: string } | undefined,
@@ -33,6 +34,7 @@ vi.mock("@/lib/ppq/client", () => ({
 
 vi.mock("@/lib/env", () => ({
   readEnv: mocks.readEnv,
+  readDevEnv: mocks.readDevEnv,
 }));
 
 vi.mock("./useOperatorEnvelope", () => ({
@@ -62,6 +64,7 @@ describe("usePpqAccount", () => {
     mocks.createAccount.mockReset();
     mocks.getBalance.mockReset().mockResolvedValue({ balance_usd: 0, raw: {} });
     mocks.readEnv.mockReset().mockReturnValue(undefined);
+    mocks.readDevEnv.mockReset().mockReturnValue(undefined);
   });
 
   it("returns a freshly created account immediately after ensureAccount resolves", async () => {
@@ -161,5 +164,27 @@ describe("usePpqAccount", () => {
 
     expect(mocks.operator.ensureWithPpq).toHaveBeenCalledWith(fresh);
     await waitFor(() => expect(result.current.account).toEqual(fresh));
+  });
+
+  it("uses only dev-scoped env credentials and otherwise mints per operator", async () => {
+    const fresh = { api_key: "api-new", credit_id: "credit-new" };
+    mocks.readEnv.mockImplementation((key: string) => {
+      if (key === "VITE_PPQ_API_KEY") return "shared-prod-key";
+      if (key === "VITE_PPQ_CREDIT_ID") return "shared-prod-credit";
+      return undefined;
+    });
+    mocks.readDevEnv.mockReturnValue(undefined);
+    mocks.createAccount.mockResolvedValue(fresh);
+
+    const { result } = renderHook(() => usePpqAccount(), { wrapper });
+
+    await waitFor(() => expect(result.current.account).toBeNull());
+
+    await act(async () => {
+      await expect(result.current.ensureAccount()).resolves.toEqual(fresh);
+    });
+
+    expect(mocks.operator.ensureWithPpq).toHaveBeenCalledWith(fresh);
+    expect(mocks.createAccount).toHaveBeenCalledOnce();
   });
 });

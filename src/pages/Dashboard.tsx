@@ -83,9 +83,8 @@ const Dashboard = () => {
   const envelope = persona.data?.envelope ?? null;
   const personaConfig = envelope?.persona ?? null;
   // Persona wallets are NOT subject to env override — donations go to
-  // each persona's own wallet, always. The operator's `VITE_WALLET_SEED`
-  // pin only applies to the header (operator) wallet badge. PPQ env
-  // overrides still apply globally for inference (PROJECT.md §6).
+  // each persona's own wallet, always. Dev-only operator wallet / PPQ
+  // pins are handled by the operator hooks, never the persona wallet.
   const walletSeed = envelope?.wallet?.seed;
   const walletAutoTopup = useMemo(
     () => autoTopupConfigFromPersisted(envelope?.wallet?.auto_topup),

@@ -24,6 +24,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Lock } from "lucide-react";
 import { nip19 } from "nostr-tools";
 import { useNostrLogin } from "@nostrify/react/login";
@@ -34,16 +35,13 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLoginActions } from "@/hooks/useLoginActions";
 import {
-  clearSessionUnlocked,
   clearPersistedNostrLogin,
-  clearUserNcryptsec,
   decryptNcryptsec,
   hasUserNcryptsec,
   loadUserNcryptsec,
   markSessionUnlocked,
 } from "@/lib/nip49Storage";
-import { clearPersonaDecryptCache } from "@/hooks/usePersona";
-import { clearAllVideoChains } from "@/lib/video/chainStore";
+import { clearOperatorDeviceSecrets } from "@/lib/operatorSessionState";
 
 interface UnlockGateProps {
   children: React.ReactNode;
@@ -52,6 +50,7 @@ interface UnlockGateProps {
 export function UnlockGate({ children }: UnlockGateProps) {
   const { logins } = useNostrLogin();
   const login = useLoginActions();
+  const queryClient = useQueryClient();
 
   // Reactive — recomputed every render from current logins state.
   // When Settings → Lock now removes the login, this flips true on
@@ -125,11 +124,7 @@ export function UnlockGate({ children }: UnlockGateProps) {
     // localStorage we deliberately keep: AppContext config (theme,
     // relay list, blossom servers), the install-banner dismissal —
     // those are app preferences, not personal data.
-    clearUserNcryptsec();
-    clearSessionUnlocked();
-    clearPersistedNostrLogin();
-    clearPersonaDecryptCache();
-    await clearAllVideoChains();
+    await clearOperatorDeviceSecrets(queryClient);
     window.location.assign("/");
   }
 

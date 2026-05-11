@@ -54,3 +54,30 @@ export function readEnv(name: string): string | undefined {
   }
   return undefined;
 }
+
+export function isProductionRuntime(): boolean {
+  const configuredRuntime = readEnv("VITE_ZUKA_RUNTIME")?.toLowerCase();
+  if (configuredRuntime === "production") return true;
+  if (configuredRuntime === "development" || configuredRuntime === "test") {
+    return false;
+  }
+
+  try {
+    const viteEnv = (import.meta as ImportMeta).env as
+      | {
+          PROD?: boolean;
+          MODE?: string;
+        }
+      | undefined;
+    if (viteEnv?.PROD === true) return true;
+    if (viteEnv?.MODE === "production") return true;
+  } catch {
+    /* not in a Vite bundle — fall through */
+  }
+
+  return process.env.NODE_ENV === "production";
+}
+
+export function readDevEnv(name: string): string | undefined {
+  return isProductionRuntime() ? undefined : readEnv(name);
+}

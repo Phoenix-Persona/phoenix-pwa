@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   useCurrentUser: vi.fn(),
   useOperatorEnvelope: vi.fn(),
   readEnv: vi.fn(),
+  readDevEnv: vi.fn(),
 }));
 
 vi.mock("@/hooks/useCurrentUser", () => ({
@@ -28,6 +29,7 @@ vi.mock("@/hooks/useOperatorEnvelope", () => ({
 
 vi.mock("@/lib/env", () => ({
   readEnv: mocks.readEnv,
+  readDevEnv: mocks.readDevEnv,
 }));
 
 interface FakeEnvelopeState {
@@ -55,6 +57,7 @@ function setupEnvelope(overrides: Partial<FakeEnvelopeState> = {}): FakeEnvelope
 describe("OperatorWalletInit", () => {
   beforeEach(() => {
     mocks.readEnv.mockReturnValue(undefined);
+    mocks.readDevEnv.mockReturnValue(undefined);
     mocks.useCurrentUser.mockReturnValue({
       user: { pubkey: "operator-pubkey" },
     });
@@ -134,7 +137,7 @@ describe("OperatorWalletInit", () => {
   });
 
   it("does not mint when the env override is complete", async () => {
-    mocks.readEnv.mockImplementation((key: string) => {
+    mocks.readDevEnv.mockImplementation((key: string) => {
       if (key === "VITE_WALLET_SEED") return "env seed";
       if (key === "VITE_PPQ_API_KEY") return "env api key";
       return undefined;
@@ -145,6 +148,22 @@ describe("OperatorWalletInit", () => {
     await Promise.resolve();
 
     expect(env.mint).not.toHaveBeenCalled();
+  });
+
+  it("ignores production env pins and still mints a missing operator envelope", async () => {
+    mocks.readEnv.mockImplementation((key: string) => {
+      if (key === "VITE_WALLET_SEED") return "production env seed";
+      if (key === "VITE_PPQ_API_KEY") return "production env api key";
+      return undefined;
+    });
+    mocks.readDevEnv.mockReturnValue(undefined);
+    const env = setupEnvelope();
+
+    render(<OperatorWalletInit />);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(env.mint).toHaveBeenCalledTimes(1);
   });
 
   it("does not mint when no user is logged in", async () => {

@@ -2,9 +2,10 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { clearPersonaDecryptCache } from "@/hooks/usePersona";
-import { clearLegacyPpqAccountStorage } from "@/lib/ppq/storage";
-import { queryKeys } from "@/lib/queryKeys";
+import {
+  clearOperatorLegacyStorage,
+  clearOperatorRuntimeState,
+} from "@/lib/operatorSessionState";
 
 export function OperatorScopedStateCleanup() {
   const { user } = useCurrentUser();
@@ -13,20 +14,11 @@ export function OperatorScopedStateCleanup() {
   const pubkey = user?.pubkey;
 
   useEffect(() => {
-    clearLegacyPpqAccountStorage();
+    clearOperatorLegacyStorage();
 
     const previous = previousPubkey.current;
     if (previous && previous !== pubkey) {
-      qc.removeQueries({ queryKey: queryKeys.ppq.all() });
-      qc.removeQueries({ queryKey: queryKeys.wallet.allDetails() });
-      qc.removeQueries({ queryKey: queryKeys.wallet.allPayments() });
-      qc.removeQueries({
-        queryKey: queryKeys.operator.envelope(previous),
-        exact: true,
-      });
-      qc.removeQueries({ queryKey: queryKeys.persona.allMine() });
-      qc.removeQueries({ queryKey: queryKeys.persona.allDetails() });
-      clearPersonaDecryptCache();
+      void clearOperatorRuntimeState(qc, previous);
     }
 
     previousPubkey.current = pubkey;

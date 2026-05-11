@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
 import { UnlockGate } from "./UnlockGate";
@@ -41,11 +42,14 @@ vi.mock("@/lib/video/chainStore", () => ({
 describe("UnlockGate", () => {
   it("clears sensitive local state when forgetting the device", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
+    const queryClient = new QueryClient();
 
     render(
-      <UnlockGate>
-        <main>locked app</main>
-      </UnlockGate>,
+      <QueryClientProvider client={queryClient}>
+        <UnlockGate>
+          <main>locked app</main>
+        </UnlockGate>
+      </QueryClientProvider>,
     );
 
     fireEvent.click(screen.getByRole("button", { name: /forget this device/i }));

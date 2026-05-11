@@ -98,6 +98,7 @@ persona's wallet entirely.
 | Passphrase          | UTF-8 NFKC-normalized         | Operator's head; held in memory while unlocking           |
 | Persona nsec        | Plaintext (hex) inside backup | Encrypted kind 30078 event on relays + memory only        |
 | Wallet seed (BIP-39)| Plaintext inside backup       | Encrypted kind 30078 event on relays + memory only        |
+| Operator PPQ credentials | Plaintext inside backup | Encrypted operator kind 30078 event on relays + memory only |
 | Persona system prompt | Plaintext inside backup     | Encrypted kind 30078 event on relays                      |
 
 **The operator nsec is the only secret on the device that links the
@@ -121,6 +122,13 @@ every wallet, and post as every persona under that operator.
   pubkey via NIP-44 before publishing.
 - **Zuka UI never shows a persona seed except during the explicit
   "download backup" flow.**
+- **Production app flows never share PPQ or wallet credentials through
+  environment pins.** `VITE_PPQ_API_KEY`, `VITE_PPQ_CREDIT_ID`, and
+  `VITE_WALLET_SEED` are dev-only affordances.
+- **All lock, forget-device, and operator-switch cleanup goes through
+  `src/lib/operatorSessionState.ts`.** This keeps query caches,
+  decrypt caches, video state, legacy PPQ storage, and session secrets
+  in one cleanup boundary.
 - **No Zuka-owned backend service** — see `docs/SCOPE.md` "out of
   scope".
 
@@ -149,5 +157,7 @@ every wallet, and post as every persona under that operator.
 ## Source
 
 - `dev/PROJECT.md` §3 (canonical for the identity model), §10
+- `docs/AUTH-SESSION-MODEL.md` — auth/session persistence and cleanup rules
+- `docs/SECURITY-REGRESSION-CHECKLIST.md` — PR review checklist
 - `docs/GLOSSARY.md` — "Operator", "Persona keypair"
 - `../dev/docs/nostr-nips.md` — NIP-44, NIP-49 details
