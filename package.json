@@ -11,6 +11,7 @@
     "test:unit": "tsc --noEmit && eslint --cache && vitest run --exclude 'test/integration/**' --reporter=dot --silent",
     "test:integration": "vitest run test/integration --pool=forks --maxWorkers=1 --testTimeout=10000 --reporter=dot --silent",
     "test:all": "npm run test:unit && npm run test:integration && vite build -l error && cp dist/index.html dist/404.html && echo 'All tests passed!'",
+    "test:ci": "npm run test:all",
     "postinstall": "mkdir -p public/ffmpeg && cp -f node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.js node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.wasm public/ffmpeg/",
     "cap:sync": "npm run build && npx cap sync",
     "cap:open:android": "npx cap open android",
