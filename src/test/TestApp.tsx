@@ -2,9 +2,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createHead, UnheadProvider } from '@unhead/react/client';
 import { BrowserRouter } from 'react-router-dom';
 import { NostrLoginProvider } from '@nostrify/react/login';
+import { useMemo } from 'react';
 import NostrProvider from '@/components/NostrProvider';
 import { AppProvider } from '@/components/AppProvider';
 import { AppConfig } from '@/contexts/AppContext';
+import { createMemoryNostrLoginStorage } from '@/lib/nostrLoginStorage';
 
 interface TestAppProps {
   children: React.ReactNode;
@@ -12,6 +14,7 @@ interface TestAppProps {
 
 export function TestApp({ children }: TestAppProps) {
   const head = createHead();
+  const loginStorage = useMemo(() => createMemoryNostrLoginStorage(), []);
 
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -39,7 +42,10 @@ export function TestApp({ children }: TestAppProps) {
     <UnheadProvider head={head}>
       <AppProvider storageKey='test-app-config' defaultConfig={defaultConfig}>
         <QueryClientProvider client={queryClient}>
-          <NostrLoginProvider storageKey='test-login'>
+          <NostrLoginProvider
+            storageKey='test-login'
+            storage={loginStorage}
+          >
             <NostrProvider>
               <BrowserRouter>
                 {children}

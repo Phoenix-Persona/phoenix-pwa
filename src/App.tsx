@@ -18,6 +18,7 @@ import { InstallBanner } from '@/components/InstallBanner';
 import { DevAutoLogin } from '@/components/DevAutoLogin';
 import { OperatorWalletInit } from '@/components/OperatorWalletInit';
 import { OperatorScopedStateCleanup } from '@/components/OperatorScopedStateCleanup';
+import { appNostrLoginStorage } from '@/lib/nostrLoginStorage';
 import AppRouter from './AppRouter';
 const head = createHead({
   plugins: [
@@ -54,7 +55,10 @@ export function App() {
     <UnheadProvider head={head}>
       <AppProvider storageKey="nostr:app-config" defaultConfig={defaultConfig}>
         <QueryClientProvider client={queryClient}>
-          <NostrLoginProvider storageKey='nostr:login'>
+          <NostrLoginProvider
+            storageKey='nostr:login'
+            storage={appNostrLoginStorage}
+          >
             <NostrProvider>
               <DevAutoLogin />
               <OperatorScopedStateCleanup />

@@ -55,14 +55,17 @@ if (typeof window !== 'undefined') {
 }
 
 // Mock IntersectionObserver
-global.IntersectionObserver = vi.fn().mockImplementation((_callback) => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-  root: null,
-  rootMargin: '',
-  thresholds: [],
-}));
+global.IntersectionObserver = vi.fn(function () {
+  return {
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+    root: null,
+    rootMargin: '',
+    thresholds: [],
+    takeRecords: vi.fn(() => []),
+  };
+}) as unknown as typeof IntersectionObserver;
 
 // Mock ResizeObserver
 global.ResizeObserver = vi.fn().mockImplementation((_callback) => ({
