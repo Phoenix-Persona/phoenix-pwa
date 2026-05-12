@@ -7,6 +7,12 @@ import { nip19 } from "nostr-tools";
 
 import { encryptPhoenixEnvelope } from "@/lib/personaCrypto";
 import type { Persona, PhoenixEnvelope } from "@/lib/persona";
+import {
+  PHOENIX_OPERATOR_APP,
+  PHOENIX_OPERATOR_VERSION,
+  type OperatorEnvelope,
+  type OperatorEnvelopeInput,
+} from "@/lib/operator";
 
 export type TestKeypair = {
   skHex: string;
@@ -150,6 +156,39 @@ export async function unrelatedEncryptedAppEvent(
     tags: [["d", dTag]],
     created_at: createdAt,
   });
+}
+
+export async function operatorEnvelopeEvent(args: {
+  operator: TestKeypair;
+  dTag?: string;
+  wallet?: OperatorEnvelopeInput["wallet"];
+  ppq?: OperatorEnvelopeInput["ppq"];
+  createdAt?: number;
+}): Promise<{ event: NostrEvent; envelope: OperatorEnvelope }> {
+  const dTag = args.dTag ?? "operator-fixture";
+  const createdAt = args.createdAt ?? 1_700_000_000;
+  const envelope: OperatorEnvelope = {
+    app: PHOENIX_OPERATOR_APP,
+    version: PHOENIX_OPERATOR_VERSION,
+    dTag,
+    wallet: args.wallet,
+    ppq: args.ppq,
+    created_at: createdAt,
+  };
+  const ciphertext = await args.operator.signer.nip44.encrypt(
+    args.operator.pubkey,
+    JSON.stringify(envelope),
+  );
+
+  return {
+    envelope,
+    event: signedEvent(args.operator, {
+      kind: 30078,
+      content: ciphertext,
+      tags: [["d", dTag]],
+      created_at: createdAt,
+    }),
+  };
 }
 
 function personaFixture(

@@ -6,6 +6,8 @@ Zuka has three test layers:
 - `test/integration/` contains automated integration tests that run against local in-memory Nostr relay and HTTP mock servers.
 - `test/manual/` contains explicit manual scripts for wallet, PPQ, media, and other spend/network workflows.
 
+Before demos or releases, use [`test/manual/RELEASE-CHECKLIST.md`](./manual/RELEASE-CHECKLIST.md) for the real spend/network smoke cadence.
+
 ## Integration Relay
 
 `test/integration/relay/TestRelay.ts` is a minimal Nostr relay for tests. It speaks WebSocket Nostr messages, verifies event signatures, supports the filter fields the app uses, and applies replaceable/addressable event retention for profile, relay-list, Blossom-list, and encrypted persona events.

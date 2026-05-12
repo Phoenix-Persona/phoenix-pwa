@@ -28,7 +28,6 @@ jobs:
           # GitHub Actions doesn't auto-expose secrets to step env; we have
           # to map them explicitly here.
           VITE_BREEZ_API_KEY: ${{ secrets.VITE_BREEZ_API_KEY }}
-          VITE_PPQ_API_KEY: ${{ secrets.PPQ_API_KEY }}
 
       - name: Copy files to production server
         uses: appleboy/scp-action@v0.1.4

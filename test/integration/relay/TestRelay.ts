@@ -227,11 +227,17 @@ function queryEvents(events: NostrEvent[], filters: NostrFilter[]): NostrEvent[]
   const result: NostrEvent[] = [];
 
   for (const filter of filters) {
-    for (const event of events.filter((candidate) => matchesFilter(candidate, filter)).sort(compareEventsDesc)) {
+    const matches = events
+      .filter((candidate) => matchesFilter(candidate, filter))
+      .sort(compareEventsDesc);
+    const limited = typeof filter.limit === "number"
+      ? matches.slice(0, filter.limit)
+      : matches;
+
+    for (const event of limited) {
       if (seen.has(event.id)) continue;
       seen.add(event.id);
       result.push(event);
-      if (typeof filter.limit === "number" && result.length >= filter.limit) break;
     }
   }
 
@@ -239,7 +245,7 @@ function queryEvents(events: NostrEvent[], filters: NostrFilter[]): NostrEvent[]
 }
 
 function matchesFilter(event: NostrEvent, filter: NostrFilter): boolean {
-  if (filter.ids && !filter.ids.includes(event.id)) return false;
+  if (filter.ids && !filter.ids.some((id) => event.id.startsWith(id))) return false;
   if (filter.authors && !filter.authors.includes(event.pubkey)) return false;
   if (filter.kinds && !filter.kinds.includes(event.kind)) return false;
   if (typeof filter.since === "number" && event.created_at < filter.since) return false;

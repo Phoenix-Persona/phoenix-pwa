@@ -105,6 +105,77 @@ describe("TestRelay", () => {
     expect(events[0]?.content).toBe("newer matching post");
   });
 
+  it("matches id prefixes in filters", async () => {
+    const event = signedEvent(testKeys.operator, {
+      kind: 1,
+      content: "prefix matched post",
+      created_at: 150,
+    });
+    const relay = await startRelay([event]);
+    const client = await RelayClient.connect(relay.url);
+
+    client.send(["REQ", "prefix", { ids: [event.id.slice(0, 12)] }]);
+
+    const messages = await client.collectUntil(
+      (message) => message[0] === "EOSE" && message[1] === "prefix",
+    );
+    const events = messages.filter(isEventMessage).map((message) => message[2]);
+    expect(events.map((candidate) => candidate.id)).toEqual([event.id]);
+  });
+
+  it("applies limits per filter before deduplicating multi-filter results", async () => {
+    const newest = signedEvent(testKeys.operator, {
+      kind: 1,
+      content: "newest",
+      tags: [["t", "one"], ["t", "two"]],
+      created_at: 300,
+    });
+    const middle = signedEvent(testKeys.operator, {
+      kind: 1,
+      content: "middle",
+      tags: [["t", "one"]],
+      created_at: 200,
+    });
+    const oldest = signedEvent(testKeys.operator, {
+      kind: 1,
+      content: "oldest",
+      tags: [["t", "two"]],
+      created_at: 100,
+    });
+    const relay = await startRelay([oldest, middle, newest]);
+    const client = await RelayClient.connect(relay.url);
+
+    client.send([
+      "REQ",
+      "multi",
+      { kinds: [1], "#t": ["one"], limit: 1 },
+      { kinds: [1], "#t": ["two"], limit: 2 },
+    ]);
+
+    const messages = await client.collectUntil(
+      (message) => message[0] === "EOSE" && message[1] === "multi",
+    );
+    const events = messages.filter(isEventMessage).map((message) => message[2]);
+    expect(events.map((event) => event.content)).toEqual(["newest", "oldest"]);
+  });
+
+  it("returns NOTICE for malformed client messages", async () => {
+    const relay = await startRelay();
+    const client = await RelayClient.connect(relay.url);
+
+    client.sendRaw("{not json");
+    await expect(client.next()).resolves.toEqual(["NOTICE", "invalid message"]);
+
+    client.send(["UNKNOWN", "sub"]);
+    await expect(client.next()).resolves.toEqual(["NOTICE", "invalid message"]);
+
+    client.send(["EVENT", { id: "not-an-event" }]);
+    await expect(client.next()).resolves.toEqual(["NOTICE", "invalid message"]);
+
+    client.send(["REQ"]);
+    await expect(client.next()).resolves.toEqual(["NOTICE", "invalid message"]);
+  });
+
   it("returns counts for matching filters", async () => {
     const relay = await startRelay([
       signedEvent(testKeys.operator, {
@@ -264,6 +335,10 @@ class RelayClient {
 
   send(message: unknown[]): void {
     this.socket.send(JSON.stringify(message));
+  }
+
+  sendRaw(message: string): void {
+    this.socket.send(message);
   }
 
   async next(timeoutMs = 500): Promise<ServerMessage> {

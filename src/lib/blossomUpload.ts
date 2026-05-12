@@ -7,6 +7,8 @@ export interface UploadFileToBlossomArgs {
   file: File;
   signer: NostrSigner;
   blossomServers?: string[];
+  fetch?: typeof fetch;
+  expiresIn?: number;
 }
 
 /**
@@ -20,6 +22,8 @@ export async function uploadFileToBlossom({
   file,
   signer,
   blossomServers,
+  fetch,
+  expiresIn,
 }: UploadFileToBlossomArgs): Promise<string[][]> {
   const servers =
     blossomServers && blossomServers.length > 0
@@ -33,6 +37,8 @@ export async function uploadFileToBlossom({
   const uploader = new BlossomUploader({
     servers,
     signer,
+    fetch,
+    expiresIn,
   });
 
   return uploader.upload(file);
