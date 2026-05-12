@@ -9,7 +9,7 @@ import htmlEslint from "@html-eslint/eslint-plugin";
 import customRules from "./eslint-rules/index.js";
 
 export default defineConfig(
-  globalIgnores(["dist", ".agents"]),
+  globalIgnores(["dist", ".agents", "android/app/src/main/assets/public"]),
   {
     name: "app/ts",
     files: ["**/*.{ts,tsx}"],
