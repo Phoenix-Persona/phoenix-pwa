@@ -6,6 +6,11 @@ Engineering reference for agents working on Zuka. **Start with
 Source of truth for design intent is [`../dev/PROJECT.md`](../dev/PROJECT.md);
 these docs distill or extend it for engineers reading code.
 
+CI status lives in GitHub Actions: [`CI`](https://github.com/zuka-org/zuka-pwa/actions/workflows/ci.yml)
+and [`Security`](https://github.com/zuka-org/zuka-pwa/actions/workflows/security.yml).
+Branch protection expectations are documented in
+[`BRANCH-PROTECTION.md`](./BRANCH-PROTECTION.md).
+
 ## Zuka-specific
 
 | Doc | What it's for |
