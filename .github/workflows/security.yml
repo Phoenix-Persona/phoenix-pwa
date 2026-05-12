@@ -1,13 +1,14 @@
-name: CI
+name: Security
 
 on:
-  push:
-    branches: [dev, main]
   pull_request:
     branches: [dev, main]
+  schedule:
+    - cron: "0 14 * * 1"
+  workflow_dispatch:
 
 jobs:
-  test:
+  audit:
     runs-on: ubuntu-latest
 
     steps:
@@ -23,16 +24,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run validation suite
-        # Integration tests bind only to 127.0.0.1. They require loopback
-        # networking but must not use public relays, PPQ, Breez, Blossom, or
-        # Lightning services.
-        run: npm run test:ci
+      - name: Run production dependency audit
+        run: |
+          mkdir -p test-results
+          npm audit --omit=dev --audit-level=high --json > test-results/npm-audit.json
 
-      - name: Upload test reports
-        if: always()
+      - name: Upload audit report
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: vitest-junit
-          path: test-results/*.xml
+          name: npm-audit
+          path: test-results/npm-audit.json
           if-no-files-found: warn

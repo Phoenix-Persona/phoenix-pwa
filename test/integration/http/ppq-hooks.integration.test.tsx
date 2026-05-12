@@ -14,6 +14,7 @@ import {
   usePpqVideoJob,
   usePpqVideoSubmit,
 } from "@/hooks/usePpqVideo";
+import { PpqError } from "@/lib/ppq/types";
 import type { PpqAccount } from "@/lib/ppq/types";
 
 import { TestHttpServer } from "./TestHttpServer";
@@ -86,6 +87,54 @@ describe("PPQ hooks against local HTTP mock", () => {
         messages: [{ role: "user", content: "hello" }],
       }),
     );
+  });
+
+  it("surfaces PPQ payment-required errors from inference", async () => {
+    const server = await startServer();
+    vi.stubEnv("VITE_PPQ_BASE_URL", server.url);
+    server.on("POST", "/chat/completions", () => ({
+      status: 402,
+      json: {
+        error: {
+          type: "payment_required",
+          message: "insufficient balance",
+        },
+      },
+    }));
+
+    const { result } = renderHook(() => usePpqInference(), { wrapper });
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({
+          messages: [{ role: "user", content: "hello" }],
+        }),
+      ).rejects.toMatchObject({
+        name: "PpqError",
+        status: 402,
+        message: "payment_required: insufficient balance",
+      } satisfies Partial<PpqError>);
+    });
+  });
+
+  it("surfaces malformed JSON responses from inference", async () => {
+    const server = await startServer();
+    vi.stubEnv("VITE_PPQ_BASE_URL", server.url);
+    server.on("POST", "/chat/completions", () => ({
+      text: "not-json",
+    }));
+
+    const { result } = renderHook(() => usePpqInference(), { wrapper });
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({
+          messages: [{ role: "user", content: "hello" }],
+        }),
+      ).rejects.toMatchObject({
+        name: "PpqError",
+        status: 200,
+        message: "Malformed JSON from ppq.ai",
+      } satisfies Partial<PpqError>);
+    });
   });
 
   it("runs image generation through the real PPQ client", async () => {
@@ -200,6 +249,31 @@ describe("PPQ hooks against local HTTP mock", () => {
     );
     await waitFor(() => expect(statusHook.result.current.isSettled).toBe(true));
     expect(statusHook.result.current.isTerminal).toBe(true);
+  });
+
+  it("surfaces PPQ auth failures from Lightning topups", async () => {
+    const server = await startServer();
+    vi.stubEnv("VITE_PPQ_BASE_URL", server.url);
+    server.on("POST", "/topup/create/btc-lightning", () => ({
+      status: 401,
+      json: {
+        error: {
+          type: "auth_error",
+          message: "bad api key",
+        },
+      },
+    }));
+
+    const topupHook = renderHook(() => usePpqLightningTopup(), { wrapper });
+    await act(async () => {
+      await expect(
+        topupHook.result.current.mutateAsync({ amount: 2.5 }),
+      ).rejects.toMatchObject({
+        name: "PpqError",
+        status: 401,
+        message: "auth_error: bad api key",
+      } satisfies Partial<PpqError>);
+    });
   });
 });
 

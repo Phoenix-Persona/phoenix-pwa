@@ -75,6 +75,7 @@ export default defineConfig(({ mode }) => ({
   // both locations work without forcing a key-migration on teammates.
   define: {
     __PHOENIX_ENV__: mergedViteEnvForDefine(mode),
+    ...(mode === "test" ? { IS_REACT_ACT_ENVIRONMENT: "true" } : {}),
   },
   server: {
     host: "::",
@@ -162,7 +163,7 @@ export default defineConfig(({ mode }) => ({
   test: {
     globals: true,
     environment: "jsdom",
-    setupFiles: "./test/vitest/setup.ts",
+    setupFiles: ["./test/vitest/act-env.ts", "./test/vitest/setup.ts"],
     exclude: [
       "**/node_modules/**",
       "**/dist/**",

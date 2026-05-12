@@ -52,6 +52,39 @@ describe("uploadFileToBlossom", () => {
     ]);
     expect(urlFromUploadTags(tags)).toBe(`${server.url}/blob/${sha256}`);
   });
+
+  it("falls back to the next Blossom server when the first upload fails", async () => {
+    const failingServer = await startServer();
+    const acceptingServer = await startServer();
+    const file = new File(["fallback blossom"], "fallback.txt", {
+      type: "text/plain",
+    });
+    const sha256 = await fileSha256(file);
+    failingServer.on("PUT", "/upload", () => ({
+      status: 500,
+      text: "temporary failure",
+    }));
+    acceptingServer.on("PUT", "/upload", (req) => ({
+      json: {
+        url: `${acceptingServer.url}/blob/${sha256}`,
+        sha256,
+        size: req.body.length,
+        type: req.headers["content-type"],
+      },
+    }));
+
+    const tags = await uploadFileToBlossom({
+      file,
+      signer: testKeys.persona.signer,
+      blossomServers: [failingServer.url, acceptingServer.url],
+      fetch: fileAwareFetch,
+      expiresIn: 30_000,
+    });
+
+    expect(failingServer.requests).toHaveLength(1);
+    expect(acceptingServer.requests).toHaveLength(1);
+    expect(urlFromUploadTags(tags)).toBe(`${acceptingServer.url}/blob/${sha256}`);
+  });
 });
 
 async function startServer(): Promise<TestHttpServer> {
