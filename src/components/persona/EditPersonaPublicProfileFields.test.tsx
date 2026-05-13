@@ -1,17 +1,17 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import { EditPersonaPublicProfileFields } from "./EditPersonaPublicProfileFields";
 
-const mocks = vi.hoisted(() => ({
-  inferenceMutateAsync: vi.fn(),
+const mocks = hoisted(() => ({
+  inferenceMutateAsync: mockFn(),
 }));
 
-vi.mock("@/components/PersonaPictureField", () => ({
+mockModule("@/components/PersonaPictureField", () => ({
   PersonaPictureField: () => <div data-testid="persona-picture-field" />,
 }));
 
-vi.mock("@/hooks/usePpqInference", async (importOriginal) => {
+mockModule("@/hooks/usePpqInference", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/hooks/usePpqInference")>();
   return {
     ...actual,
@@ -44,7 +44,7 @@ describe("EditPersonaPublicProfileFields", () => {
   });
 
   it("uses AI Assist to replace the public bio", async () => {
-    const onBioChange = vi.fn();
+    const onBioChange = mockFn();
     mocks.inferenceMutateAsync.mockResolvedValue(ppqResponse("Generated bio."));
 
     render(
@@ -57,7 +57,7 @@ describe("EditPersonaPublicProfileFields", () => {
         systemPrompt="Private prompt"
         loadingBio={false}
         onBioChange={onBioChange}
-        onPictureUrlChange={vi.fn()}
+        onPictureUrlChange={mockFn()}
         pictureSigner={{} as never}
       />,
     );

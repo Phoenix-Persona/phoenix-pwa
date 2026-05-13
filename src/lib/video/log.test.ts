@@ -1,13 +1,12 @@
-import { describe, expect, it, vi } from "@/test/api";
+import { describe, expect, it, spyOn } from "@/test/api";
 
 import { verror, vlog, vwarn } from "./log";
 
 describe("video logging", () => {
   it("does not write to the console by default", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const errorSpy = vi
-      .spyOn(console, "error")
+    const logSpy = spyOn(console, "log").mockImplementation(() => undefined);
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => undefined);
+    const errorSpy = spyOn(console, "error")
       .mockImplementation(() => undefined);
 
     vlog("pipeline", "prompt", { url: "https://example.com/secret.png" });

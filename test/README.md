@@ -22,7 +22,7 @@ Use `test/integration/http/TestHttpServer.ts` for local HTTP mocks. It records m
 
 Automated tests must not call public relays, PPQ, Breez, Blossom, browser extensions, NIP-46 signers, or Lightning services. Put those workflows in `test/manual/`.
 
-Integration tests are intentionally serialized with `--maxWorkers=1` so loopback ports, global WebSocket overrides, and storage keys remain deterministic. CI must allow loopback networking on `127.0.0.1`; no outbound network is required for integration tests.
+Integration tests are intentionally serialized by the node:test runner so loopback ports, global WebSocket overrides, and storage keys remain deterministic. CI must allow loopback networking on `127.0.0.1`; no outbound network is required for integration tests.
 
 ## Commands
 
@@ -31,6 +31,8 @@ npm run test:unit
 npm run test:integration
 npm run test:ci
 npm test
+npm run smoke:dev
+npm run analyze:bundle
 ```
 
-For CI, install dependencies first, then run `npm run test:ci`. `npm test` remains the local one-command path and installs dependencies before running the full suite.
+For CI, install dependencies first, then run `npm run test:ci`. `npm test` remains the local one-command path and installs dependencies before running the full suite. `npm run smoke:dev` starts the local esbuild dev server and checks SPA fallback/static assets; `npm run analyze:bundle` reads the latest production build metafile.

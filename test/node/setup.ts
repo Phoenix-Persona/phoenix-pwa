@@ -1,6 +1,6 @@
 import { JSDOM } from "jsdom";
 import { afterEach } from "node:test";
-import { vi } from "./api";
+import { mockFn } from "./api";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://localhost/",
@@ -46,21 +46,21 @@ Object.defineProperty(window, "IS_REACT_ACT_ENVIRONMENT", {
 
 Object.defineProperty(window, "matchMedia", {
   writable: true,
-  value: vi.fn((query: unknown) => ({
+  value: mockFn((query: unknown) => ({
     matches: false,
     media: String(query),
     onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
+    addListener: mockFn(),
+    removeListener: mockFn(),
+    addEventListener: mockFn(),
+    removeEventListener: mockFn(),
+    dispatchEvent: mockFn(),
   })),
 });
 
 Object.defineProperty(window, "scrollTo", {
   writable: true,
-  value: vi.fn(),
+  value: mockFn(),
 });
 
 const makeStorage = (store: Map<string, string>): Storage => ({
@@ -112,20 +112,20 @@ if (!("detachEvent" in HTMLElement.prototype)) {
   });
 }
 
-globalThis.IntersectionObserver = vi.fn(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
+globalThis.IntersectionObserver = mockFn(() => ({
+  observe: mockFn(),
+  unobserve: mockFn(),
+  disconnect: mockFn(),
   root: null,
   rootMargin: "",
   thresholds: [],
-  takeRecords: vi.fn(() => []),
+  takeRecords: mockFn(() => []),
 })) as unknown as typeof IntersectionObserver;
 
-globalThis.ResizeObserver = vi.fn(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
+globalThis.ResizeObserver = mockFn(() => ({
+  observe: mockFn(),
+  unobserve: mockFn(),
+  disconnect: mockFn(),
 })) as unknown as typeof ResizeObserver;
 
 afterEach(async () => {

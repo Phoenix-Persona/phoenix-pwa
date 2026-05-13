@@ -1,12 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "@/test/api";
+import { afterEach, beforeEach, describe, expect, it, mockFn, spyOn, stubGlobal, unstubAllGlobals } from "@/test/api";
 
 import { getQueryHistory } from "./client";
 
 describe("ppq client query history", () => {
   beforeEach(() => {
-    vi.stubGlobal(
+    stubGlobal(
       "fetch",
-      vi.fn(async () =>
+      mockFn(async () =>
         new Response(
           JSON.stringify({
             status: "success",
@@ -36,7 +36,7 @@ describe("ppq client query history", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it("fetches query history with all keys enabled", async () => {
@@ -60,9 +60,8 @@ describe("ppq client query history", () => {
   });
 
   it("does not log request details by default", async () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    const errorSpy = vi
-      .spyOn(console, "error")
+    const logSpy = spyOn(console, "log").mockImplementation(() => undefined);
+    const errorSpy = spyOn(console, "error")
       .mockImplementation(() => undefined);
 
     await getQueryHistory("ppq_api_key", {

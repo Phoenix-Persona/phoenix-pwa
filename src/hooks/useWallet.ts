@@ -455,9 +455,6 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
     if (lastAutoTopupKeyRef.current === runKey) return;
     lastAutoTopupKeyRef.current = runKey;
     autoTopupMutation.mutate();
-    // We intentionally leave `autoTopupMutation` out of deps — TanStack
-    // Query mutation objects are referentially stable per query client.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     balanceUsd,
     canAutoTopup,
@@ -466,6 +463,9 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
     autoTopup.fundingSource,
     ppq.account?.credit_id,
     resolveFundingWallet,
+    autoTopupMutation.isPending,
+    autoTopupMutation.mutate,
+    autoTopupRun.isRunning,
   ]);
 
   const triggerAutoTopup = useCallback(async () => {

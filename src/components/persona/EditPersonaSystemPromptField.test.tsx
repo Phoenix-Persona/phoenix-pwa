@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import { EditPersonaSystemPromptField } from "./EditPersonaSystemPromptField";
 
-const mocks = vi.hoisted(() => ({
-  inferenceMutateAsync: vi.fn(),
+const mocks = hoisted(() => ({
+  inferenceMutateAsync: mockFn(),
 }));
 
-vi.mock("@/hooks/usePpqInference", async (importOriginal) => {
+mockModule("@/hooks/usePpqInference", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/hooks/usePpqInference")>();
   return {
     ...actual,
@@ -40,7 +40,7 @@ describe("EditPersonaSystemPromptField", () => {
   });
 
   it("uses AI Assist to replace the private system prompt", async () => {
-    const onSystemPromptChange = vi.fn();
+    const onSystemPromptChange = mockFn();
     mocks.inferenceMutateAsync.mockResolvedValue(
       ppqResponse("Generated private prompt."),
     );

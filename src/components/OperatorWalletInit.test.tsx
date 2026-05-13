@@ -8,26 +8,26 @@
  */
 
 import { render } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "@/test/api";
+import { afterEach, beforeEach, describe, expect, it, mockFn, hoisted, mockModule, clearAllMocks } from "@/test/api";
 
 import { OperatorWalletInit } from "./OperatorWalletInit";
 
-const mocks = vi.hoisted(() => ({
-  useCurrentUser: vi.fn(),
-  useOperatorEnvelope: vi.fn(),
-  readEnv: vi.fn(),
-  readDevEnv: vi.fn(),
+const mocks = hoisted(() => ({
+  useCurrentUser: mockFn(),
+  useOperatorEnvelope: mockFn(),
+  readEnv: mockFn(),
+  readDevEnv: mockFn(),
 }));
 
-vi.mock("@/hooks/useCurrentUser", () => ({
+mockModule("@/hooks/useCurrentUser", () => ({
   useCurrentUser: mocks.useCurrentUser,
 }));
 
-vi.mock("@/hooks/useOperatorEnvelope", () => ({
+mockModule("@/hooks/useOperatorEnvelope", () => ({
   useOperatorEnvelope: mocks.useOperatorEnvelope,
 }));
 
-vi.mock("@/lib/env", () => ({
+mockModule("@/lib/env", () => ({
   readEnv: mocks.readEnv,
   readDevEnv: mocks.readDevEnv,
 }));
@@ -39,7 +39,7 @@ interface FakeEnvelopeState {
   };
   isLoading: boolean;
   isMinting: boolean;
-  mint: ReturnType<typeof vi.fn>;
+  mint: ReturnType<typeof mockFn>;
 }
 
 function setupEnvelope(overrides: Partial<FakeEnvelopeState> = {}): FakeEnvelopeState {
@@ -47,7 +47,7 @@ function setupEnvelope(overrides: Partial<FakeEnvelopeState> = {}): FakeEnvelope
     envelope: undefined,
     isLoading: false,
     isMinting: false,
-    mint: vi.fn().mockRejectedValue(new Error("signer rejected")),
+    mint: mockFn().mockRejectedValue(new Error("signer rejected")),
     ...overrides,
   };
   mocks.useOperatorEnvelope.mockReturnValue(state);
@@ -64,7 +64,7 @@ describe("OperatorWalletInit", () => {
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    clearAllMocks();
   });
 
   it("calls mint exactly once when the user is logged in and no envelope exists", async () => {

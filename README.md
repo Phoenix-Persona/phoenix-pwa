@@ -38,7 +38,7 @@ The authoritative design document is **[`PROJECT.md`](./dev/PROJECT.md)**.
 ```bash
 npm install
 npm run dev      # local esbuild dev server
-npm test         # tsc --noEmit + eslint + node:test + esbuild build
+npm test         # tsc --noEmit + Biome + node:test + esbuild build
 npm run build    # production build to ./dist
 
 # Android (Capacitor)

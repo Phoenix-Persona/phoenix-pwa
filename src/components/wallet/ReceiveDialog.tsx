@@ -7,7 +7,7 @@
  * closes immediately so the moment of receipt feels responsive.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Copy, Loader2 } from "lucide-react";
 
 import {
@@ -66,9 +66,9 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
     toast({ title: "Invoice copied" });
   }
 
-  function reset() {
+  const reset = useCallback(() => {
     setInvoice(null);
-  }
+  }, []);
 
   // Subscribe to SDK events while an invoice is on screen. When a
   // `paymentSucceeded` event fires for the BOLT11 string we generated,
@@ -123,7 +123,7 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
         void handle.removeEventListener(listenerId).catch(() => undefined);
       }
     };
-  }, [handle, invoice, open, onOpenChange, toast, wallet]);
+  }, [handle, invoice, open, onOpenChange, reset, toast, wallet]);
 
   return (
     <Dialog

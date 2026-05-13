@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "@/test/api";
+import { afterEach, beforeEach, describe, expect, it, mockFn, hoisted, mockModule, clearAllMocks } from "@/test/api";
 
 import type { CreatePersonaResult } from "@/hooks/useCreatePersona";
 import { useCreatePersona } from "@/hooks/useCreatePersona";
@@ -20,28 +20,28 @@ import {
   type RelayHarness,
 } from "./harness/renderWithRelay";
 
-const walletMocks = vi.hoisted(() => ({
-  generateMnemonic: vi.fn(async () =>
+const walletMocks = hoisted(() => ({
+  generateMnemonic: mockFn(async () =>
     "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
   ),
-  connectWallet: vi.fn(async () => ({
-    deleteLightningAddress: vi.fn(async () => undefined),
+  connectWallet: mockFn(async () => ({
+    deleteLightningAddress: mockFn(async () => undefined),
   })),
-  disconnectWallet: vi.fn(async () => undefined),
-  registerLightningAddressWithRetry: vi.fn(async () => ({
+  disconnectWallet: mockFn(async () => undefined),
+  registerLightningAddressWithRetry: mockFn(async () => ({
     username: "amina",
     lightningAddress: "amina@breez.tips",
     lnurl: "lnurl1fixture",
   })),
 }));
 
-vi.mock("@/lib/wallet/client", () => ({
+mockModule("@/lib/wallet/client", () => ({
   generateMnemonic: walletMocks.generateMnemonic,
   connectWallet: walletMocks.connectWallet,
   disconnectWallet: walletMocks.disconnectWallet,
 }));
 
-vi.mock("@/lib/wallet/lightningAddress", async (importOriginal) => {
+mockModule("@/lib/wallet/lightningAddress", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@/lib/wallet/lightningAddress")>();
   return {
@@ -56,7 +56,7 @@ describe("persona lifecycle integration", () => {
 
   beforeEach(() => {
     clearPersonaDecryptCache();
-    vi.clearAllMocks();
+    clearAllMocks();
   });
 
   afterEach(async () => {

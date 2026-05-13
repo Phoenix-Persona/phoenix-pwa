@@ -28,11 +28,3 @@ jobs:
         # networking but must not use public relays, PPQ, Breez, Blossom, or
         # Lightning services.
         run: npm run test:ci
-
-      - name: Upload test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: node-test-reports
-          path: test-results/*.xml
-          if-no-files-found: warn

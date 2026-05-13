@@ -22,8 +22,8 @@
 
 import { Relay } from "nostr-tools/relay";
 // nostr-tools exports `useWebSocketImplementation` (a config setter,
-// NOT a React hook). The name trips eslint's rules-of-hooks, so we
-// alias on import to keep the linter happy.
+// NOT a React hook). The name looks like a hook, so keep this file outside
+// automated React hook linting; alias on import to make that distinction explicit.
 import { useWebSocketImplementation as setNostrWebSocket } from "nostr-tools/relay";
 import WebSocketImpl from "ws";
 

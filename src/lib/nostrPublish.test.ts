@@ -1,5 +1,5 @@
 import type { NostrEvent } from "@nostrify/nostrify";
-import { describe, expect, it, vi } from "@/test/api";
+import { describe, expect, it, mockFn } from "@/test/api";
 
 import { DEFAULT_PUBLISH_TIMEOUT_MS, publishWithTimeout } from "./nostrPublish";
 
@@ -15,7 +15,7 @@ const event: NostrEvent = {
 
 describe("publishWithTimeout", () => {
   it("publishes with the default AbortSignal timeout", async () => {
-    const eventFn = vi.fn().mockResolvedValue(undefined);
+    const eventFn = mockFn().mockResolvedValue(undefined);
 
     await publishWithTimeout({ event: eventFn }, event);
 

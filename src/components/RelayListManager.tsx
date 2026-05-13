@@ -30,7 +30,6 @@ export function RelayListManager() {
   // `relays` state is what the UI edits optimistically, and we need to reset
   // it when the authoritative config changes from outside.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRelays(config.relayMetadata.relays);
   }, [config.relayMetadata.relays]);
 
@@ -112,7 +111,6 @@ export function RelayListManager() {
 
   const saveRelays = (newRelays: Relay[]) => {
     // Only called from event handlers, not during render, so Date.now() is safe.
-    // eslint-disable-next-line react-hooks/purity
     const now = Math.floor(Date.now() / 1000);
 
     // Update local config

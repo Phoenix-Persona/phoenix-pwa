@@ -2,14 +2,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import type { NostrEvent } from "@nostrify/nostrify";
 import type { PropsWithChildren } from "react";
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule, clearAllMocks } from "@/test/api";
 
 import { useDeletePersona } from "./useDeletePersona";
 
-const mocks = vi.hoisted(() => {
-  const nostrEvent = vi.fn(async () => undefined);
-  const nostrQuery = vi.fn(async () => [] as NostrEvent[]);
-  const signEvent = vi.fn(async (template: {
+const mocks = hoisted(() => {
+  const nostrEvent = mockFn(async () => undefined);
+  const nostrQuery = mockFn(async () => [] as NostrEvent[]);
+  const signEvent = mockFn(async (template: {
     kind: number;
     created_at: number;
     tags: string[][];
@@ -25,8 +25,8 @@ const mocks = vi.hoisted(() => {
     pubkey: "operator-pubkey",
     sig: "operator-sig",
   }) as NostrEvent);
-  const nip44Encrypt = vi.fn(async () => "tombstone-ciphertext");
-  const nip44Decrypt = vi.fn();
+  const nip44Encrypt = mockFn(async () => "tombstone-ciphertext");
+  const nip44Decrypt = mockFn();
 
   return {
     nostrEvent,
@@ -34,20 +34,20 @@ const mocks = vi.hoisted(() => {
     signEvent,
     nip44Encrypt,
     nip44Decrypt,
-    tryDecryptPhoenixEnvelope: vi.fn(),
-    connectWallet: vi.fn(),
-    disconnectWallet: vi.fn(async () => undefined),
-    deleteLightningAddress: vi.fn(async () => undefined),
+    tryDecryptPhoenixEnvelope: mockFn(),
+    connectWallet: mockFn(),
+    disconnectWallet: mockFn(async () => undefined),
+    deleteLightningAddress: mockFn(async () => undefined),
   };
 });
 
-vi.mock("@nostrify/react", () => ({
+mockModule("@nostrify/react", () => ({
   useNostr: () => ({
     nostr: { event: mocks.nostrEvent, query: mocks.nostrQuery },
   }),
 }));
 
-vi.mock("./useCurrentUser", () => ({
+mockModule("./useCurrentUser", () => ({
   useCurrentUser: () => ({
     user: {
       pubkey: "operator-pubkey",
@@ -59,11 +59,11 @@ vi.mock("./useCurrentUser", () => ({
   }),
 }));
 
-vi.mock("@/lib/personaCrypto", () => ({
+mockModule("@/lib/personaCrypto", () => ({
   tryDecryptPhoenixEnvelope: mocks.tryDecryptPhoenixEnvelope,
 }));
 
-vi.mock("@/lib/wallet/client", () => ({
+mockModule("@/lib/wallet/client", () => ({
   connectWallet: mocks.connectWallet,
   disconnectWallet: mocks.disconnectWallet,
 }));
@@ -108,7 +108,7 @@ function makeKind0Event(): NostrEvent {
 describe("useDeletePersona", () => {
   beforeEach(() => {
     resetQueryClient();
-    vi.clearAllMocks();
+    clearAllMocks();
 
     // Default: a usable wallet handle that releases the address cleanly.
     mocks.connectWallet.mockResolvedValue({

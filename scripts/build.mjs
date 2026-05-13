@@ -11,6 +11,7 @@ import { REPO_ROOT, esbuildDefines } from "./env.mjs";
 const mode = process.env.NODE_ENV === "development" ? "development" : "production";
 const distDir = path.join(REPO_ROOT, "dist");
 const assetsDir = path.join(distDir, "assets");
+const metaDir = path.join(REPO_ROOT, ".tmp", "build");
 
 function repoPath(...parts) {
   return path.join(REPO_ROOT, ...parts);
@@ -107,6 +108,8 @@ async function buildJs() {
     output.entryPoint?.endsWith("src/main.tsx"),
   );
   if (!entry) throw new Error("Could not locate esbuild main.tsx output");
+  await mkdir(metaDir, { recursive: true });
+  await writeFile(path.join(metaDir, "meta.json"), JSON.stringify(result.metafile, null, 2));
   return path.relative(distDir, path.join(REPO_ROOT, entry[0]));
 }
 

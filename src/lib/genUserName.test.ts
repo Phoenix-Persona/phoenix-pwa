@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@/test/api';
+import { describe, expect, it } from "@/test/api";
 import { genUserName } from './genUserName';
 
 describe('genUserName', () => {

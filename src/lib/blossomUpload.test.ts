@@ -1,15 +1,15 @@
 import type { NostrSigner } from "@nostrify/types";
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import { APP_BLOSSOM_SERVERS } from "@/lib/appBlossom";
 import { uploadFileToBlossom, urlFromUploadTags } from "./blossomUpload";
 
-const mocks = vi.hoisted(() => ({
-  upload: vi.fn(),
+const mocks = hoisted(() => ({
+  upload: mockFn(),
   constructors: [] as Array<{ servers: string[]; signer: NostrSigner }>,
 }));
 
-vi.mock("@nostrify/nostrify/uploaders", () => ({
+mockModule("@nostrify/nostrify/uploaders", () => ({
   BlossomUploader: class {
     constructor(args: { servers: string[]; signer: NostrSigner }) {
       mocks.constructors.push(args);
@@ -23,8 +23,8 @@ vi.mock("@nostrify/nostrify/uploaders", () => ({
 
 function makeSigner(): NostrSigner {
   return {
-    getPublicKey: vi.fn(async () => "a".repeat(64)),
-    signEvent: vi.fn(),
+    getPublicKey: mockFn(async () => "a".repeat(64)),
+    signEvent: mockFn(),
   } satisfies NostrSigner;
 }
 

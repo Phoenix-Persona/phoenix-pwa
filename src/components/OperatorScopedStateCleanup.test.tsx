@@ -1,23 +1,23 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import { queryKeys } from "@/lib/queryKeys";
 import { OperatorScopedStateCleanup } from "./OperatorScopedStateCleanup";
 
-const mocks = vi.hoisted(() => ({
+const mocks = hoisted(() => ({
   currentUser: {
     user: { pubkey: "operator-old" } as { pubkey: string } | undefined,
   },
-  clearPersonaDecryptCache: vi.fn(),
+  clearPersonaDecryptCache: mockFn(),
 }));
 
-vi.mock("@/hooks/useCurrentUser", () => ({
+mockModule("@/hooks/useCurrentUser", () => ({
   useCurrentUser: () => mocks.currentUser,
 }));
 
-vi.mock("@/hooks/usePersona", () => ({
+mockModule("@/hooks/usePersona", () => ({
   clearPersonaDecryptCache: mocks.clearPersonaDecryptCache,
 }));
 

@@ -1,47 +1,47 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "@/test/api";
+import { describe, expect, it, mockFn, hoisted, mockModule, spyOn } from "@/test/api";
 
 import { UnlockGate } from "./UnlockGate";
 
-const mocks = vi.hoisted(() => ({
-  clearSessionUnlocked: vi.fn(),
-  clearPersistedNostrLogin: vi.fn(),
-  clearUserNcryptsec: vi.fn(),
-  hasUserNcryptsec: vi.fn(() => true),
-  clearPersonaDecryptCache: vi.fn(),
-  clearAllVideoChains: vi.fn(async () => undefined),
+const mocks = hoisted(() => ({
+  clearSessionUnlocked: mockFn(),
+  clearPersistedNostrLogin: mockFn(),
+  clearUserNcryptsec: mockFn(),
+  hasUserNcryptsec: mockFn(() => true),
+  clearPersonaDecryptCache: mockFn(),
+  clearAllVideoChains: mockFn(async () => undefined),
 }));
 
-vi.mock("@nostrify/react/login", () => ({
+mockModule("@nostrify/react/login", () => ({
   useNostrLogin: () => ({ logins: [] }),
 }));
 
-vi.mock("@/hooks/useLoginActions", () => ({
-  useLoginActions: () => ({ nsec: vi.fn() }),
+mockModule("@/hooks/useLoginActions", () => ({
+  useLoginActions: () => ({ nsec: mockFn() }),
 }));
 
-vi.mock("@/lib/nip49Storage", () => ({
+mockModule("@/lib/nip49Storage", () => ({
   clearSessionUnlocked: mocks.clearSessionUnlocked,
   clearPersistedNostrLogin: mocks.clearPersistedNostrLogin,
   clearUserNcryptsec: mocks.clearUserNcryptsec,
-  decryptNcryptsec: vi.fn(),
+  decryptNcryptsec: mockFn(),
   hasUserNcryptsec: mocks.hasUserNcryptsec,
-  loadUserNcryptsec: vi.fn(),
-  markSessionUnlocked: vi.fn(),
+  loadUserNcryptsec: mockFn(),
+  markSessionUnlocked: mockFn(),
 }));
 
-vi.mock("@/hooks/usePersona", () => ({
+mockModule("@/hooks/usePersona", () => ({
   clearPersonaDecryptCache: mocks.clearPersonaDecryptCache,
 }));
 
-vi.mock("@/lib/video/chainStore", () => ({
+mockModule("@/lib/video/chainStore", () => ({
   clearAllVideoChains: mocks.clearAllVideoChains,
 }));
 
 describe("UnlockGate", () => {
   it("clears sensitive local state when forgetting the device", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    spyOn(window, "confirm").mockReturnValue(true);
     const queryClient = new QueryClient();
 
     render(

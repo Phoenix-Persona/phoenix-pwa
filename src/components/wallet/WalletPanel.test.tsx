@@ -1,17 +1,17 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, mockModule } from "@/test/api";
 
 import { WalletPanel } from "./WalletPanel";
 import { WalletDialog } from "./WalletDialog";
 import type { UseWalletResult } from "@/hooks/useWallet";
 
-vi.mock("@/hooks/useToast", () => ({
-  useToast: () => ({ toast: vi.fn() }),
+mockModule("@/hooks/useToast", () => ({
+  useToast: () => ({ toast: mockFn() }),
 }));
 
-vi.mock("@/components/ui/qrcode", () => ({
+mockModule("@/components/ui/qrcode", () => ({
   QRCodeCanvas: ({ value }: { value: string }) => (
     <div data-testid="qr-code">{value}</div>
   ),
@@ -48,23 +48,23 @@ function makeWallet(
     } as UseWalletResult["info"],
     isInfoLoading: false,
     infoError: undefined,
-    refreshInfo: vi.fn(),
+    refreshInfo: mockFn(),
     payments: [
       makePayment("receive", 4_000n, "receive-1"),
       makePayment("send", 1_500n, "send-1"),
     ],
-    refreshPayments: vi.fn(),
-    receive: vi.fn(),
+    refreshPayments: mockFn(),
+    receive: mockFn(),
     isReceiving: false,
     receiveError: undefined,
-    send: vi.fn(),
+    send: mockFn(),
     isSending: false,
     sendError: undefined,
     ppqAccount: {
       credit_id: "credit_active_123",
       api_key: "ppq_live_secret_key",
     },
-    rotatePpqAccount: vi.fn().mockResolvedValue({
+    rotatePpqAccount: mockFn().mockResolvedValue({
       credit_id: "credit_rotated_456",
       api_key: "ppq_live_rotated_key",
     }),
@@ -72,14 +72,14 @@ function makeWallet(
     ppqRotateError: undefined,
     ppqBalanceUsd: 4.25,
     isPpqBalanceLoading: false,
-    refreshPpqBalance: vi.fn(),
+    refreshPpqBalance: mockFn(),
     autoTopup: {
       enabled: true,
       thresholdUsd: 5,
       topupAmountUsd: 10,
       fundingSource: "persona",
     },
-    setAutoTopup: vi.fn(),
+    setAutoTopup: mockFn(),
     autoTopupRun: {
       isRunning: false,
       lastResult: {
@@ -89,12 +89,12 @@ function makeWallet(
         status: "Settled",
       },
     },
-    triggerAutoTopup: vi.fn(),
+    triggerAutoTopup: mockFn(),
     fundingSources: [
       { source: "operator", label: "Operator", isAvailable: true },
       { source: "persona", label: "Persona", isAvailable: true },
     ],
-    manualTopup: vi.fn().mockResolvedValue({
+    manualTopup: mockFn().mockResolvedValue({
       toppedUpUsd: 15,
       invoiceId: "invoice_manual",
       paymentRequest: "lnbc1manual",
@@ -117,7 +117,7 @@ function makeWallet(
     ],
     isPpqQueryHistoryLoading: false,
     ppqQueryHistoryError: undefined,
-    refreshPpqQueryHistory: vi.fn(),
+    refreshPpqQueryHistory: mockFn(),
     ...overrides,
   };
 }
@@ -144,7 +144,7 @@ describe("WalletPanel", () => {
   beforeEach(() => {
     Object.assign(navigator, {
       clipboard: {
-        writeText: vi.fn(),
+        writeText: mockFn(),
       },
     });
   });
@@ -184,7 +184,7 @@ describe("WalletPanel", () => {
 
   it("saves edited auto top-up threshold and amount", async () => {
     const wallet = makeWallet();
-    const onAutoTopupSave = vi.fn().mockResolvedValue(undefined);
+    const onAutoTopupSave = mockFn().mockResolvedValue(undefined);
     renderWallet(wallet, { onAutoTopupSave });
 
     activateTab(/ai credits/i);
@@ -214,7 +214,7 @@ describe("WalletPanel", () => {
 
   it("saves the selected PPQ funding source", async () => {
     const wallet = makeWallet();
-    const onAutoTopupSave = vi.fn().mockResolvedValue(undefined);
+    const onAutoTopupSave = mockFn().mockResolvedValue(undefined);
     renderWallet(wallet, { onAutoTopupSave });
 
     activateTab(/ai credits/i);
@@ -344,7 +344,7 @@ describe("WalletDialog", () => {
           wallet={makeWallet()}
           walletScope="operator"
           open
-          onOpenChange={vi.fn()}
+          onOpenChange={mockFn()}
           personaName="Operator"
         />
       </MemoryRouter>,
@@ -361,7 +361,7 @@ describe("WalletDialog", () => {
         <WalletDialog
           wallet={makeWallet()}
           open
-          onOpenChange={vi.fn()}
+          onOpenChange={mockFn()}
           personaName="Voice"
         />
       </MemoryRouter>,

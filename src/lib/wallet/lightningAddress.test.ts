@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, stubGlobal, restoreAllMocks } from "@/test/api";
 
 import type { WalletHandle } from "./types";
 import {
@@ -17,10 +17,10 @@ function makeHandle({
   registerRejects?: boolean;
 }): WalletHandle {
   return {
-    checkLightningAddressAvailable: vi.fn(async () => {
+    checkLightningAddressAvailable: mockFn(async () => {
       return available.shift() ?? true;
     }),
-    registerLightningAddress: vi.fn(async ({ username }: { username: string }) => {
+    registerLightningAddress: mockFn(async ({ username }: { username: string }) => {
       if (registerRejects) throw new Error("register collision");
       return {
         username,
@@ -33,7 +33,7 @@ function makeHandle({
 
 describe("Lightning Address helpers", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
+    restoreAllMocks();
   });
 
   it("slugifies display names into valid usernames", () => {
@@ -58,8 +58,8 @@ describe("Lightning Address helpers", () => {
   });
 
   it("probes username availability via the LUD-16 endpoint", async () => {
-    const fetchMock = vi.fn<typeof fetch>();
-    vi.stubGlobal("fetch", fetchMock);
+    const fetchMock = mockFn<typeof fetch>();
+    stubGlobal("fetch", fetchMock);
 
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 404 }));
     await expect(probeLightningUsernameAvailability("imani")).resolves.toBe(

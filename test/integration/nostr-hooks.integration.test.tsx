@@ -1,5 +1,5 @@
 import { useNostrLogin } from "@nostrify/react/login";
-import { cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "@/test/api";
 
 import { NostrSync } from "@/components/NostrSync";
@@ -75,15 +75,19 @@ describe("Nostr hook integration", () => {
     const { result } = renderHook(() => usePersonaPublish(), { wrapper: harness.wrapper });
     await waitFor(() => expect(result.current).toBeTruthy());
 
-    const event = await result.current.mutateAsync({
-      personaNsec: testKeys.persona.nsec,
-      template: {
-        kind: 1,
-        content: "Persona-authored note",
-        tags: [["t", "freedom"]],
-        created_at: 1_700_000_020,
-      },
+    let event: Awaited<ReturnType<typeof result.current.mutateAsync>> | undefined;
+    await act(async () => {
+      event = await result.current.mutateAsync({
+        personaNsec: testKeys.persona.nsec,
+        template: {
+          kind: 1,
+          content: "Persona-authored note",
+          tags: [["t", "freedom"]],
+          created_at: 1_700_000_020,
+        },
+      });
     });
+    if (!event) throw new Error("Persona publish mutation did not return an event.");
 
     expect(event.pubkey).toBe(testKeys.persona.pubkey);
     expect(event.tags).not.toContainEqual(["p", testKeys.operator.pubkey]);
@@ -120,7 +124,9 @@ describe("Nostr hook integration", () => {
     render(<PersonaCountProbe />, { wrapper: harness.wrapper });
 
     await waitFor(() => expect(screen.getByTestId("persona-count").textContent).toBe("1"));
-    fireEvent.click(screen.getByRole("button", { name: "Switch" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Switch" }));
+    });
     await waitFor(() => expect(screen.getByTestId("persona-count").textContent).toBe("0"));
   });
 });

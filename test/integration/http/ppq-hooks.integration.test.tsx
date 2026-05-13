@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "@/test/api";
+import { afterEach, beforeEach, describe, expect, it, mockModule, stubEnv, unstubAllEnvs } from "@/test/api";
 
 import { getInferenceText, usePpqInference } from "@/hooks/usePpqInference";
 import { usePpqImage } from "@/hooks/usePpqImage";
@@ -25,7 +25,7 @@ const account: PpqAccount = {
 };
 const openServers: TestHttpServer[] = [];
 
-vi.mock("@/hooks/usePpqAccount", () => ({
+mockModule("@/hooks/usePpqAccount", () => ({
   usePpqAccount: () => ({
     account,
     ensureAccount: async () => account,
@@ -44,11 +44,11 @@ function wrapper({ children }: PropsWithChildren) {
 
 describe("PPQ hooks against local HTTP mock", () => {
   beforeEach(() => {
-    vi.unstubAllEnvs();
+    unstubAllEnvs();
   });
 
   afterEach(async () => {
-    vi.unstubAllEnvs();
+    unstubAllEnvs();
     for (const server of openServers.splice(0)) {
       await server.close();
     }
@@ -56,7 +56,7 @@ describe("PPQ hooks against local HTTP mock", () => {
 
   it("runs chat inference through the real PPQ client", async () => {
     const server = await startServer();
-    vi.stubEnv("VITE_PPQ_BASE_URL", server.url);
+    stubEnv("VITE_PPQ_BASE_URL", server.url);
     server.on("POST", "/chat/completions", (req) => ({
       json: {
         id: "chatcmpl-local",
@@ -91,7 +91,7 @@ describe("PPQ hooks against local HTTP mock", () => {
 
   it("surfaces PPQ payment-required errors from inference", async () => {
     const server = await startServer();
-    vi.stubEnv("VITE_PPQ_BASE_URL", server.url);
+    stubEnv("VITE_PPQ_BASE_URL", server.url);
     server.on("POST", "/chat/completions", () => ({
       status: 402,
       json: {
@@ -118,7 +118,7 @@ describe("PPQ hooks against local HTTP mock", () => {
 
   it("surfaces malformed JSON responses from inference", async () => {
     const server = await startServer();
-    vi.stubEnv("VITE_PPQ_BASE_URL", server.url);
+    stubEnv("VITE_PPQ_BASE_URL", server.url);
     server.on("POST", "/chat/completions", () => ({
       text: "not-json",
     }));
@@ -139,7 +139,7 @@ describe("PPQ hooks against local HTTP mock", () => {
 
   it("runs image generation through the real PPQ client", async () => {
     const server = await startServer();
-    vi.stubEnv("VITE_PPQ_BASE_URL", server.url);
+    stubEnv("VITE_PPQ_BASE_URL", server.url);
     server.on("POST", "/v1/images/generations", (req) => ({
       json: {
         created: 1,
@@ -167,7 +167,7 @@ describe("PPQ hooks against local HTTP mock", () => {
 
   it("submits and polls video jobs through the real PPQ client", async () => {
     const server = await startServer();
-    vi.stubEnv("VITE_PPQ_BASE_URL", server.url);
+    stubEnv("VITE_PPQ_BASE_URL", server.url);
     server.on("POST", "/v1/videos", (req) => ({
       status: 202,
       json: {
@@ -210,7 +210,7 @@ describe("PPQ hooks against local HTTP mock", () => {
 
   it("creates Lightning topups and reads topup status through the real PPQ client", async () => {
     const server = await startServer();
-    vi.stubEnv("VITE_PPQ_BASE_URL", server.url);
+    stubEnv("VITE_PPQ_BASE_URL", server.url);
     server.on("POST", "/topup/create/btc-lightning", (req) => ({
       json: {
         id: "invoice-local",
@@ -253,7 +253,7 @@ describe("PPQ hooks against local HTTP mock", () => {
 
   it("surfaces PPQ auth failures from Lightning topups", async () => {
     const server = await startServer();
-    vi.stubEnv("VITE_PPQ_BASE_URL", server.url);
+    stubEnv("VITE_PPQ_BASE_URL", server.url);
     server.on("POST", "/topup/create/btc-lightning", () => ({
       status: 401,
       json: {

@@ -1,30 +1,30 @@
 import { render, waitFor } from "@testing-library/react";
 import { nip19 } from "nostr-tools";
 import { generateSecretKey } from "nostr-tools/pure";
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import { DevAutoLogin } from "./DevAutoLogin";
 
-const mocks = vi.hoisted(() => ({
+const mocks = hoisted(() => ({
   currentUser: undefined as { id: string; pubkey: string; metadata: Record<string, never> } | undefined,
-  nsec: vi.fn(),
-  readEnv: vi.fn(),
+  nsec: mockFn(),
+  readEnv: mockFn(),
 }));
 
-vi.mock("@/hooks/useLoggedInAccounts", () => ({
+mockModule("@/hooks/useLoggedInAccounts", () => ({
   useLoggedInAccounts: () => ({
     authors: [],
     currentUser: mocks.currentUser,
   }),
 }));
 
-vi.mock("@/hooks/useLoginActions", () => ({
+mockModule("@/hooks/useLoginActions", () => ({
   useLoginActions: () => ({
     nsec: mocks.nsec,
   }),
 }));
 
-vi.mock("@/lib/env", () => ({
+mockModule("@/lib/env", () => ({
   readEnv: mocks.readEnv,
 }));
 

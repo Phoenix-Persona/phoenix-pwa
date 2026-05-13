@@ -1,25 +1,25 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import type { PpqAccount } from "@/lib/ppq/types";
 import { usePpqAccount } from "./usePpqAccount";
 
-const mocks = vi.hoisted(() => {
+const mocks = hoisted(() => {
   const operator = {
     envelope: undefined as { ppq?: PpqAccount } | undefined,
     event: undefined as unknown,
-    ensureWithPpq: vi.fn(),
+    ensureWithPpq: mockFn(),
     isLoading: false,
-    refetch: vi.fn(),
+    refetch: mockFn(),
   };
 
   return {
-    createAccount: vi.fn(),
-    getBalance: vi.fn(),
-    readEnv: vi.fn(),
-    readDevEnv: vi.fn(),
+    createAccount: mockFn(),
+    getBalance: mockFn(),
+    readEnv: mockFn(),
+    readDevEnv: mockFn(),
     operator,
     currentUser: {
       user: { pubkey: "operator-pubkey" } as { pubkey: string } | undefined,
@@ -27,21 +27,21 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/ppq/client", () => ({
+mockModule("@/lib/ppq/client", () => ({
   createAccount: mocks.createAccount,
   getBalance: mocks.getBalance,
 }));
 
-vi.mock("@/lib/env", () => ({
+mockModule("@/lib/env", () => ({
   readEnv: mocks.readEnv,
   readDevEnv: mocks.readDevEnv,
 }));
 
-vi.mock("./useOperatorEnvelope", () => ({
+mockModule("./useOperatorEnvelope", () => ({
   useOperatorEnvelope: () => mocks.operator,
 }));
 
-vi.mock("./useCurrentUser", () => ({
+mockModule("./useCurrentUser", () => ({
   useCurrentUser: () => mocks.currentUser,
 }));
 

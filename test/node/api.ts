@@ -264,29 +264,41 @@ function unstubAllGlobals() {
   globalStubs.clear();
 }
 
-export const vi = {
-  fn: createMockFunction,
-  hoisted: <T>(factory: () => T) => factory(),
-  mock: registerMock,
-  mocked: <T>(value: T) => value,
-  spyOn,
-  stubGlobal,
-  unstubAllGlobals,
-  stubEnv,
-  unstubAllEnvs,
-  clearAllMocks: () => {
-    for (const mock of mocks) mock.mockClear();
-  },
-  resetAllMocks: () => {
-    for (const mock of mocks) mock.mockReset();
-  },
-  restoreAllMocks: () => {
-    for (const restore of restoreCallbacks) restore();
-    restoreCallbacks.clear();
-    for (const mock of mocks) mock.mockRestore();
-    unstubAllEnvs();
-    unstubAllGlobals();
-  },
+const hoisted = <T>(factory: () => T) => factory();
+const mocked = <T>(value: T) => value;
+const clearAllMocks = () => {
+  for (const mock of mocks) mock.mockClear();
+};
+const resetAllMocks = () => {
+  for (const mock of mocks) mock.mockReset();
+};
+const restoreAllMocks = () => {
+  for (const restore of restoreCallbacks) restore();
+  restoreCallbacks.clear();
+  for (const mock of mocks) mock.mockRestore();
+  unstubAllEnvs();
+  unstubAllGlobals();
 };
 
-export { after, afterEach, before, beforeEach, describe, expect, it, test };
+export {
+  after,
+  afterEach,
+  before,
+  beforeEach,
+  clearAllMocks,
+  describe,
+  expect,
+  hoisted,
+  it,
+  createMockFunction as mockFn,
+  registerMock as mockModule,
+  mocked,
+  resetAllMocks,
+  restoreAllMocks,
+  spyOn,
+  stubEnv,
+  stubGlobal,
+  test,
+  unstubAllEnvs,
+  unstubAllGlobals,
+};

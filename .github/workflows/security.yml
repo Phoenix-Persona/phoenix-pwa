@@ -26,13 +26,13 @@ jobs:
 
       - name: Run production dependency audit
         run: |
-          mkdir -p test-results
-          npm audit --omit=dev --audit-level=high --json > test-results/npm-audit.json
+          mkdir -p .tmp/security
+          npm audit --omit=dev --audit-level=high --json > .tmp/security/npm-audit.json
 
       - name: Upload audit report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: npm-audit
-          path: test-results/npm-audit.json
+          path: .tmp/security/npm-audit.json
           if-no-files-found: warn

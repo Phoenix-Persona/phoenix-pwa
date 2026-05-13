@@ -1,35 +1,35 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, mockModule, stubGlobal } from "@/test/api";
 
 import {
   PersonaPictureStager,
   type StagedPersonaPicture,
 } from "./PersonaPictureStager";
 
-vi.mock("@/hooks/usePpqImage", () => ({
+mockModule("@/hooks/usePpqImage", () => ({
   usePpqImage: () => ({
-    mutateAsync: vi.fn(),
+    mutateAsync: mockFn(),
     isPending: false,
   }),
 }));
 
-vi.mock("@/hooks/useToast", () => ({
-  useToast: () => ({ toast: vi.fn() }),
+mockModule("@/hooks/useToast", () => ({
+  useToast: () => ({ toast: mockFn() }),
 }));
 
 describe("PersonaPictureStager", () => {
   beforeEach(() => {
-    vi.stubGlobal(
+    stubGlobal(
       "URL",
       Object.assign(URL, {
-        createObjectURL: vi.fn(() => "blob:preview"),
-        revokeObjectURL: vi.fn(),
+        createObjectURL: mockFn(() => "blob:preview"),
+        revokeObjectURL: mockFn(),
       }),
     );
   });
 
   it("stages a selected image file with a local preview URL", () => {
-    const onChange = vi.fn<(picture: StagedPersonaPicture | null) => void>();
+    const onChange = mockFn<(picture: StagedPersonaPicture | null) => void>();
     const file = new File(["image"], "portrait.png", { type: "image/png" });
     const { container } = render(
       <PersonaPictureStager value={null} onChange={onChange} />,
@@ -51,7 +51,7 @@ describe("PersonaPictureStager", () => {
   });
 
   it("uses a multiline prompt field for generated portraits", () => {
-    render(<PersonaPictureStager value={null} onChange={vi.fn()} />);
+    render(<PersonaPictureStager value={null} onChange={mockFn()} />);
 
     const prompt = screen.getByLabelText("Image prompt");
 

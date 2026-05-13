@@ -152,8 +152,7 @@ export function VideoComposerDialog(props: VideoComposerDialogProps) {
     if (phase.type !== "idle") return;
     if (!idea.trim()) return;
     void pipeline.generatePreview();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, resumeChecked, resumable, resumeDispatched]);
+  }, [open, resumeChecked, resumable, resumeDispatched, phase.type, idea, pipeline.generatePreview]);
 
   const handleClose = (next: boolean) => {
     if (!next) {
@@ -168,8 +167,7 @@ export function VideoComposerDialog(props: VideoComposerDialogProps) {
     if (phase.type === "done") {
       onPublished?.();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase.type]);
+  }, [phase.type, onPublished]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>

@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import { AiAssistButton } from "./AiAssistField";
 
-const mocks = vi.hoisted(() => ({
-  inferenceMutateAsync: vi.fn(),
+const mocks = hoisted(() => ({
+  inferenceMutateAsync: mockFn(),
 }));
 
-vi.mock("@/hooks/usePpqInference", async (importOriginal) => {
+mockModule("@/hooks/usePpqInference", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/hooks/usePpqInference")>();
   return {
     ...actual,
@@ -18,7 +18,7 @@ vi.mock("@/hooks/usePpqInference", async (importOriginal) => {
   };
 });
 
-function renderAiAssist(onReplace = vi.fn()) {
+function renderAiAssist(onReplace = mockFn()) {
   render(
     <AiAssistButton
       fieldLabel="Bio"

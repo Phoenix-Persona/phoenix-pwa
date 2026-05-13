@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule, clearAllMocks } from "@/test/api";
 
 import { queryKeys } from "./queryKeys";
 import {
@@ -8,36 +8,36 @@ import {
   clearOperatorSessionState,
 } from "./operatorSessionState";
 
-const mocks = vi.hoisted(() => ({
-  clearSessionUnlocked: vi.fn(),
-  clearPersistedNostrLogin: vi.fn(),
-  clearUserNcryptsec: vi.fn(),
-  clearPersonaDecryptCache: vi.fn(),
-  clearLegacyPpqAccountStorage: vi.fn(),
-  clearAllVideoChains: vi.fn(async () => undefined),
+const mocks = hoisted(() => ({
+  clearSessionUnlocked: mockFn(),
+  clearPersistedNostrLogin: mockFn(),
+  clearUserNcryptsec: mockFn(),
+  clearPersonaDecryptCache: mockFn(),
+  clearLegacyPpqAccountStorage: mockFn(),
+  clearAllVideoChains: mockFn(async () => undefined),
 }));
 
-vi.mock("@/lib/nip49Storage", () => ({
+mockModule("@/lib/nip49Storage", () => ({
   clearSessionUnlocked: mocks.clearSessionUnlocked,
   clearPersistedNostrLogin: mocks.clearPersistedNostrLogin,
   clearUserNcryptsec: mocks.clearUserNcryptsec,
 }));
 
-vi.mock("@/hooks/usePersona", () => ({
+mockModule("@/hooks/usePersona", () => ({
   clearPersonaDecryptCache: mocks.clearPersonaDecryptCache,
 }));
 
-vi.mock("@/lib/ppq/storage", () => ({
+mockModule("@/lib/ppq/storage", () => ({
   clearLegacyPpqAccountStorage: mocks.clearLegacyPpqAccountStorage,
 }));
 
-vi.mock("@/lib/video/chainStore", () => ({
+mockModule("@/lib/video/chainStore", () => ({
   clearAllVideoChains: mocks.clearAllVideoChains,
 }));
 
 describe("operatorSessionState", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    clearAllMocks();
   });
 
   it("clears operator runtime caches and transient sensitive state", async () => {

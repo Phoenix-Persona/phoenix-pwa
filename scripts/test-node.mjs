@@ -70,11 +70,11 @@ function resolveMockSpecifier(specifier, importer) {
   return specifier;
 }
 
-function findViMocks(source, importer) {
+function findModuleMocks(source, importer) {
   const mocks = new Map();
   let cursor = 0;
   while (true) {
-    const start = source.indexOf("vi.mock(", cursor);
+    const start = source.indexOf("mockModule(", cursor);
     if (start === -1) break;
     const quoteIndex = source.slice(start).search(/["']/);
     if (quoteIndex === -1) break;
@@ -121,8 +121,8 @@ function rewriteMockSpecifiers(source, importer, mockMap) {
   for (const mock of mockMap.values()) {
     const escaped = mock.original.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     out = out.replace(
-      new RegExp(`vi\\.mock\\((["'])${escaped}\\1`, "g"),
-      `vi.mock("${mock.id}"`,
+      new RegExp(`mockModule\\((["'])${escaped}\\1`, "g"),
+      `mockModule("${mock.id}"`,
     );
   }
   return out;
@@ -272,7 +272,7 @@ await esbuild.build({
 const builtFiles = [];
 for (const file of files) {
   const source = await readFile(file, "utf8");
-  const mockMap = findViMocks(source, file);
+  const mockMap = findModuleMocks(source, file);
   const rel = path.relative(REPO_ROOT, file).replace(/[\\/]/g, "__");
   const outfile = path.join(outDir, `${rel}.mjs`);
   await esbuild.build({

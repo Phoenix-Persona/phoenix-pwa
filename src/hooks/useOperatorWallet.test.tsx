@@ -1,12 +1,12 @@
 import { renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import { useOperatorWallet } from "./useOperatorWallet";
 
-const mocks = vi.hoisted(() => ({
-  useWallet: vi.fn(() => ({ handle: undefined })),
-  readEnv: vi.fn(),
-  readDevEnv: vi.fn(),
+const mocks = hoisted(() => ({
+  useWallet: mockFn(() => ({ handle: undefined })),
+  readEnv: mockFn(),
+  readDevEnv: mockFn(),
   currentUser: {
     user: { pubkey: "operator-pubkey" } as { pubkey: string } | undefined,
   },
@@ -20,19 +20,19 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/hooks/useWallet", () => ({
+mockModule("@/hooks/useWallet", () => ({
   useWallet: mocks.useWallet,
 }));
 
-vi.mock("@/hooks/useCurrentUser", () => ({
+mockModule("@/hooks/useCurrentUser", () => ({
   useCurrentUser: () => mocks.currentUser,
 }));
 
-vi.mock("@/hooks/useOperatorEnvelope", () => ({
+mockModule("@/hooks/useOperatorEnvelope", () => ({
   useOperatorEnvelope: () => mocks.operator,
 }));
 
-vi.mock("@/lib/env", () => ({
+mockModule("@/lib/env", () => ({
   readEnv: mocks.readEnv,
   readDevEnv: mocks.readDevEnv,
 }));

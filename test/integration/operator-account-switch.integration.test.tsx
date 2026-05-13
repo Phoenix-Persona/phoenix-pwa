@@ -1,6 +1,6 @@
 import { useNostrLogin } from "@nostrify/react/login";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "@/test/api";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "@/test/api";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePpqAccount } from "@/hooks/usePpqAccount";
@@ -25,7 +25,7 @@ afterEach(async () => {
 describe("operator PPQ account switching", () => {
   it("does not render the previous operator PPQ credentials after login switch", async () => {
     const consoleErrors: string[] = [];
-    const consoleError = vi.spyOn(console, "error").mockImplementation((...args) => {
+    const consoleError = spyOn(console, "error").mockImplementation((...args) => {
       consoleErrors.push(args.map(String).join(" "));
     });
     try {

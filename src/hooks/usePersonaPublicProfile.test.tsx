@@ -2,15 +2,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { NostrEvent } from "@nostrify/nostrify";
 import type { PropsWithChildren } from "react";
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import { usePersonaPublicProfile } from "./usePersonaPublicProfile";
 
-const mocks = vi.hoisted(() => ({
-  query: vi.fn(),
+const mocks = hoisted(() => ({
+  query: mockFn(),
 }));
 
-vi.mock("@nostrify/react", () => ({
+mockModule("@nostrify/react", () => ({
   useNostr: () => ({ nostr: { query: mocks.query } }),
 }));
 

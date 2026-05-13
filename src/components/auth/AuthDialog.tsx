@@ -146,7 +146,6 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
   // reset here. The multiple setState calls are intentional.
   useEffect(() => {
     if (!isOpen) {
-      /* eslint-disable react-hooks/set-state-in-effect */
       setStep('welcome');
       setNsec('');
       setLoginNsec('');
@@ -162,7 +161,6 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
       setHasOpenedSigner(false);
       setShowBunkerInput(false);
       setBunkerUri('');
-      /* eslint-enable react-hooks/set-state-in-effect */
       abortControllerRef.current?.abort();
       abortControllerRef.current = null;
     }

@@ -4,7 +4,7 @@ import type { NostrEvent } from "@nostrify/nostrify";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { nip19 } from "nostr-tools";
 import type { PropsWithChildren } from "react";
-import { beforeEach, describe, expect, it, vi } from "@/test/api";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule, spyOn } from "@/test/api";
 
 import {
   PHOENIX_PAYLOAD_APP,
@@ -14,9 +14,9 @@ import {
 import { LightningUsernameTakenError } from "@/lib/wallet/lightningAddress";
 import { useUpdatePersona } from "./useUpdatePersona";
 
-const mocks = vi.hoisted(() => {
-  const nostrEvent = vi.fn();
-  const signEvent = vi.fn(async (template: {
+const mocks = hoisted(() => {
+  const nostrEvent = mockFn();
+  const signEvent = mockFn(async (template: {
     kind: number;
     created_at: number;
     tags: string[][];
@@ -31,42 +31,42 @@ const mocks = vi.hoisted(() => {
   return {
     nostrEvent,
     signEvent,
-    encryptPhoenixEnvelope: vi.fn(),
-    connectWallet: vi.fn(),
-    disconnectWallet: vi.fn(),
-    registerLightningAddressWithRetry: vi.fn(),
+    encryptPhoenixEnvelope: mockFn(),
+    connectWallet: mockFn(),
+    disconnectWallet: mockFn(),
+    registerLightningAddressWithRetry: mockFn(),
   };
 });
 
-vi.mock("@nostrify/react", () => ({
+mockModule("@nostrify/react", () => ({
   useNostr: () => ({ nostr: { event: mocks.nostrEvent } }),
 }));
 
-vi.mock("./useCurrentUser", () => ({
+mockModule("./useCurrentUser", () => ({
   useCurrentUser: () => ({
     user: {
       pubkey: "operator-pubkey",
       signer: {
         signEvent: mocks.signEvent,
         nip44: {
-          encrypt: vi.fn(),
-          decrypt: vi.fn(),
+          encrypt: mockFn(),
+          decrypt: mockFn(),
         },
       },
     },
   }),
 }));
 
-vi.mock("@/lib/personaCrypto", () => ({
+mockModule("@/lib/personaCrypto", () => ({
   encryptPhoenixEnvelope: mocks.encryptPhoenixEnvelope,
 }));
 
-vi.mock("@/lib/wallet/client", () => ({
+mockModule("@/lib/wallet/client", () => ({
   connectWallet: mocks.connectWallet,
   disconnectWallet: mocks.disconnectWallet,
 }));
 
-vi.mock("@/lib/wallet/lightningAddress", async (importOriginal) => {
+mockModule("@/lib/wallet/lightningAddress", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@/lib/wallet/lightningAddress")>();
   return {
@@ -231,7 +231,7 @@ describe("useUpdatePersona", () => {
   });
 
   it("keeps profile publish failures best-effort after backup save", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const warn = spyOn(console, "warn").mockImplementation(() => undefined);
     mocks.nostrEvent
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error("profile relay failed"));
