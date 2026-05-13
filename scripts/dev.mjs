@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
@@ -12,6 +12,7 @@ const distDir = path.join(REPO_ROOT, "dist");
 const assetsDir = path.join(distDir, "assets");
 const port = Number(process.env.PORT ?? 8080);
 const sourceHtmlPath = repoPath("public", "index.html");
+const cssOutputPath = path.join(assetsDir, "index.css");
 
 function repoPath(...parts) {
   return path.join(REPO_ROOT, ...parts);
@@ -52,6 +53,31 @@ function aliasPlugin() {
   };
 }
 
+function run(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: REPO_ROOT,
+      stdio: "inherit",
+      shell: false,
+    });
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${command} ${args.join(" ")} exited with ${code}`));
+    });
+  });
+}
+
+async function buildCssOnce() {
+  await run("npx", [
+    "tailwindcss",
+    "-i",
+    "src/index.css",
+    "-o",
+    cssOutputPath,
+  ]);
+}
+
 async function writeDevHtml() {
   const source = await readFile(sourceHtmlPath, "utf8");
   const withCss = source.replace(
@@ -65,12 +91,63 @@ async function writeDevHtml() {
   await writeFile(path.join(distDir, "index.html"), html);
 }
 
-function startTailwind() {
-  return spawn(
-    "npx",
-    ["tailwindcss", "-i", "src/index.css", "-o", "dist/assets/index.css", "--watch"],
-    { cwd: REPO_ROOT, stdio: "inherit" },
-  );
+async function collectCssWatchFiles(dir) {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    if (entry.name === "node_modules" || entry.name === ".tmp" || entry.name === "dist") {
+      continue;
+    }
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...await collectCssWatchFiles(full));
+    } else if (/\.(css|html|js|jsx|ts|tsx)$/.test(entry.name)) {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
+async function cssWatchSignature() {
+  const files = [
+    sourceHtmlPath,
+    ...await collectCssWatchFiles(repoPath("src")),
+  ];
+  return files
+    .map((file) => {
+      const stat = statSync(file);
+      return `${file}:${stat.mtimeMs}:${stat.size}`;
+    })
+    .join("\n");
+}
+
+async function startCssPoller() {
+  let signature = await cssWatchSignature();
+  let rebuilding = false;
+  const timer = setInterval(() => {
+    void (async () => {
+      if (rebuilding) return;
+      const nextSignature = await cssWatchSignature();
+      if (nextSignature === signature) return;
+
+      rebuilding = true;
+      try {
+        await buildCssOnce();
+        signature = nextSignature;
+        console.log("[tailwind] rebuilt dist/assets/index.css");
+      } catch (error) {
+        console.error("[tailwind] rebuild failed:", error);
+      } finally {
+        rebuilding = false;
+      }
+    })();
+  }, 1_000);
+
+  return {
+    kill() {
+      clearInterval(timer);
+    },
+  };
 }
 
 function contentType(filePath) {
@@ -92,7 +169,17 @@ function serve() {
     const decodedPath = decodeURIComponent(url.pathname);
     const requested = decodedPath === "/" ? "/index.html" : decodedPath;
     let filePath = path.join(distDir, requested);
-    if (!filePath.startsWith(distDir) || !existsSync(filePath)) {
+    if (!filePath.startsWith(distDir)) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Not found");
+      return;
+    }
+    if (!existsSync(filePath) && requested.startsWith("/assets/")) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Asset not found");
+      return;
+    }
+    if (!existsSync(filePath)) {
       filePath = path.join(distDir, "index.html");
     }
 
@@ -111,6 +198,7 @@ function serve() {
 await rm(distDir, { recursive: true, force: true });
 await mkdir(assetsDir, { recursive: true });
 await cp(repoPath("public"), distDir, { recursive: true });
+await buildCssOnce();
 await writeDevHtml();
 
 const ctx = await esbuild.context({
@@ -125,9 +213,10 @@ const ctx = await esbuild.context({
   plugins: [aliasPlugin()],
   logLevel: "info",
 });
+await ctx.rebuild();
 await ctx.watch();
 
-const tailwind = startTailwind();
+const tailwind = await startCssPoller();
 const server = serve();
 
 function shutdown() {

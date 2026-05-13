@@ -67,6 +67,10 @@ try {
   if (!css.response.ok || css.text.length < 100) {
     throw new Error("Dev CSS asset is missing or unexpectedly small.");
   }
+  expectHeader(css.response, "content-type", "text/css; charset=utf-8");
+  if (css.text.includes("<!DOCTYPE html>")) {
+    throw new Error("Dev CSS asset returned the SPA fallback HTML.");
+  }
 
   const manifest = await fetchText("/manifest.webmanifest");
   if (!manifest.response.ok || !manifest.text.includes("\"short_name\": \"Zuka\"")) {
