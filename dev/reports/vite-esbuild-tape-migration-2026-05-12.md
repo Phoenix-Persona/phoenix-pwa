@@ -1,5 +1,9 @@
 # Vite to esbuild and tape Migration Report
 
+> **Status: Historical.** The app now uses esbuild, `node:test`, and Biome.
+> Vite, Vitest, Vite plugins, and ESLint-era artifacts referenced below
+> describe the pre-migration state.
+
 Date: 2026-05-12
 
 ## Executive Summary

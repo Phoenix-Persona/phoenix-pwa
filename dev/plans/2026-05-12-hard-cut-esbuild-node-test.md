@@ -5,6 +5,8 @@
 > The shipped node:test harness keeps project-local `vi`-style helpers in
 > `test/node/api.ts` so the existing mock-heavy suite can run without the
 > Vitest package.
+> Current linting is handled by Biome; references to ESLint below are
+> historical migration context.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

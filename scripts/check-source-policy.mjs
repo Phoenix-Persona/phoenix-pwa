@@ -5,6 +5,7 @@ import path from "node:path";
 import { REPO_ROOT } from "./env.mjs";
 
 const failures = [];
+const sourceHtmlLabel = "public/index.html";
 
 function fail(message) {
   failures.push(message);
@@ -25,7 +26,7 @@ function checkNoInlineScripts(html) {
     const attributes = match[1] ?? "";
     const body = match[2] ?? "";
     if (!/\bsrc\s*=/i.test(attributes) && body.trim().length > 0) {
-      fail("index.html contains an inline <script> body; use external scripts only.");
+      fail(`${sourceHtmlLabel} contains an inline <script> body; use external scripts only.`);
     }
   }
 }
@@ -40,30 +41,46 @@ function manifestPathFromHtml(html) {
   return link[1]?.match(/\bhref=["']([^"']+)["']/i)?.[1];
 }
 
-function resolveManifestPath(href) {
+function resolveManifestPath(href, htmlDir) {
   if (href.startsWith("/")) return repoPath("public", href.slice(1));
-  return repoPath(href);
+  return path.resolve(htmlDir, href);
 }
 
 async function checkHtmlPolicy() {
-  const htmlPath = repoPath("index.html");
+  const htmlPath = repoPath("public", "index.html");
   const html = await readFile(htmlPath, "utf8");
+  const htmlDir = path.dirname(htmlPath);
 
   checkNoInlineScripts(html);
-  requirePattern(html, /<meta\b[^>]*name=["']viewport["'][^>]*>/i, "index.html is missing viewport meta.");
-  requirePattern(html, /<meta\b[^>]*name=["']description["'][^>]*>/i, "index.html is missing description meta.");
-  requirePattern(html, /<meta\b[^>]*property=["']og:type["'][^>]*>/i, "index.html is missing og:type meta.");
-  requirePattern(html, /<meta\b[^>]*property=["']og:title["'][^>]*>/i, "index.html is missing og:title meta.");
-  requirePattern(html, /<meta\b[^>]*property=["']og:description["'][^>]*>/i, "index.html is missing og:description meta.");
+  requirePattern(html, /<meta\b[^>]*name=["']viewport["'][^>]*>/i, `${sourceHtmlLabel} is missing viewport meta.`);
+  requirePattern(html, /<meta\b[^>]*name=["']description["'][^>]*>/i, `${sourceHtmlLabel} is missing description meta.`);
+  requirePattern(html, /<meta\b[^>]*property=["']og:type["'][^>]*>/i, `${sourceHtmlLabel} is missing og:type meta.`);
+  requirePattern(html, /<meta\b[^>]*property=["']og:title["'][^>]*>/i, `${sourceHtmlLabel} is missing og:title meta.`);
+  requirePattern(html, /<meta\b[^>]*property=["']og:description["'][^>]*>/i, `${sourceHtmlLabel} is missing og:description meta.`);
 
   const manifestHref = manifestPathFromHtml(html);
   if (!manifestHref) {
-    fail("index.html is missing a web manifest link.");
+    fail(`${sourceHtmlLabel} is missing a web manifest link.`);
     return;
   }
-  const manifestPath = resolveManifestPath(manifestHref);
+  const manifestPath = resolveManifestPath(manifestHref, htmlDir);
   if (!existsSync(manifestPath)) {
-    fail(`index.html manifest link points to a missing file: ${manifestHref}`);
+    fail(`${sourceHtmlLabel} manifest link points to a missing file: ${manifestHref}`);
+  }
+}
+
+function checkNoLegacyArtifacts() {
+  const blocked = [
+    "index.html",
+    "eslint-rules",
+    "eslint.config.js",
+    "eslint.config.mjs",
+    "eslint.config.cjs",
+    ".eslintcache",
+    "test-results",
+  ];
+  for (const artifact of blocked) {
+    if (existsSync(repoPath(artifact))) fail(`Remove legacy/generated root artifact: ${artifact}`);
   }
 }
 
@@ -103,6 +120,7 @@ async function checkComments() {
   }
 }
 
+checkNoLegacyArtifacts();
 await checkHtmlPolicy();
 await checkComments();
 

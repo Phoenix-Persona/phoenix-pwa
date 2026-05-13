@@ -18,6 +18,7 @@
     "test:ci": "npm run test:unit:ci && npm run test:integration:ci && node scripts/build.mjs && node scripts/verify-build.mjs && echo 'All tests passed!'",
     "smoke:dev": "node scripts/smoke-dev.mjs",
     "analyze:bundle": "node scripts/analyze-bundle.mjs",
+    "check:bundle-budget": "node scripts/check-bundle-budget.mjs",
     "postinstall": "mkdir -p public/ffmpeg && cp -f node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.js node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.wasm public/ffmpeg/",
     "cap:sync": "npm run build && npx cap sync",
     "cap:open:android": "npx cap open android",

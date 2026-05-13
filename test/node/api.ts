@@ -249,7 +249,7 @@ function unstubAllEnvs() {
 function stubGlobal(key: PropertyKey, value: unknown) {
   if (!globalStubs.has(key)) {
     globalStubs.set(key, {
-      existed: Object.prototype.hasOwnProperty.call(globalThis, key),
+      existed: Object.hasOwn(globalThis, key),
       value: Reflect.get(globalThis, key),
     });
   }

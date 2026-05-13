@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { type NostrSigner, NostrEvent, NostrFilter, NPool, NRelay1 } from '@nostrify/nostrify';
+import type React from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { type NostrSigner, type NostrEvent, type NostrFilter, NPool, NRelay1 } from '@nostrify/nostrify';
 import { NostrContext } from '@nostrify/react';
 import { NUser, useNostrLogin } from '@nostrify/react/login';
 import { useQueryClient } from '@tanstack/react-query';

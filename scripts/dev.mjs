@@ -11,6 +11,7 @@ import { REPO_ROOT, esbuildDefines } from "./env.mjs";
 const distDir = path.join(REPO_ROOT, "dist");
 const assetsDir = path.join(distDir, "assets");
 const port = Number(process.env.PORT ?? 8080);
+const sourceHtmlPath = repoPath("public", "index.html");
 
 function repoPath(...parts) {
   return path.join(REPO_ROOT, ...parts);
@@ -52,7 +53,7 @@ function aliasPlugin() {
 }
 
 async function writeDevHtml() {
-  const source = await readFile(repoPath("index.html"), "utf8");
+  const source = await readFile(sourceHtmlPath, "utf8");
   const withCss = source.replace(
     "        <title>Zuka — Uncensorable Voices</title>",
     `        <link rel="stylesheet" href="/assets/index.css">\n\n        <title>Zuka — Uncensorable Voices</title>`,

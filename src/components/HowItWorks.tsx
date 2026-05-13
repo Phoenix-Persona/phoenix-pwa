@@ -7,7 +7,7 @@
  * visual stacks below the copy so reading order stays intact.
  */
 
-import { type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 import { BuildVisual } from "./howItWorks/BuildVisual";

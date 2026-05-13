@@ -28,7 +28,7 @@ import { PersonaWalletView } from "./PersonaWalletView";
 import { PpqFundingSection } from "./PpqFundingSection";
 import { ReceiveDialog } from "./ReceiveDialog";
 import { SendDialog } from "./SendDialog";
-import { type OperatorWalletDiagnostics } from "./WalletPanelSections";
+import type { OperatorWalletDiagnostics } from "./WalletPanelSections";
 
 interface WalletPanelProps {
   wallet: UseWalletResult;

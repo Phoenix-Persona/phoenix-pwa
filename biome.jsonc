@@ -30,9 +30,16 @@
           }
         }
       },
+      "style": {
+        "useImportType": "error"
+      },
       "suspicious": {
         "noConsole": "off",
-        "noExplicitAny": "error"
+        "noExplicitAny": "error",
+        "noPrototypeBuiltins": "error"
+      },
+      "a11y": {
+        "useButtonType": "error"
       }
     }
   },

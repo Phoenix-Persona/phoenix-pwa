@@ -1,5 +1,8 @@
 # Codebase Audit - 2026-05-10
 
+> **Status: Historical.** Current source HTML lives at `public/index.html`;
+> root `index.html` references below describe the repo state at audit time.
+
 Scope: `src/`, `index.html`, `package.json`, `dev/PROJECT.md`, and current local
 configuration surfaces.
 

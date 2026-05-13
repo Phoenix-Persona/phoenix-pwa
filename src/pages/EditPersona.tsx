@@ -41,7 +41,7 @@ import { useToast } from "@/hooks/useToast";
 import { useUpdatePersona } from "@/hooks/useUpdatePersona";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 import { featureFlags } from "@/lib/features";
-import { type PhoenixEnvelope } from "@/lib/persona";
+import type { PhoenixEnvelope } from "@/lib/persona";
 import {
   isValidLightningUsername,
   slugifyForUsername,

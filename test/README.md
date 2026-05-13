@@ -8,6 +8,8 @@ Zuka has three test layers:
 
 Before demos or releases, use [`test/manual/RELEASE-CHECKLIST.md`](./manual/RELEASE-CHECKLIST.md) for the real spend/network smoke cadence.
 
+Generated reports, compiled test bundles, and temporary build metadata belong under `.tmp/`. Do not commit `test-results/`, `.eslintcache`, root ESLint config files, or other runner-specific output directories.
+
 ## Integration Relay
 
 `test/integration/relay/TestRelay.ts` is a minimal Nostr relay for tests. It speaks WebSocket Nostr messages, verifies event signatures, supports the filter fields the app uses, and applies replaceable/addressable event retention for profile, relay-list, Blossom-list, and encrypted persona events.
@@ -33,6 +35,7 @@ npm run test:ci
 npm test
 npm run smoke:dev
 npm run analyze:bundle
+npm run check:bundle-budget
 ```
 
-For CI, install dependencies first, then run `npm run test:ci`. `npm test` remains the local one-command path and installs dependencies before running the full suite. `npm run smoke:dev` starts the local esbuild dev server and checks SPA fallback/static assets; `npm run analyze:bundle` reads the latest production build metafile.
+For CI, install dependencies first, then run `npm run test:ci`. `npm test` remains the local one-command path and installs dependencies before running the full suite. `npm run smoke:dev` starts the local esbuild dev server and checks SPA fallback/static assets; `npm run analyze:bundle` and `npm run check:bundle-budget` read the latest production build metafile.

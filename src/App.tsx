@@ -1,23 +1,23 @@
 // NOTE: This file should normally not be modified unless you are adding a new provider.
 // To add new routes, edit the AppRouter.tsx file.
 
+import { Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Suspense } from 'react';
-import NostrProvider from '@/components/NostrProvider';
-import { NostrSync } from '@/components/NostrSync';
+import NostrProvider from "@/components/NostrProvider";
+import { NostrSync } from "@/components/NostrSync";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { NostrLoginProvider } from '@nostrify/react/login';
-import { AppProvider } from '@/components/AppProvider';
-import { AppConfig } from '@/contexts/AppContext';
-import { APP_RELAYS } from '@/lib/appRelays';
-import { UnlockGate } from '@/components/UnlockGate';
-import { InstallBanner } from '@/components/InstallBanner';
-import { DevAutoLogin } from '@/components/DevAutoLogin';
-import { OperatorWalletInit } from '@/components/OperatorWalletInit';
-import { OperatorScopedStateCleanup } from '@/components/OperatorScopedStateCleanup';
-import { appNostrLoginStorage } from '@/lib/nostrLoginStorage';
-import AppRouter from './AppRouter';
+import { NostrLoginProvider } from "@nostrify/react/login";
+import { AppProvider } from "@/components/AppProvider";
+import type { AppConfig } from "@/contexts/AppContext";
+import { APP_RELAYS } from "@/lib/appRelays";
+import { UnlockGate } from "@/components/UnlockGate";
+import { InstallBanner } from "@/components/InstallBanner";
+import { DevAutoLogin } from "@/components/DevAutoLogin";
+import { OperatorWalletInit } from "@/components/OperatorWalletInit";
+import { OperatorScopedStateCleanup } from "@/components/OperatorScopedStateCleanup";
+import { appNostrLoginStorage } from "@/lib/nostrLoginStorage";
+import AppRouter from "./AppRouter";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,7 +58,7 @@ export function App() {
             <NostrSync />
             <TooltipProvider>
               <Toaster />
-              <Suspense>
+              <Suspense fallback={<div className="min-h-dvh bg-background" />}>
                 <UnlockGate>
                   <AppRouter />
                 </UnlockGate>

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import type React from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Download,
   Upload,
@@ -602,6 +603,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
               )}
 
               <button
+                type="button"
                 onClick={() => setStep('welcome')}
                 className="text-sm text-muted-foreground hover:text-foreground"
               >
@@ -853,6 +855,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
               )}
 
               <button
+                type="button"
                 onClick={() => setStep('welcome')}
                 className="w-full text-sm text-muted-foreground hover:text-foreground"
               >
@@ -935,6 +938,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
               </Button>
 
               <button
+                type="button"
                 onClick={() => {
                   setStep('login');
                   setPassphrase('');
@@ -1008,6 +1012,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
               </Button>
 
               <button
+                type="button"
                 onClick={() => {
                   setImportedNcryptsec('');
                   setImportPassphrase('');
@@ -1109,6 +1114,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
               </Collapsible>
 
               <button
+                type="button"
                 onClick={() => setStep('login')}
                 className="w-full text-sm text-muted-foreground hover:text-foreground"
               >

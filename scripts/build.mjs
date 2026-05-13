@@ -12,6 +12,7 @@ const mode = process.env.NODE_ENV === "development" ? "development" : "productio
 const distDir = path.join(REPO_ROOT, "dist");
 const assetsDir = path.join(distDir, "assets");
 const metaDir = path.join(REPO_ROOT, ".tmp", "build");
+const sourceHtmlPath = repoPath("public", "index.html");
 
 function repoPath(...parts) {
   return path.join(REPO_ROOT, ...parts);
@@ -114,7 +115,7 @@ async function buildJs() {
 }
 
 async function writeHtml({ jsPath, cssPath }) {
-  const source = await readFile(repoPath("index.html"), "utf8");
+  const source = await readFile(sourceHtmlPath, "utf8");
   const withCss = source.includes('rel="stylesheet"')
     ? source
     : source.replace(

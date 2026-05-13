@@ -14,7 +14,7 @@ import {
   usePpqVideoJob,
   usePpqVideoSubmit,
 } from "@/hooks/usePpqVideo";
-import { PpqError } from "@/lib/ppq/types";
+import type { PpqError } from "@/lib/ppq/types";
 import type { PpqAccount } from "@/lib/ppq/types";
 
 import { TestHttpServer } from "./TestHttpServer";

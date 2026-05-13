@@ -1,7 +1,7 @@
 import { useNostr } from '@nostrify/react';
 import { useNostrLogin } from '@nostrify/react/login';
 import { useQuery } from '@tanstack/react-query';
-import { NSchema as n, NostrEvent, NostrMetadata } from '@nostrify/nostrify';
+import { NSchema as n, type NostrEvent, type NostrMetadata } from '@nostrify/nostrify';
 import { queryKeys } from '@/lib/queryKeys';
 
 export interface Account {

@@ -8,7 +8,7 @@ import {
 import { useMemo } from "react";
 import NostrProvider from "@/components/NostrProvider";
 import { AppProvider } from "@/components/AppProvider";
-import { AppConfig } from "@/contexts/AppContext";
+import type { AppConfig } from "@/contexts/AppContext";
 import { createMemoryNostrLoginStorage } from "@/lib/nostrLoginStorage";
 
 interface TestAppProps {
