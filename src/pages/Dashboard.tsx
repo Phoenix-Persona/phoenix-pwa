@@ -8,7 +8,6 @@
 
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useSeoMeta } from "@unhead/react";
 import { X } from "lucide-react";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -28,6 +27,7 @@ import { impactLight, notificationError, notificationSuccess } from "@/lib/hapti
 import { useToast } from "@/hooks/useToast";
 import { useAuthor } from "@/hooks/useAuthor";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { usePersonaComposer } from "@/hooks/usePersonaComposer";
 import { usePersona, usePersonaPosts } from "@/hooks/usePersona";
 import { useOperatorWallet } from "@/hooks/useOperatorWallet";
@@ -40,7 +40,7 @@ import { autoTopupConfigFromPersisted } from "@/lib/wallet/types";
 
 const Dashboard = () => {
   const { npub = "" } = useParams();
-  useSeoMeta({ title: "Dashboard — Zuka" });
+  usePageMeta({ title: "Dashboard — Zuka" });
   const crossPostEnabled = featureFlags.crossPost;
 
   const { user } = useCurrentUser();

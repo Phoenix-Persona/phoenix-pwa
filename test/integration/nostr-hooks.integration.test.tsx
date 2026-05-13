@@ -1,6 +1,6 @@
 import { useNostrLogin } from "@nostrify/react/login";
 import { cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "@/test/api";
 
 import { NostrSync } from "@/components/NostrSync";
 import { useAuthor } from "@/hooks/useAuthor";

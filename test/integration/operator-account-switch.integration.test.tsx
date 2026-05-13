@@ -1,6 +1,6 @@
 import { useNostrLogin } from "@nostrify/react/login";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "@/test/api";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePpqAccount } from "@/hooks/usePpqAccount";

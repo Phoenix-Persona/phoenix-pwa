@@ -1,5 +1,5 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "@/test/api";
 
 import { NostrSync } from "@/components/NostrSync";
 import { useAppContext } from "@/hooks/useAppContext";

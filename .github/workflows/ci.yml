@@ -33,6 +33,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: vitest-junit
+          name: node-test-reports
           path: test-results/*.xml
           if-no-files-found: warn

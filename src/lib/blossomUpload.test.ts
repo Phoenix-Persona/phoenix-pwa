@@ -1,5 +1,5 @@
 import type { NostrSigner } from "@nostrify/types";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "@/test/api";
 
 import { APP_BLOSSOM_SERVERS } from "@/lib/appBlossom";
 import { uploadFileToBlossom, urlFromUploadTags } from "./blossomUpload";

@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { useSeoMeta } from "@unhead/react";
 import { LayoutDashboard, Plus, Radio, Sparkles } from "lucide-react";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -10,11 +9,12 @@ import { PersonaStatsBadge } from "@/components/PersonaStatsBadge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { useMyPersonas, usePersonaActivityStats } from "@/hooks/usePersona";
 import { sanitizeHttpsUrl } from "@/lib/url";
 
 const MyPersonas = () => {
-  useSeoMeta({ title: "My personas — Zuka" });
+  usePageMeta({ title: "My personas — Zuka" });
   const { user } = useCurrentUser();
   const { data, isLoading, isError, error } = useMyPersonas();
   // Batched activity query keyed on the union of persona pubkeys —

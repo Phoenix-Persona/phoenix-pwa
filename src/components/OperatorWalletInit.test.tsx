@@ -8,7 +8,7 @@
  */
 
 import { render } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "@/test/api";
 
 import { OperatorWalletInit } from "./OperatorWalletInit";
 

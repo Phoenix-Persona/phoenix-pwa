@@ -4,7 +4,7 @@ import type { NostrEvent } from "@nostrify/nostrify";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { nip19 } from "nostr-tools";
 import type { PropsWithChildren } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "@/test/api";
 
 import {
   PHOENIX_PAYLOAD_APP,
@@ -238,34 +238,32 @@ describe("useUpdatePersona", () => {
     const envelope = makeEnvelope("stable-dtag");
     const { result } = renderHook(() => useUpdatePersona(), { wrapper });
 
-    await expect(
-      act(async () => {
-        await result.current.mutateAsync({
-          backupEvent: {
-            id: "old",
-            pubkey: "operator-pubkey",
-            kind: 30078,
-            created_at: 1,
-            tags: [["d", "stable-dtag"]],
-            content: "old",
-            sig: "sig",
-          },
-          envelope,
-          npub: "npub1persona",
-          name: "Voice",
-          username: "voice",
-          lightningUsername: "voice",
-          systemPrompt: "System",
-          bio: "Updated bio",
-          originalBio: "",
-          bioHydrated: true,
-          pictureUrl: "",
-          originalPicture: "",
-          pictureHydrated: true,
-          crossPost: undefined,
-        });
-      }),
-    ).resolves.toBeUndefined();
+    await act(async () => {
+      await result.current.mutateAsync({
+        backupEvent: {
+          id: "old",
+          pubkey: "operator-pubkey",
+          kind: 30078,
+          created_at: 1,
+          tags: [["d", "stable-dtag"]],
+          content: "old",
+          sig: "sig",
+        },
+        envelope,
+        npub: "npub1persona",
+        name: "Voice",
+        username: "voice",
+        lightningUsername: "voice",
+        systemPrompt: "System",
+        bio: "Updated bio",
+        originalBio: "",
+        bioHydrated: true,
+        pictureUrl: "",
+        originalPicture: "",
+        pictureHydrated: true,
+        crossPost: undefined,
+      });
+    });
 
     expect(mocks.nostrEvent).toHaveBeenCalledTimes(2);
     expect(warn).toHaveBeenCalledWith(
@@ -319,8 +317,9 @@ describe("useUpdatePersona", () => {
     const envelope = makeEnvelope("stable-dtag");
     const { result } = renderHook(() => useUpdatePersona(), { wrapper });
 
-    await expect(
-      act(async () => {
+    let caught: unknown;
+    await act(async () => {
+      try {
         await result.current.mutateAsync({
           backupEvent: {
             id: "old",
@@ -345,8 +344,15 @@ describe("useUpdatePersona", () => {
           pictureHydrated: true,
           crossPost: undefined,
         });
-      }),
-    ).rejects.toThrow("new-voice@breez.tips is already taken");
+      } catch (error) {
+        caught = error;
+      }
+    });
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toContain(
+      "new-voice@breez.tips is already taken",
+    );
 
     expect(mocks.registerLightningAddressWithRetry).toHaveBeenCalledWith(
       { id: "wallet" },

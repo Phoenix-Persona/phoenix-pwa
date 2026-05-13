@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { generateSecretKey, nip19 } from "nostr-tools";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "@/test/api";
 
 import AuthDialog from "./AuthDialog";
 

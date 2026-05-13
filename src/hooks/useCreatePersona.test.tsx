@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import type { NostrEvent } from "@nostrify/nostrify";
 import type { PropsWithChildren } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "@/test/api";
 
 import { queryKeys } from "@/lib/queryKeys";
 import { LightningUsernameTakenError } from "@/lib/wallet/lightningAddress";

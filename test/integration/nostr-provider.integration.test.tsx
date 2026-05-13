@@ -1,6 +1,6 @@
 import { useNostr } from "@nostrify/react";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "@/test/api";
 
 import { signedEvent, testKeys } from "./fixtures/nostr";
 import { createRelayHarness, type RelayHarness } from "./harness/renderWithRelay";

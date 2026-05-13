@@ -23,8 +23,8 @@ jobs:
       - name: Build project
         run: npm run build
         env:
-          # Vite injects VITE_*-prefixed env vars into the bundle at build
-          # time via __PHOENIX_ENV__ (see vite.config.ts → loadMergedViteEnv).
+          # The esbuild script injects VITE_*-prefixed env vars into the bundle
+          # at build time via __PHOENIX_ENV__.
           # GitHub Actions doesn't auto-expose secrets to step env; we have
           # to map them explicitly here.
           VITE_BREEZ_API_KEY: ${{ secrets.VITE_BREEZ_API_KEY }}

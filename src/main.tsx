@@ -5,10 +5,10 @@ import './lib/polyfills.ts';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import App from './App.tsx';
-import './index.css';
 import { ensureWalletReady } from './lib/wallet/init';
 import { clearStaleNostrLoginIfLocked, hydrateUserNcryptsec } from './lib/nip49Storage';
 import { bootstrapNative } from './lib/nativeBootstrap';
+import { registerServiceWorker } from "./lib/registerServiceWorker";
 
 // Capacitor native bootstrap — must run BEFORE React mounts so the
 // system bar style is themed at first paint and the iOS keyboard
@@ -65,6 +65,8 @@ async function boot() {
       <App />
     </ErrorBoundary>,
   );
+
+  registerServiceWorker();
 }
 
 boot();

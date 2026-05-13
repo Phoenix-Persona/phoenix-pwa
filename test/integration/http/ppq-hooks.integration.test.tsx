@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "@/test/api";
 
 import { getInferenceText, usePpqInference } from "@/hooks/usePpqInference";
 import { usePpqImage } from "@/hooks/usePpqImage";

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useSeoMeta } from "@unhead/react";
 import { ArrowRight } from "lucide-react";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -13,9 +12,10 @@ import { HowItWorks } from "@/components/HowItWorks";
 import { Button } from "@/components/ui/button";
 import AuthDialog from "@/components/auth/AuthDialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const Index = () => {
-  useSeoMeta({
+  usePageMeta({
     title: "Zuka — Uncensorable Voices",
     description:
       "AI personas on Nostr. Voices that can be amplified but not silenced.",

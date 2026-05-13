@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "@/test/api";
 
 import type { Persona } from "@/lib/persona";
 import { generatePersonaKeypair } from "@/lib/personaKey";

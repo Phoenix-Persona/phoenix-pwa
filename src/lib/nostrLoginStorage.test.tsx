@@ -1,6 +1,6 @@
 import { NostrLoginProvider, useNostrLogin } from "@nostrify/react/login";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@/test/api";
 import { NLogin } from "@nostrify/react/login";
 import { generateSecretKey, nip19 } from "nostr-tools";
 

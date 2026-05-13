@@ -200,13 +200,13 @@ shadcn CLI when upstream changes. App-specific UI lives one level up.
 | ----------------- | --------------------------------------------------------- |
 | `AppContext.ts`   | `AppConfig` shape + context. `RelayMetadata`, `BlossomServerMetadata`. |
 
-## `test/vitest/`
+## `test/node/`
 
 | File                    | What it does                                              |
 | ----------------------- | --------------------------------------------------------- |
-| `setup.ts`              | Vitest setup (jest-dom, jsdom).                           |
+| `setup.ts`              | node:test setup (jest-dom, jsdom).                        |
 | `TestApp.tsx`           | Wrapped provider tree for render tests.                   |
-| `ErrorBoundary.test.tsx`| Smoke test.                                               |
+| `api.ts`                | Project-local test API and mock helpers.                  |
 
 ## `test/manual/`
 

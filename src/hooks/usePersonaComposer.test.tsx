@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import type { NostrEvent } from "@nostrify/nostrify";
 import type { PropsWithChildren } from "react";
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "@/test/api";
 
 import type { Persona } from "@/lib/persona";
 import {

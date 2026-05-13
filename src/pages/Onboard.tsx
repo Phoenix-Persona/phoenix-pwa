@@ -16,7 +16,6 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSeoMeta } from "@unhead/react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -45,6 +44,7 @@ import {
 import { useToast } from "@/hooks/useToast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useCreatePersona } from "@/hooks/useCreatePersona";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 
 import { generatePersonaKeypair } from "@/lib/personaKey";
@@ -59,7 +59,7 @@ import {
 type WizardStep = "details" | "picture";
 
 const Onboard = () => {
-  useSeoMeta({ title: "Create a persona — Zuka" });
+  usePageMeta({ title: "Create a persona — Zuka" });
   const navigate = useNavigate();
   const { user } = useCurrentUser();
   const { toast } = useToast();

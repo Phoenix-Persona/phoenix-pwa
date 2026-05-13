@@ -7,13 +7,13 @@
 
 import { useState } from "react";
 import { Loader2, Wand2 } from "lucide-react";
-import { useSeoMeta } from "@unhead/react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/useToast";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { useWallet } from "@/hooks/useWallet";
 import { generateMnemonic } from "@/lib/wallet/client";
 import { readEnv } from "@/lib/env";
@@ -22,7 +22,7 @@ import { WalletPanel } from "@/components/wallet/WalletPanel";
 const PINNED_MNEMONIC = readEnv("VITE_WALLET_SEED");
 
 export default function WalletHarness() {
-  useSeoMeta({ title: "/dev/wallet — Phoenix" });
+  usePageMeta({ title: "/dev/wallet — Phoenix" });
   const { toast } = useToast();
 
   const [mnemonicInput, setMnemonicInput] = useState(PINNED_MNEMONIC ?? "");

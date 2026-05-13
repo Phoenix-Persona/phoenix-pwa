@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@/test/api";
 import { nip19 } from "nostr-tools";
 
 import {

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "@/test/api";
 
 import Onboard from "./Onboard";
 
@@ -12,10 +12,6 @@ const mocks = vi.hoisted(() => ({
   uploadFileToBlossom: vi.fn(),
   inferenceMutateAsync: vi.fn(),
   availability: { status: "idle" } as { status: "idle" } | { status: "taken"; username: string },
-}));
-
-vi.mock("@unhead/react", () => ({
-  useSeoMeta: vi.fn(),
 }));
 
 vi.mock("react-router-dom", () => ({

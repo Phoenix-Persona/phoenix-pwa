@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "@/test/api";
 
 import { verror, vlog, vwarn } from "./log";
 

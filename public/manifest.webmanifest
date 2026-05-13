@@ -1,9 +1,9 @@
 {
-  "name": "Phoenix — Uncensorable Voices",
-  "short_name": "Phoenix",
+  "name": "Zuka — Uncensorable Voices",
+  "short_name": "Zuka",
   "description": "AI personas on Nostr. Voices that can be amplified but not silenced.",
-  "theme_color": "#a8431b",
-  "background_color": "#1a0f08",
+  "theme_color": "#f6f1ea",
+  "background_color": "#f6f1ea",
   "display": "standalone",
   "orientation": "portrait",
   "start_url": "/",

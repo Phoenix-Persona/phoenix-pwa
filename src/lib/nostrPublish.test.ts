@@ -1,5 +1,5 @@
 import type { NostrEvent } from "@nostrify/nostrify";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "@/test/api";
 
 import { DEFAULT_PUBLISH_TIMEOUT_MS, publishWithTimeout } from "./nostrPublish";
 

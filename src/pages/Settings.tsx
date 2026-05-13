@@ -12,7 +12,6 @@
  */
 
 import { useNavigate } from "react-router-dom";
-import { useSeoMeta } from "@unhead/react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Lock,
@@ -44,6 +43,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { useLoggedInAccounts } from "@/hooks/useLoggedInAccounts";
 import { impactHeavy, notificationWarning } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
@@ -54,7 +54,7 @@ import {
 } from "@/lib/operatorSessionState";
 
 const Settings = () => {
-  useSeoMeta({ title: "Settings — Zuka" });
+  usePageMeta({ title: "Settings — Zuka" });
   const navigate = useNavigate();
   const { user } = useCurrentUser();
   const { logins, removeLogin } = useNostrLogin();

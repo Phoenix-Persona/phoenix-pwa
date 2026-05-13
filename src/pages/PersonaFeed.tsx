@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { useSeoMeta } from "@unhead/react";
 import { Copy, QrCode, Zap } from "lucide-react";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -20,6 +19,7 @@ import {
 import { QRCodeCanvas } from "@/components/ui/qrcode";
 import { useAppContext } from "@/hooks/useAppContext";
 import { useAuthor } from "@/hooks/useAuthor";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { usePersonaPosts } from "@/hooks/usePersona";
 import { useToast } from "@/hooks/useToast";
 import { genUserName } from "@/lib/genUserName";
@@ -73,7 +73,7 @@ const PersonaFeed = () => {
     toast({ title: "nprofile copied" });
   }
 
-  useSeoMeta({
+  usePageMeta({
     title: `${displayName} — Zuka`,
     description: bio || undefined,
   });

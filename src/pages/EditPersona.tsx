@@ -21,7 +21,6 @@
 
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useSeoMeta } from "@unhead/react";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import type { NostrEvent } from "@nostrify/nostrify";
 
@@ -35,6 +34,7 @@ import { createPersonaSigner } from "@/lib/personaSigner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { usePersona } from "@/hooks/usePersona";
 import { usePersonaPublicProfile } from "@/hooks/usePersonaPublicProfile";
 import { useToast } from "@/hooks/useToast";
@@ -50,7 +50,7 @@ import { parseCommaList } from "@/lib/text";
 
 const EditPersona = () => {
   const { npub = "" } = useParams();
-  useSeoMeta({ title: "Edit persona — Zuka" });
+  usePageMeta({ title: "Edit persona — Zuka" });
   const { user } = useCurrentUser();
   const personaQ = usePersona(npub);
 

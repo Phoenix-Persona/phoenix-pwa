@@ -1,7 +1,7 @@
 import { render, waitFor } from "@testing-library/react";
 import { nip19 } from "nostr-tools";
 import { generateSecretKey } from "nostr-tools/pure";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "@/test/api";
 
 import { DevAutoLogin } from "./DevAutoLogin";
 

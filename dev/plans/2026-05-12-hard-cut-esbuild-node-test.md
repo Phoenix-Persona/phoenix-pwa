@@ -1,5 +1,11 @@
 # Hard-Cut esbuild + node:test Migration Plan
 
+> **Status: Shipped on 2026-05-12.** Implemented on `feature/esbuild-node-test-hard-cut`.
+> Vite, Vitest, Vite plugins, and Unhead were removed from the dependency graph.
+> The shipped node:test harness keeps project-local `vi`-style helpers in
+> `test/node/api.ts` so the existing mock-heavy suite can run without the
+> Vitest package.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the Vite/Vitest/Unhead toolchain with explicit esbuild build scripts and Node's built-in test runner.
