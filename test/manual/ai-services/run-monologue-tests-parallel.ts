@@ -164,7 +164,7 @@ async function main(): Promise<void> {
     );
   }
 
-  console.log("Phoenix monologue tests — parallel runner");
+  console.log("Zuka monologue tests — parallel runner");
   console.log(`  jobs:    ${jobs.map((j) => j.name).join(", ")}`);
   console.log(`  log dir: ${logDir}`);
   console.log(

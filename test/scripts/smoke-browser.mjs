@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 
 import { chromium } from "playwright";
 
-import { REPO_ROOT } from "./env.mjs";
+import { REPO_ROOT } from "../../scripts/env.mjs";
 
 const port = Number(process.env.PORT ?? 48732);
 const baseUrl = `http://127.0.0.1:${port}`;

@@ -278,7 +278,7 @@ async function topupStep(
 /* ---------- main ---------- */
 
 async function main(): Promise<void> {
-  console.log("Phoenix wallet — auto-topup + inference test");
+  console.log("Zuka wallet — auto-topup + inference test");
   if (!process.env.VITE_BREEZ_API_KEY) {
     console.warn(
       "VITE_BREEZ_API_KEY not found — add it to .env or export it in the shell.",

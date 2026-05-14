@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { REPO_ROOT } from "./env.mjs";
+import { REPO_ROOT } from "../../scripts/env.mjs";
 
 const failures = [];
 const sourceHtmlLabel = "public/index.html";
@@ -109,7 +109,7 @@ async function checkComments() {
   const files = await walkFiles(REPO_ROOT);
   const commentPattern = /(\/\/\s*in a real\b|\/\*+\s*in a real\b|FIXME\b)/i;
   for (const file of files) {
-    if (path.relative(REPO_ROOT, file) === "scripts/check-source-policy.mjs") continue;
+    if (path.relative(REPO_ROOT, file) === "test/scripts/check-source-policy.mjs") continue;
     const source = await readFile(file, "utf8");
     const lines = source.split(/\r?\n/);
     lines.forEach((line, index) => {

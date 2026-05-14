@@ -4,7 +4,7 @@ import path from "node:path";
 
 import * as esbuild from "esbuild";
 
-import { REPO_ROOT } from "./env.mjs";
+import { REPO_ROOT } from "../../scripts/env.mjs";
 
 const metaPath = path.join(REPO_ROOT, ".tmp", "build", "meta.json");
 

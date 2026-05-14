@@ -3,7 +3,7 @@ import { createReadStream, existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { REPO_ROOT } from "./env.mjs";
+import { REPO_ROOT } from "../../scripts/env.mjs";
 
 const port = Number(process.env.PORT ?? 48733);
 const distDir = path.join(REPO_ROOT, "dist");

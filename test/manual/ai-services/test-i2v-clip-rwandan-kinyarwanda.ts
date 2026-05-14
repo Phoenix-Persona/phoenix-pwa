@@ -128,7 +128,7 @@ async function askYesNo(prompt: string, def: "y" | "n" = "y"): Promise<boolean> 
 const PREFLIGHT_USD_REQUIRED = 2;
 
 async function main(): Promise<void> {
-  console.log("Phoenix single-clip i2v test — Kinyarwanda");
+  console.log("Zuka single-clip i2v test — Kinyarwanda");
   console.log(
     `(${flags.clipDuration}s clip, ${flags.model}, conditioned on the same seed image)`,
   );

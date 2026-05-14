@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { REPO_ROOT } from "./env.mjs";
+import { REPO_ROOT } from "../../scripts/env.mjs";
 
 const metaPath = path.join(REPO_ROOT, ".tmp", "build", "meta.json");
 const defaultMainBudgetBytes = 550 * 1024;

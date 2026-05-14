@@ -144,7 +144,7 @@ async function main(): Promise<void> {
     Math.min(SCRIPT_SEGMENTS.length, flags.numClips),
   );
 
-  console.log("Phoenix multi-clip i2v chain — English (paced)");
+  console.log("Zuka multi-clip i2v chain — English (paced)");
   console.log(
     `(${numClips} sequential ${flags.clipDuration}s clips, ${flags.model}, last-frame conditioning each step)`,
   );

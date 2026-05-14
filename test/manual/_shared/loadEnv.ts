@@ -8,14 +8,14 @@
  *      ppq.ai api_key from a "free credits" team grant, or a
  *      `VITE_BREEZ_API_KEY` for the Spark wallet tests).
  *   2. `<repo>/dev/.env`  — project default, also layered into the
- *      browser via Vite's `define` injection. Use this for shared /
+ *      browser via esbuild's `define` injection. Use this for shared /
  *      project-level config.
  *
  * dotenv's default behavior is "first load wins" (no override), so a
  * key set in root `.env` is preserved when `dev/.env` is loaded after.
  *
- * `tsx test/manual/<dir>/<script>.ts` runs in plain Node where Vite isn't in
- * the loop, so this module is what bridges env-vs-`import.meta.env` for
+ * `tsx test/manual/<dir>/<script>.ts` runs in plain Node where the browser
+ * bundler is not in the loop, so this module is what bridges env-vs-client-env for
  * the tests. Importing it at the top of a test script makes
  * `process.env` carry the same keys the browser bundle sees, so
  * primitives can read them via `readEnv()` without duplicate fallbacks.

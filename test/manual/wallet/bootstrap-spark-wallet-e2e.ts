@@ -1,5 +1,5 @@
 /**
- * Bootstrap a fresh Phoenix wallet end-to-end.
+ * Bootstrap a fresh Zuka wallet end-to-end.
  *
  * Walks every goal of the headless wallet branch:
  *
@@ -215,7 +215,7 @@ async function connectAndPrintInfo(
       await registerLightningAddress(
         handle,
         username,
-        "Phoenix headless wallet test",
+        "Zuka headless wallet test",
       );
       info = await loadWalletInfo(handle);
       console.log(`  registered →     ${info.lightningAddress ?? "(failed)"}`);
@@ -248,7 +248,7 @@ async function receiveStep(state: WalletState): Promise<void> {
     return;
   }
 
-  const description = await ask(rl, "Memo?", "Phoenix wallet test");
+  const description = await ask(rl, "Memo?", "Zuka wallet test");
   const inv = await receiveBolt11(state.handle, { amountSats, description });
   console.log("\nPay this BOLT11 with any Lightning wallet:\n");
   console.log(inv.paymentRequest);
@@ -337,7 +337,7 @@ async function autoTopupStep(state: WalletState): Promise<void> {
 /* ---------- main ---------- */
 
 async function main(): Promise<void> {
-  console.log("Phoenix wallet bootstrap (full smoke walk)");
+  console.log("Zuka wallet bootstrap (full smoke walk)");
   if (!process.env.VITE_BREEZ_API_KEY) {
     console.warn(
       "VITE_BREEZ_API_KEY not found — add it to .env or export it in the shell.",

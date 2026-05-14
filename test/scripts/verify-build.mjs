@@ -2,7 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
-import { REPO_ROOT } from "./env.mjs";
+import { REPO_ROOT } from "../../scripts/env.mjs";
 
 const distDir = path.join(REPO_ROOT, "dist");
 const failures = [];

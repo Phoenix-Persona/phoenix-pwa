@@ -21,7 +21,7 @@
  *       of the first clip?
  *
  * Together these are the prompt-engineering technique we'll document for
- * the Phoenix wizard's "scene continuation" mode. This script is the
+ * the Zuka wizard's "scene continuation" mode. This script is the
  * artifact that proves the technique works (or doesn't) on Veo 3.1 Fast.
  *
  * What you get back: two MP4 URLs, side by side. Visually inspect the
@@ -215,7 +215,7 @@ const BEST_SINGLETON_PREFERENCE = [
   // Seedance 2 Fast — empirically PROVEN to deliver all three of
   // (a) image-to-video conditioning, (b) native lip-synced audio, and
   // (c) character + setting continuity across the seam. THIS is the
-  // path for Phoenix's multi-clip talking-head videos. `-fast` first
+  // path for Zuka's multi-clip talking-head videos. `-fast` first
   // for dev iteration; promote to `seedance-2` only for finals.
   "seedance-2-fast",
   "seedance-2",

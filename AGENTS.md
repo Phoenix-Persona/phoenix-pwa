@@ -53,9 +53,10 @@ Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, esbuild, Radi
 - `/src/contexts/` — React context providers (`AppContext`).
 - `/src/dev/` — dev harnesses for slice-by-slice testing (`WalletHarness`, `InferencePayHarness`). Routed under `/dev/*` in `AppRouter.tsx`.
 - `/test/node/` — node:test setup and testing utilities including the `TestApp` wrapper.
+- `/test/scripts/` — validation scripts for node:test, source policy, build verification, bundle budgets/analysis, and PWA smoke checks.
 - `/test/manual/` — manual and E2E Node scripts for wallet, PPQ, and media workflows.
 - `/public/` — static assets.
-- `App.tsx` — **already configured** with `QueryClientProvider`, `NostrProvider`, `UnheadProvider`, `AppProvider`, `NostrLoginProvider`. **Read before editing**; changes are rarely needed.
+- `App.tsx` — **already configured** with `AppProvider`, `QueryClientProvider`, `NostrLoginProvider`, `NostrProvider`, operator cleanup/init, `NostrSync`, `TooltipProvider`, `AppToaster`, `UnlockGate`, and `AppRouter`. **Read before editing**; changes are rarely needed.
 - `AppRouter.tsx` — React Router configuration. The catch-all `/:nip19` route handles all NIP-19 identifiers (see the `nip19-routing` skill).
 
 **Always read an existing file before modifying it.** Never write over `App.tsx`, `AppRouter.tsx`, or `NostrProvider` without first reading their contents.

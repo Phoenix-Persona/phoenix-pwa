@@ -5,6 +5,7 @@ Zuka has three test layers:
 - `src/**/*.test.ts(x)` contains colocated unit and focused component tests.
 - `test/integration/` contains automated integration tests that run against local in-memory Nostr relay and HTTP mock servers.
 - `test/manual/` contains explicit manual scripts for wallet, PPQ, media, and other spend/network workflows.
+- `test/scripts/` contains the node:test runner, source-policy check, build verifier, bundle budget/analyzer, and PWA smoke scripts used by npm commands.
 
 Before demos or releases, use [`test/manual/RELEASE-CHECKLIST.md`](./manual/RELEASE-CHECKLIST.md) for the real spend/network smoke cadence.
 
@@ -34,8 +35,17 @@ npm run test:integration
 npm run test:ci
 npm test
 npm run smoke:dev
+npm run smoke:dist
+npm run smoke:browser:prod
+npm run smoke:browser
 npm run analyze:bundle
 npm run check:bundle-budget
 ```
 
-For CI, install dependencies first, then run `npm run test:ci`. `npm test` remains the local one-command path and installs dependencies before running the full suite. `npm run smoke:dev` starts the local esbuild dev server and checks SPA fallback/static assets; `npm run analyze:bundle` and `npm run check:bundle-budget` read the latest production build metafile.
+For CI, install dependencies first, install Chromium for Playwright, then run
+`npm run test:ci`. `npm test` remains the local one-command path and installs
+dependencies before running the full suite. `npm run smoke:dev` checks SPA
+fallback/static assets against the dev server; `npm run smoke:dist` checks the
+production files; `npm run smoke:browser:prod` and `npm run smoke:browser`
+open the production and dev apps in Chromium. `npm run analyze:bundle` and
+`npm run check:bundle-budget` read the latest production build metafile.

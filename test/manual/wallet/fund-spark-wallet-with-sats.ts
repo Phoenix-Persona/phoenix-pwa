@@ -1,5 +1,5 @@
 /**
- * Fund the existing Phoenix wallet by an arbitrary number of sats.
+ * Fund the existing Zuka wallet by an arbitrary number of sats.
  *
  * Reuses the persisted operator + encrypted persona from
  * `bootstrap-spark-wallet-e2e.ts`, reconnects the Spark wallet, and
@@ -15,7 +15,7 @@
  *
  * Flags:
  *   --amount-sats <n>     Amount to receive (skips the prompt if set).
- *   --memo <text>         Invoice memo. Defaults to "Phoenix wallet top-up".
+ *   --memo <text>         Invoice memo. Defaults to "Zuka wallet top-up".
  *   --timeout-mins <n>    How long to wait for inbound payment (default 10).
  */
 
@@ -54,7 +54,7 @@ function flagValue(name: string): string | undefined {
 
 const flags = {
   amountSats: flagValue("amount-sats"),
-  memo: flagValue("memo") ?? "Phoenix wallet top-up",
+  memo: flagValue("memo") ?? "Zuka wallet top-up",
   timeoutMins: Number(flagValue("timeout-mins") ?? "10"),
 };
 
@@ -63,7 +63,7 @@ const rl = makeReadline();
 /* ---------- main ---------- */
 
 async function main(): Promise<void> {
-  console.log("Phoenix wallet — receive sats");
+  console.log("Zuka wallet — receive sats");
   if (!process.env.VITE_BREEZ_API_KEY) {
     console.warn(
       "VITE_BREEZ_API_KEY not found — add it to .env or export it in the shell.",

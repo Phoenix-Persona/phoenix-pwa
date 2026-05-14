@@ -1,6 +1,6 @@
 # ppq.ai integration smoke tests
 
-Manual end-to-end checks that the Phoenix ppq.ai primitives work against
+Manual end-to-end checks that the Zuka ppq.ai primitives work against
 the real `https://api.ppq.ai` service.
 
 ## Proven video model: `seedance-2-fast`

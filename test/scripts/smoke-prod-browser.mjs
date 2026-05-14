@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { chromium } from "playwright";
 
-import { REPO_ROOT } from "./env.mjs";
+import { REPO_ROOT } from "../../scripts/env.mjs";
 
 const port = Number(process.env.PORT ?? 48734);
 const distDir = path.join(REPO_ROOT, "dist");

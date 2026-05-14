@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 
-import { REPO_ROOT } from "./env.mjs";
+import { REPO_ROOT } from "../../scripts/env.mjs";
 
 const port = 48731;
 const baseUrl = `http://127.0.0.1:${port}`;

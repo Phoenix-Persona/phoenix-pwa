@@ -5,7 +5,7 @@ import path from "node:path";
 
 import * as esbuild from "esbuild";
 
-import { REPO_ROOT, esbuildDefines } from "./env.mjs";
+import { REPO_ROOT, esbuildDefines } from "../../scripts/env.mjs";
 
 const mode = process.argv.includes("--integration") ? "integration" : "unit";
 const selectedFiles = process.argv

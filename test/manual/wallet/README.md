@@ -1,6 +1,6 @@
 # wallet integration smoke tests
 
-Manual end-to-end checks that the Phoenix wallet primitives work against
+Manual end-to-end checks that the Zuka wallet primitives work against
 the real Breez Spark SDK.
 
 ## Three scripts
@@ -47,7 +47,7 @@ npx tsx test/manual/wallet/test-auto-topup-and-inference.ts
 | Flag | Effect |
 | --- | --- |
 | `--amount-sats <n>` | Skip the prompt and request this many sats |
-| `--memo <text>` | Invoice memo (default `"Phoenix wallet top-up"`) |
+| `--memo <text>` | Invoice memo (default `"Zuka wallet top-up"`) |
 | `--timeout-mins <n>` | How long to wait for inbound payment (default 10) |
 
 `test-auto-topup-and-inference.ts`
@@ -70,7 +70,7 @@ the `✓` lines, is what you should expect.
 ```text
 $ npx tsx test/manual/wallet/test-auto-topup-and-inference.ts
 Breez SDK: Node.js storage automatically enabled
-Phoenix wallet — auto-topup + inference test
+Zuka wallet — auto-topup + inference test
 
 ────── 0. Reload wallet + persona + ppq account ──────
 Connecting Spark wallet…

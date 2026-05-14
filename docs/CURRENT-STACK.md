@@ -5,8 +5,9 @@ Zuka uses explicit tooling instead of a framework build pipeline:
 - `scripts/build.mjs` bundles browser JS with esbuild, builds Tailwind CSS through the Tailwind CLI, copies static assets from `public/`, and writes `dist/index.html` plus `dist/404.html`.
 - `scripts/dev.mjs` runs the local esbuild dev server and Tailwind CSS watcher.
 - Biome handles linting through `npm run lint:ci`.
-- `node:test` runs unit and integration tests through `scripts/test-node.mjs`.
+- `node:test` runs unit and integration tests through `test/scripts/test-node.mjs`.
 - Playwright powers browser smoke checks for both dev and production builds.
+- Root `scripts/` is reserved for app build/dev/shared-env code; validation scripts live in `test/scripts/`.
 
 ## Validation
 
