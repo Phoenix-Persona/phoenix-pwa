@@ -18,6 +18,7 @@ Branch protection expectations are documented in
 | [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Directory map of `src/`, provider stack, route table, per-file one-liners. **Read first.** |
 | [`AUTH-SESSION-MODEL.md`](./AUTH-SESSION-MODEL.md) | Hard-cut auth/session persistence rules, operator isolation, cleanup boundary, and dev-only env pins. |
 | [`BRANCH-PROTECTION.md`](./BRANCH-PROTECTION.md) | Required CI/security checks for `dev` and `main`. |
+| [`CURRENT-STACK.md`](./CURRENT-STACK.md) | Current build, test, lint, browser smoke, and bundle-budget policy. |
 | [`DATA-FLOW.md`](./DATA-FLOW.md) | Traces user actions through actual code: persona creation, compose + publish, PPQ flows, etc. |
 | [`PERSONA-SCHEMA.md`](./PERSONA-SCHEMA.md) | The three Nostr events Zuka publishes per persona (kind 0, kind 30078, kind 1). Mirrors `PROJECT.md` §5. |
 | [`SECURITY-REGRESSION-CHECKLIST.md`](./SECURITY-REGRESSION-CHECKLIST.md) | PR checklist for secrets, operator isolation, Nostr trust boundaries, wallets, and PPQ. |

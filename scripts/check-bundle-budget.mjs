@@ -11,7 +11,7 @@ const mainBudgetBytes = Number(process.env.BUNDLE_MAIN_MAX_BYTES ?? defaultMainB
 const largestChunkBudgetBytes = Number(
   process.env.BUNDLE_LARGEST_JS_MAX_BYTES ?? defaultLargestChunkBudgetBytes,
 );
-const strict = process.env.BUNDLE_BUDGET_STRICT === "1";
+const strict = process.env.BUNDLE_BUDGET_STRICT === "1" || process.argv.includes("--strict");
 
 if (!existsSync(metaPath)) {
   console.error("Missing .tmp/build/meta.json. Run npm run build first.");
@@ -39,6 +39,9 @@ const jsOutputs = Object.entries(metafile.outputs)
   .sort((a, b) => b.bytes - a.bytes);
 const largest = jsOutputs[0];
 const failures = [];
+const zodInputs = Object.keys(metafile.inputs ?? {}).filter((input) =>
+  input.includes("node_modules/zod/"),
+);
 
 if (bytes > mainBudgetBytes) {
   failures.push(
@@ -56,6 +59,12 @@ if (largest && largest.bytes > largestChunkBudgetBytes) {
   console.log(
     `Largest JS output ${largest.file}: ${formatBytes(largest.bytes)} / ${formatBytes(largestChunkBudgetBytes)} within budget.`,
   );
+}
+
+if (zodInputs.length > 0) {
+  failures.push(`Browser bundle includes Zod inputs (${zodInputs.length}); keep Zod out of production browser chunks.`);
+} else {
+  console.log("Browser bundle has no Zod inputs.");
 }
 
 if (failures.length > 0) {

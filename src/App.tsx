@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import NostrProvider from "@/components/NostrProvider";
 import { NostrSync } from "@/components/NostrSync";
-import { Toaster } from "@/components/ui/toaster";
+import { AppToaster } from "@/components/AppToaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NostrLoginProvider } from "@nostrify/react/login";
 import { AppProvider } from "@/components/AppProvider";
@@ -57,7 +57,7 @@ export function App() {
             <OperatorWalletInit />
             <NostrSync />
             <TooltipProvider>
-              <Toaster />
+              <AppToaster />
               <Suspense fallback={<div className="min-h-dvh bg-background" />}>
                 <UnlockGate>
                   <AppRouter />

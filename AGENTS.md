@@ -5,6 +5,7 @@
 V1 has shipped. Per-feature plans live under [`dev/plans/`](./dev/plans/); shipped plans stay there as historical context, with a status banner at the top.
 
 **Doc indexes:** [`docs/INDEX.md`](./docs/INDEX.md) (engineering & architecture) · [`dev/INDEX.md`](./dev/INDEX.md) (design plan, parallel build streams).
+Current build/test/lint/smoke tooling is summarized in [`docs/CURRENT-STACK.md`](./docs/CURRENT-STACK.md).
 
 **Zuka-specific stack additions** (beyond the MKStack base described below):
 
