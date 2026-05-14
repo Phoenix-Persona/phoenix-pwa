@@ -72,7 +72,8 @@
   framework already wired into the scaffold. See `../dev/docs/nostrify.md`.
 
 - **MKStack** — the React/Vite/Tailwind/Nostrify boilerplate that Zuka
-  was scaffolded from.
+  was scaffolded from. The current app build uses explicit esbuild,
+  Tailwind CLI, node:test, and Biome tooling.
 
 - **Imigongo** — traditional Rwandan geometric art style. Visual motif
   carried forward from the existing scaffold for V1.5 polish.

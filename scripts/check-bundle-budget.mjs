@@ -6,7 +6,11 @@ import { REPO_ROOT } from "./env.mjs";
 
 const metaPath = path.join(REPO_ROOT, ".tmp", "build", "meta.json");
 const defaultMainBudgetBytes = 550 * 1024;
+const defaultLargestChunkBudgetBytes = 750 * 1024;
 const mainBudgetBytes = Number(process.env.BUNDLE_MAIN_MAX_BYTES ?? defaultMainBudgetBytes);
+const largestChunkBudgetBytes = Number(
+  process.env.BUNDLE_LARGEST_JS_MAX_BYTES ?? defaultLargestChunkBudgetBytes,
+);
 const strict = process.env.BUNDLE_BUDGET_STRICT === "1";
 
 if (!existsSync(metaPath)) {
@@ -26,17 +30,40 @@ if (!mainEntry) {
 
 const [file, output] = mainEntry;
 const bytes = output.bytes ?? 0;
-const message = `Main bundle ${file}: ${formatBytes(bytes)} / ${formatBytes(mainBudgetBytes)}`;
+const jsOutputs = Object.entries(metafile.outputs)
+  .filter(([outputFile]) => outputFile.endsWith(".js"))
+  .map(([outputFile, jsOutput]) => ({
+    file: outputFile,
+    bytes: jsOutput.bytes ?? 0,
+  }))
+  .sort((a, b) => b.bytes - a.bytes);
+const largest = jsOutputs[0];
+const failures = [];
 
 if (bytes > mainBudgetBytes) {
-  const warning = `${message} budget exceeded.`;
-  if (strict) {
-    console.error(warning);
-    process.exit(1);
-  }
-  console.warn(`${warning} Set BUNDLE_BUDGET_STRICT=1 to fail on this regression.`);
+  failures.push(
+    `Main bundle ${file}: ${formatBytes(bytes)} / ${formatBytes(mainBudgetBytes)} budget exceeded.`,
+  );
 } else {
-  console.log(`${message} within budget.`);
+  console.log(`Main bundle ${file}: ${formatBytes(bytes)} / ${formatBytes(mainBudgetBytes)} within budget.`);
+}
+
+if (largest && largest.bytes > largestChunkBudgetBytes) {
+  failures.push(
+    `Largest JS output ${largest.file}: ${formatBytes(largest.bytes)} / ${formatBytes(largestChunkBudgetBytes)} budget exceeded.`,
+  );
+} else if (largest) {
+  console.log(
+    `Largest JS output ${largest.file}: ${formatBytes(largest.bytes)} / ${formatBytes(largestChunkBudgetBytes)} within budget.`,
+  );
+}
+
+if (failures.length > 0) {
+  for (const failure of failures) {
+    if (strict) console.error(failure);
+    else console.warn(`${failure} Set BUNDLE_BUDGET_STRICT=1 to fail on this regression.`);
+  }
+  if (strict) process.exit(1);
 }
 
 function formatBytes(bytes) {

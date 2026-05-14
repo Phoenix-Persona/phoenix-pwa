@@ -50,7 +50,6 @@
  * See `dev/PROJECT.md` §5.
  */
 
-import { z } from "zod";
 import { getPublicKey } from "nostr-tools/pure";
 import { nip19 } from "nostr-tools";
 import type { NostrEvent } from "@nostrify/nostrify";
@@ -59,149 +58,288 @@ export const PERSONA_KIND = 30078;
 export const PHOENIX_PAYLOAD_APP = "phoenix-persona";
 export const PHOENIX_PAYLOAD_VERSION = 1 as const;
 
-// ─────────── Zod schemas ───────────
+// ─────────── Public types ───────────
 
-/** Source of content the persona references (e.g. RSS feed, article URL). */
-const personaSourceSchema = z.object({
-  kind: z.enum(["rss", "url"]),
-  url: z.string().min(1).max(2048),
-});
+export interface PersonaSource {
+  kind: "rss" | "url";
+  url: string;
+}
 
-/**
- * Auto-topup policy for the persona's PPQ credit (NIP-47 NWC). Persisted
- * inside the encrypted payload so the user's choice rides the backup
- * across devices.
- */
-const personaAutoTopupSchema = z.object({
-  enabled: z.boolean(),
-  threshold_usd: z.number().nonnegative().max(10000),
-  topup_amount_usd: z.number().positive().max(10000).optional(),
-  funding_source: z.enum(["operator", "persona"]).optional(),
-  target_usd: z.number().positive().max(10000).optional(),
-}).refine(
-  (cfg) => cfg.topup_amount_usd !== undefined || cfg.target_usd !== undefined,
-  "must include topup_amount_usd",
-);
+export interface PersonaAutoTopup {
+  enabled: boolean;
+  threshold_usd: number;
+  topup_amount_usd?: number;
+  funding_source?: "operator" | "persona";
+  target_usd?: number;
+}
 
-const personaSchema = z.object({
-  pubkey: z.string().regex(/^[0-9a-f]{64}$/i, "must be 64 hex chars"),
-  nsec: z
-    .string()
-    .regex(/^nsec1[02-9ac-hj-np-z]{58,}$/i, "must be a valid nsec1… string"),
-  /**
-   * Stable per-persona d-tag. Generated once at creation, mirrored
-   * onto the kind 30078 envelope's `["d", ...]` tag, and reused on
-   * every update so addressable-event semantics replace the prior
-   * revision (see PROJECT.md §5.2).
-   *
-   * Optional here for back-compat with personas published before this
-   * field landed; readers fall back to the event tag. New personas
-   * always write it.
-   */
-  dTag: z.string().min(1).max(128).optional(),
-  name: z.string().min(1).max(120),
-  /**
-   * URL-friendly persona handle used for the kind 0 `name` field.
-   * Lightning Address registration is tracked separately in the wallet
-   * payload. Optional for back-compat with personas authored before this
-   * field landed; new personas always write it. Lowercase letters,
-   * digits, and hyphens.
-   */
-  username: z
-    .string()
-    .min(1)
-    .max(60)
-    .regex(/^[a-z0-9][a-z0-9-]*$/, "lowercase letters, digits, and hyphens; must start with a letter or digit")
-    .optional(),
-  /**
-   * Rich/free-form name shown in the persona's kind 0 `display_name`.
-   * Falls back to `name` if missing — the two are aliases on read but
-   * `display_name` is preferred when present.
-   */
-  display_name: z.string().min(1).max(120).optional(),
-  system_prompt: z.string().max(20000),
-  reference_image_url: z.string().min(1).max(2048).optional(),
-  created_at: z.number().int().nonnegative(),
-  // Demo-critical domain fields (added during PR #2 schema reconciliation).
-  // All optional for back-compat with personas authored before they shipped.
-  region: z.string().min(1).max(8).optional(),
-  cause: z.string().min(1).max(120).optional(),
-  bio: z.string().max(2000).optional(),
-  tone: z.string().max(2000).optional(),
-  sources: z.array(personaSourceSchema).max(64).optional(),
-  /**
-   * Cross-posting webhook (V1.5 — see derek-plan.md "Cross-post +
-   * video composer"). When set, the Dashboard composer POSTs every
-   * published kind 1 event to `webhook_url` so a third-party
-   * aggregator (Buffer / Zapier / Make.com / etc.) can fan it out
-   * to non-Nostr platforms (X / Facebook / Instagram / etc.).
-   *
-   * `webhook_platforms` is a hint passed to the aggregator inside
-   * the payload — the aggregator's account configuration is the
-   * actual source of truth for what gets posted where.
-   */
-  cross_post: z
-    .object({
-      webhook_url: z.string().min(1).max(4096).optional(),
-      webhook_platforms: z
-        .array(z.string().min(1).max(32))
-        .max(8)
-        .optional(),
-    })
-    .optional(),
-});
+export interface Persona {
+  pubkey: string;
+  nsec: string;
+  dTag?: string;
+  name: string;
+  username?: string;
+  display_name?: string;
+  system_prompt: string;
+  reference_image_url?: string;
+  created_at: number;
+  region?: string;
+  cause?: string;
+  bio?: string;
+  tone?: string;
+  sources?: PersonaSource[];
+  cross_post?: {
+    webhook_url?: string;
+    webhook_platforms?: string[];
+  };
+}
 
-export const walletSchema = z.object({
-  // Phoenix V1 uses Breez Spark SDK (`@breeztech/breez-sdk-spark`).
-  // Future SDK variants land as a discriminated union.
-  kind: z.literal("spark"),
-  /** BIP-39 mnemonic (12, 15, 18, 21, or 24 words). Held only inside the encrypted backup. */
-  seed: z
-    .string()
-    .min(1)
-    .max(2048)
-    .refine((m) => {
-      const words = m.trim().split(/\s+/);
-      return words.length === 12 || words.length === 15 ||
-        words.length === 18 || words.length === 21 || words.length === 24;
-    }, "must be a valid BIP-39 mnemonic (12, 15, 18, 21, or 24 words)"),
-  /** Public donate handle. Safe to embed; already public via the kind 0 lud16. */
-  lightning_address: z.string().max(512).optional(),
-  lnurl: z.string().min(1).max(4096).optional(),
-  auto_topup: personaAutoTopupSchema.optional(),
-});
+export interface PersonaWallet {
+  kind: "spark";
+  seed: string;
+  lightning_address?: string;
+  lnurl?: string;
+  auto_topup?: PersonaAutoTopup;
+}
 
-const modelPrefsSchema = z.object({
-  agent: z.string().min(1).max(120),
-  image: z.string().min(1).max(120),
-  tts: z.string().min(1).max(120),
-  video: z.string().min(1).max(120).nullable().optional(),
-});
+export interface PersonaModelPrefs {
+  agent: string;
+  image: string;
+  tts: string;
+  video?: string | null;
+}
 
-const settingsSchema = z.object({
-  default_relays: z.array(z.string().min(1).max(2048)).max(64).default([]),
-});
+export interface PersonaSettings {
+  default_relays: string[];
+}
 
-const phoenixEnvelopeSchema = z.object({
-  app: z.literal(PHOENIX_PAYLOAD_APP),
-  version: z.literal(PHOENIX_PAYLOAD_VERSION),
-  persona: personaSchema,
-  // Optional until the wallet wiring lands; required after that.
-  wallet: walletSchema.optional(),
-  // Optional; defaults applied at use-time.
-  model_prefs: modelPrefsSchema.optional(),
-  settings: settingsSchema.optional(),
-});
+export interface PhoenixEnvelope {
+  app: typeof PHOENIX_PAYLOAD_APP;
+  version: typeof PHOENIX_PAYLOAD_VERSION;
+  persona: Persona;
+  wallet?: PersonaWallet;
+  model_prefs?: PersonaModelPrefs;
+  settings?: PersonaSettings;
+}
 
-// ─────────── Public types (inferred from schemas) ───────────
+type JsonRecord = Record<string, unknown>;
 
-export type PersonaSource = z.infer<typeof personaSourceSchema>;
-export type PersonaAutoTopup = z.infer<typeof personaAutoTopupSchema>;
-export type Persona = z.infer<typeof personaSchema>;
-export type PersonaWallet = z.infer<typeof walletSchema>;
-export type PersonaModelPrefs = z.infer<typeof modelPrefsSchema>;
-export type PersonaSettings = z.infer<typeof settingsSchema>;
-export type PhoenixEnvelope = z.infer<typeof phoenixEnvelopeSchema>;
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isStringLength(value: unknown, min: number, max: number, pattern?: RegExp): value is string {
+  return typeof value === "string" &&
+    value.length >= min &&
+    value.length <= max &&
+    (!pattern || pattern.test(value));
+}
+
+function optionalString(value: unknown, min: number, max: number, pattern?: RegExp): string | undefined | null {
+  if (value === undefined) return undefined;
+  return isStringLength(value, min, max, pattern) ? value : null;
+}
+
+function isNumberInRange(value: unknown, min: number, max: number, integer = false): value is number {
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= min &&
+    value <= max &&
+    (!integer || Number.isInteger(value));
+}
+
+function optionalPositiveNumber(value: unknown): number | undefined | null {
+  if (value === undefined) return undefined;
+  return isNumberInRange(value, Number.MIN_VALUE, 10000) ? value : null;
+}
+
+function parseStringArray(value: unknown, maxItems: number, minLength: number, maxLength: number): string[] | undefined | null {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length > maxItems) return null;
+  const out: string[] = [];
+  for (const item of value) {
+    if (!isStringLength(item, minLength, maxLength)) return null;
+    out.push(item);
+  }
+  return out;
+}
+
+function parseSources(value: unknown): PersonaSource[] | undefined | null {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length > 64) return null;
+  const out: PersonaSource[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) return null;
+    if (item.kind !== "rss" && item.kind !== "url") return null;
+    if (!isStringLength(item.url, 1, 2048)) return null;
+    out.push({ kind: item.kind, url: item.url });
+  }
+  return out;
+}
+
+function parseAutoTopup(value: unknown): PersonaAutoTopup | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  if (typeof value.enabled !== "boolean") return null;
+  if (!isNumberInRange(value.threshold_usd, 0, 10000)) return null;
+  const topupAmountUsd = optionalPositiveNumber(value.topup_amount_usd);
+  const targetUsd = optionalPositiveNumber(value.target_usd);
+  if (topupAmountUsd === null || targetUsd === null) return null;
+  if (topupAmountUsd === undefined && targetUsd === undefined) return null;
+  if (
+    value.funding_source !== undefined &&
+    value.funding_source !== "operator" &&
+    value.funding_source !== "persona"
+  ) {
+    return null;
+  }
+  return {
+    enabled: value.enabled,
+    threshold_usd: value.threshold_usd,
+    ...(topupAmountUsd !== undefined ? { topup_amount_usd: topupAmountUsd } : {}),
+    ...(value.funding_source !== undefined ? { funding_source: value.funding_source } : {}),
+    ...(targetUsd !== undefined ? { target_usd: targetUsd } : {}),
+  };
+}
+
+function isValidMnemonicShape(seed: string): boolean {
+  const words = seed.trim().split(/\s+/);
+  return words.length === 12 ||
+    words.length === 15 ||
+    words.length === 18 ||
+    words.length === 21 ||
+    words.length === 24;
+}
+
+export function parsePersonaWallet(value: unknown): PersonaWallet | null {
+  if (!isRecord(value)) return null;
+  if (value.kind !== "spark") return null;
+  if (!isStringLength(value.seed, 1, 2048) || !isValidMnemonicShape(value.seed)) return null;
+  const lightningAddress = optionalString(value.lightning_address, 0, 512);
+  const lnurl = optionalString(value.lnurl, 1, 4096);
+  const autoTopup = parseAutoTopup(value.auto_topup);
+  if (lightningAddress === null || lnurl === null || autoTopup === null) return null;
+  return {
+    kind: "spark",
+    seed: value.seed,
+    ...(lightningAddress !== undefined ? { lightning_address: lightningAddress } : {}),
+    ...(lnurl !== undefined ? { lnurl } : {}),
+    ...(autoTopup !== undefined ? { auto_topup: autoTopup } : {}),
+  };
+}
+
+function parseModelPrefs(value: unknown): PersonaModelPrefs | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  if (!isStringLength(value.agent, 1, 120)) return null;
+  if (!isStringLength(value.image, 1, 120)) return null;
+  if (!isStringLength(value.tts, 1, 120)) return null;
+  if (
+    value.video !== undefined &&
+    value.video !== null &&
+    !isStringLength(value.video, 1, 120)
+  ) {
+    return null;
+  }
+  return {
+    agent: value.agent,
+    image: value.image,
+    tts: value.tts,
+    ...(value.video !== undefined ? { video: value.video } : {}),
+  };
+}
+
+function parseSettings(value: unknown): PersonaSettings | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  const defaultRelays = parseStringArray(value.default_relays, 64, 1, 2048);
+  if (defaultRelays === null) return null;
+  return { default_relays: defaultRelays ?? [] };
+}
+
+function parseCrossPost(value: unknown): Persona["cross_post"] | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  const webhookUrl = optionalString(value.webhook_url, 1, 4096);
+  const webhookPlatforms = parseStringArray(value.webhook_platforms, 8, 1, 32);
+  if (webhookUrl === null || webhookPlatforms === null) return null;
+  return {
+    ...(webhookUrl !== undefined ? { webhook_url: webhookUrl } : {}),
+    ...(webhookPlatforms !== undefined ? { webhook_platforms: webhookPlatforms } : {}),
+  };
+}
+
+function parsePersona(value: unknown): Persona | null {
+  if (!isRecord(value)) return null;
+  if (!isStringLength(value.pubkey, 64, 64, /^[0-9a-f]{64}$/i)) return null;
+  if (!isStringLength(value.nsec, 1, 128, /^nsec1[02-9ac-hj-np-z]{58,}$/i)) return null;
+  if (!isStringLength(value.name, 1, 120)) return null;
+  if (!isStringLength(value.system_prompt, 0, 20000)) return null;
+  if (!isNumberInRange(value.created_at, 0, Number.MAX_SAFE_INTEGER, true)) return null;
+
+  const dTag = optionalString(value.dTag, 1, 128);
+  const username = optionalString(value.username, 1, 60, /^[a-z0-9][a-z0-9-]*$/);
+  const displayName = optionalString(value.display_name, 1, 120);
+  const referenceImageUrl = optionalString(value.reference_image_url, 1, 2048);
+  const region = optionalString(value.region, 1, 8);
+  const cause = optionalString(value.cause, 1, 120);
+  const bio = optionalString(value.bio, 0, 2000);
+  const tone = optionalString(value.tone, 0, 2000);
+  const sources = parseSources(value.sources);
+  const crossPost = parseCrossPost(value.cross_post);
+  if (
+    dTag === null ||
+    username === null ||
+    displayName === null ||
+    referenceImageUrl === null ||
+    region === null ||
+    cause === null ||
+    bio === null ||
+    tone === null ||
+    sources === null ||
+    crossPost === null
+  ) {
+    return null;
+  }
+
+  return {
+    pubkey: value.pubkey,
+    nsec: value.nsec,
+    name: value.name,
+    system_prompt: value.system_prompt,
+    created_at: value.created_at,
+    ...(dTag !== undefined ? { dTag } : {}),
+    ...(username !== undefined ? { username } : {}),
+    ...(displayName !== undefined ? { display_name: displayName } : {}),
+    ...(referenceImageUrl !== undefined ? { reference_image_url: referenceImageUrl } : {}),
+    ...(region !== undefined ? { region } : {}),
+    ...(cause !== undefined ? { cause } : {}),
+    ...(bio !== undefined ? { bio } : {}),
+    ...(tone !== undefined ? { tone } : {}),
+    ...(sources !== undefined ? { sources } : {}),
+    ...(crossPost !== undefined ? { cross_post: crossPost } : {}),
+  };
+}
+
+function parseEnvelope(value: unknown): PhoenixEnvelope | null {
+  if (!isRecord(value)) return null;
+  if (value.app !== PHOENIX_PAYLOAD_APP) return null;
+  if (value.version !== PHOENIX_PAYLOAD_VERSION) return null;
+  const persona = parsePersona(value.persona);
+  if (!persona) return null;
+  const wallet = value.wallet === undefined ? undefined : parsePersonaWallet(value.wallet);
+  const modelPrefs = parseModelPrefs(value.model_prefs);
+  const settings = parseSettings(value.settings);
+  if (wallet === null || modelPrefs === null || settings === null) return null;
+  return {
+    app: PHOENIX_PAYLOAD_APP,
+    version: PHOENIX_PAYLOAD_VERSION,
+    persona,
+    ...(wallet !== undefined ? { wallet } : {}),
+    ...(modelPrefs !== undefined ? { model_prefs: modelPrefs } : {}),
+    ...(settings !== undefined ? { settings } : {}),
+  };
+}
 
 // ─────────── Event template builder ───────────
 
@@ -266,7 +404,7 @@ function pubkeyFromNsec(nsec: string): string | null {
  *
  * Defense layers (in order):
  *   1. JSON parse
- *   2. Zod schema (app discriminator, version pin, shape, length limits)
+ *   2. Runtime schema check (app discriminator, version pin, shape, length limits)
  *   3. Pubkey-from-nsec match
  */
 export function parsePhoenixEnvelope(plaintext: string): PhoenixEnvelope | null {
@@ -277,10 +415,8 @@ export function parsePhoenixEnvelope(plaintext: string): PhoenixEnvelope | null 
     return null;
   }
 
-  const result = phoenixEnvelopeSchema.safeParse(parsed);
-  if (!result.success) return null;
-
-  const envelope = result.data;
+  const envelope = parseEnvelope(parsed);
+  if (!envelope) return null;
 
   // Derive-and-verify: the persona.pubkey claim must match the public key
   // derived from the embedded persona.nsec. Defends against a tampered

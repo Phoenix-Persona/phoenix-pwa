@@ -13,6 +13,15 @@ const assetsDir = path.join(distDir, "assets");
 const port = Number(process.env.PORT ?? 8080);
 const sourceHtmlPath = repoPath("public", "index.html");
 const cssOutputPath = path.join(assetsDir, "index.css");
+const walletWasmSourcePath = repoPath(
+  "node_modules",
+  "@breeztech",
+  "breez-sdk-spark",
+  "web",
+  "breez_sdk_spark_wasm_bg.wasm",
+);
+const walletWasmOutputPath = path.join(assetsDir, "breez_sdk_spark_wasm_bg.wasm");
+const fontOutputDir = path.join(assetsDir, "files");
 
 function repoPath(...parts) {
   return path.join(REPO_ROOT, ...parts);
@@ -41,6 +50,21 @@ function aliasPlugin() {
   return {
     name: "zuka-alias",
     setup(build) {
+      build.onResolve({ filter: /^@nostrify\/nostrify$/ }, () => ({
+        path: repoPath("src", "lib", "vendor", "nostrifyRuntime.ts"),
+      }));
+      build.onResolve({ filter: /@nostrify\/nostrify\/dist\/NSchema\.js$/ }, () => ({
+        path: repoPath("src", "lib", "vendor", "nostrifySchemaShim.ts"),
+      }));
+      build.onResolve({ filter: /\/node_modules\/@nostrify\/nostrify\/dist\/NSchema\.js$/ }, () => ({
+        path: repoPath("src", "lib", "vendor", "nostrifySchemaShim.ts"),
+      }));
+      build.onResolve({ filter: /^\.\/NSchema\.js$/ }, (args) => {
+        if (!args.importer.includes(`${path.sep}@nostrify${path.sep}nostrify${path.sep}dist${path.sep}`)) {
+          return undefined;
+        }
+        return { path: repoPath("src", "lib", "vendor", "nostrifySchemaShim.ts") };
+      });
       build.onResolve({ filter: /^@\/test(\/.*)?$/ }, (args) => ({
         path: resolveLocalModule(
           repoPath("test", "node", args.path.replace(/^@\/test\/?/, "")),
@@ -78,6 +102,22 @@ async function buildCssOnce() {
   ]);
 }
 
+async function copyWalletWasm() {
+  await cp(walletWasmSourcePath, walletWasmOutputPath);
+}
+
+async function copyFontFiles() {
+  await mkdir(fontOutputDir, { recursive: true });
+  for (const family of ["fraunces", "inter"]) {
+    const sourceDir = repoPath("node_modules", "@fontsource-variable", family, "files");
+    for (const entry of await readdir(sourceDir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith(".woff2")) {
+        await cp(path.join(sourceDir, entry.name), path.join(fontOutputDir, entry.name));
+      }
+    }
+  }
+}
+
 async function writeDevHtml() {
   const source = await readFile(sourceHtmlPath, "utf8");
   const withCss = source.replace(
@@ -108,13 +148,17 @@ async function collectCssWatchFiles(dir) {
   return files;
 }
 
-async function cssWatchSignature() {
-  const files = [
+async function cssWatchFiles() {
+  return [
     sourceHtmlPath,
     ...await collectCssWatchFiles(repoPath("src")),
   ];
+}
+
+function cssWatchSignature(files) {
   return files
     .map((file) => {
+      if (!existsSync(file)) return `${file}:missing`;
       const stat = statSync(file);
       return `${file}:${stat.mtimeMs}:${stat.size}`;
     })
@@ -122,18 +166,26 @@ async function cssWatchSignature() {
 }
 
 async function startCssPoller() {
-  let signature = await cssWatchSignature();
+  let files = await cssWatchFiles();
+  let signature = cssWatchSignature(files);
   let rebuilding = false;
+  let lastFileRefresh = Date.now();
   const timer = setInterval(() => {
     void (async () => {
       if (rebuilding) return;
-      const nextSignature = await cssWatchSignature();
+      if (Date.now() - lastFileRefresh > 10_000) {
+        files = await cssWatchFiles();
+        lastFileRefresh = Date.now();
+      }
+      const nextSignature = cssWatchSignature(files);
       if (nextSignature === signature) return;
 
       rebuilding = true;
       try {
         await buildCssOnce();
+        files = await cssWatchFiles();
         signature = nextSignature;
+        lastFileRefresh = Date.now();
         console.log("[tailwind] rebuilt dist/assets/index.css");
       } catch (error) {
         console.error("[tailwind] rebuild failed:", error);
@@ -198,6 +250,8 @@ function serve() {
 await rm(distDir, { recursive: true, force: true });
 await mkdir(assetsDir, { recursive: true });
 await cp(repoPath("public"), distDir, { recursive: true });
+await copyWalletWasm();
+await copyFontFiles();
 await buildCssOnce();
 await writeDevHtml();
 
@@ -208,6 +262,7 @@ const ctx = await esbuild.context({
   format: "esm",
   platform: "browser",
   target: "esnext",
+  jsx: "automatic",
   sourcemap: true,
   define: await esbuildDefines({ mode: "development" }),
   plugins: [aliasPlugin()],

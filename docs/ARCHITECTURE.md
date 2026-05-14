@@ -82,7 +82,7 @@ Pure logic and HTTP clients. No React imports.
 
 | File              | What it does                                                                |
 | ----------------- | --------------------------------------------------------------------------- |
-| `persona.ts`      | Persona Zod schemas, kind 30078 event template builder, envelope parser. **Read the file header (lines 1-43)** — it documents the privacy posture (no Zuka-specific tags) and the four-layer envelope verification. |
+| `persona.ts`      | Persona runtime validators, kind 30078 event template builder, envelope parser. **Read the file header (lines 1-43)** — it documents the privacy posture (no Zuka-specific tags) and the four-layer envelope verification. |
 | `personaCrypto.ts`| `encryptPhoenixEnvelope` / `tryDecryptPhoenixEnvelope` — operator-self-encrypted NIP-44 ciphertext. |
 | `personaKey.ts`   | Persona keypair generation, nsec ↔ keypair, `signWithPersona()`.            |
 | `personaPost.ts`  | `buildPersonaPostTemplate` — kind 1 with **no Zuka-identifying tags** (no `client`, no operator pubkey, no persona name). Read lines 1-19 for what's deliberately omitted. |
@@ -103,7 +103,7 @@ Pure logic and HTTP clients. No React imports.
 | `appBlossom.ts`   | App-default Blossom servers + `parseBlossomServerList(event)` for kind 10063 + `getEffectiveBlossomServers()` for the merge-with-user-list policy. |
 | `genUserName.ts`  | Deterministic display name from a pubkey for "Unknown persona" fallbacks. Has tests. |
 | `polyfills.ts`    | Loaded first in `main.tsx`. Browser polyfills.                              |
-| `utils.ts`        | shadcn `cn()` helper.                                                       |
+| `utils.ts`        | `cn()` class-merge helper used by UI primitives.                            |
 | `styleClient.ts`  | **Legacy — scheduled for deletion per `dev/PROJECT.md` §11.** POSTs to `/api/style` (Vercel function) for persona text styling. Both `Onboard.tsx` and `Dashboard.tsx` still call this. The PPQ hooks exist but are not yet wired in — see `DATA-FLOW.md` "Unwired seams". Migration: replace with `usePpqInference`. |
 
 ## `src/hooks/`
@@ -126,7 +126,7 @@ Pure logic and HTTP clients. No React imports.
 | `useCurrentUser`        | Returns `{ user, users, ...metadata }`. The current login is `users[0]`. Builds `NUser` from the active login. |
 | `useLoggedInAccounts`   | Multi-account list with kind-0 metadata pre-fetched.                 |
 | `useLoginActions`       | `nsec` / `bunker` / `extension` / `nostrconnect` login methods + `logout`. **Don't edit except to add new login methods** (file comment, line 10). |
-| `useUploadFile`         | Wraps `BlossomUploader` from `@nostrify/nostrify/uploaders`. Reads server list from `useAppContext`. |
+| `useUploadFile`         | Uploads to Blossom with the active Blossom server list from `useAppContext`. |
 | `useAuthor(pubkey)`     | Resolve pubkey → kind 0 metadata. 5-min staleTime.                   |
 
 ### PPQ (built, not yet wired into pages)
@@ -145,7 +145,7 @@ Pure logic and HTTP clients. No React imports.
 | ----------------- | -------------------------------------------------- |
 | `useAppContext`   | Sugar for `AppContext` consumer.                   |
 | `useTheme`        | Reads/writes `config.theme`.                       |
-| `useToast`        | shadcn toast.                                      |
+| `useToast`        | App toast helper.                                  |
 | `useLocalStorage` | Generic key/value with serialize/deserialize hooks. |
 | `useIsMobile`     | Media-query based.                                 |
 | `useInView`       | Intersection observer wrapper.                     |
@@ -156,7 +156,7 @@ Pure logic and HTTP clients. No React imports.
 
 | File                  | What it does                                                          |
 | --------------------- | --------------------------------------------------------------------- |
-| `AppProvider.tsx`     | App config (theme, relays, Blossom). Persists to `localStorage` via Zod-validated deserializer. |
+| `AppProvider.tsx`     | App config (theme, relays, Blossom). Persists to `localStorage` via local runtime validation. |
 | `NostrProvider.tsx`   | NPool + NIP-42 AUTH. **Read it before changing the pool.** The signer/relay refs pattern (lines 22-115) is load-bearing. |
 | `NostrSync.tsx`       | Global syncer for kind 10002 + 10063 → app config.                    |
 | `ErrorBoundary.tsx`   | React error boundary at the root.                                     |
@@ -178,8 +178,8 @@ Pure logic and HTTP clients. No React imports.
 
 ### `components/ui/`
 
-56 files. **shadcn primitives — do not hand-edit.** Regenerate via the
-shadcn CLI when upstream changes. App-specific UI lives one level up.
+56 files. **Copied UI primitives — keep edits scoped and consistent.**
+App-specific UI lives one level up.
 
 ## `src/pages/`
 
@@ -211,7 +211,7 @@ shadcn CLI when upstream changes. App-specific UI lives one level up.
 ## `test/manual/`
 
 Manual and E2E Node scripts for wallet, PPQ, and media workflows. These are
-run explicitly with `tsx`; they are not part of the Vitest suite.
+run explicitly with `tsx`; they are not part of the automated node:test suite.
 
 Production tests are colocated next to source: `App.test.tsx`,
 `lib/genUserName.test.ts`, `lib/persona.test.ts`. New tests should follow
@@ -221,7 +221,7 @@ that convention.
 
 | Key                   | Owner                | Contents                                       |
 | --------------------- | -------------------- | ---------------------------------------------- |
-| `nostr:app-config`    | `AppProvider`        | Theme, relay metadata, Blossom server metadata. Zod-validated on read. |
+| `nostr:app-config`    | `AppProvider`        | Theme, relay metadata, Blossom server metadata. Runtime-validated on read. |
 | `nostr:login`         | `NostrLoginProvider` | All saved logins (nsec / bunker / extension).  |
 | `phoenix:ppq:account` | `lib/ppq/storage.ts` | `{ api_key, credit_id }` — the operator's PPQ account. |
 
@@ -234,7 +234,7 @@ operator's signer. See `lib/personaKey.ts:1-9`.
 - **`App.tsx` — providers only**, routes go in `AppRouter.tsx` (file comment line 1-2).
 - **`useNostr.ts` — re-export only**, do not add logic (file comment lines 1-5).
 - **`useLoginActions.ts` — only edit to add new login methods** (file comment line 10).
-- **`components/ui/` — shadcn-generated**, regenerate, don't hand-edit.
+- **`components/ui/` — copied primitives**, keep edits small and match the local pattern.
 - **No Zuka-specific tags on persona-published events.** Read `lib/persona.ts:1-43` and `lib/personaPost.ts:1-19` before touching tag arrays.
 - **No NIP-04 anywhere.** Use NIP-44 via `signer.nip44.{encrypt,decrypt}`.
 - **The current-user signer is at `useCurrentUser().user.signer`.** It satisfies the `Nip44Signer` interface — cast to that when calling `lib/personaCrypto.ts` helpers.

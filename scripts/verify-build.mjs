@@ -41,6 +41,9 @@ requireFile("icon-512.png");
 requireFile("icon-maskable.png");
 requireFile("ffmpeg/ffmpeg-core.js");
 requireFile("ffmpeg/ffmpeg-core.wasm");
+requireFile("assets/breez_sdk_spark_wasm_bg.wasm");
+requireFile("assets/files/inter-latin-standard-normal.woff2");
+requireFile("assets/files/fraunces-latin-standard-normal.woff2");
 
 const html = existsSync(path.join(distDir, "index.html"))
   ? await readFile(path.join(distDir, "index.html"), "utf8")

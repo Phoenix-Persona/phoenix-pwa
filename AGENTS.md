@@ -19,14 +19,17 @@ V1 has shipped. Per-feature plans live under [`dev/plans/`](./dev/plans/); shipp
 
 # Project Overview
 
-Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, Vite, shadcn/ui, and Nostrify, extended with `pi-mono` (agent runtime), PPQ (Lightning-paid AI inference), and the Breez Spark SDK (per-persona Lightning wallet).
+Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, esbuild, Radix/Tailwind UI primitives, and Nostrify, extended with `pi-mono` (agent runtime), PPQ (Lightning-paid AI inference), and the Breez Spark SDK (per-persona Lightning wallet).
 
 ## Technology Stack
 
 - **React 19.x**: hooks, concurrent rendering, ref-as-prop
 - **TailwindCSS 4.x**: utility-first styling
-- **Vite**: dev server and production bundler
-- **shadcn/ui**: unstyled accessible components on Radix UI + Tailwind (48+ components in `@/components/ui`)
+- **esbuild**: production JS bundling and watched dev builds through `scripts/build.mjs` and `scripts/dev.mjs`
+- **Tailwind CLI**: CSS build step, run explicitly from the build/dev scripts
+- **Biome**: linting
+- **node:test**: unit and integration test runner, with project helpers in `test/node`
+- **Radix/Tailwind UI primitives**: copied accessible component primitives in `@/components/ui`
 - **Nostrify** (`@nostrify/react`): Nostr protocol framework
 - **React Router**: client-side routing with `BrowserRouter` and automatic scroll-to-top
 - **TanStack Query**: data fetching, caching, state
@@ -35,7 +38,7 @@ Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, Vite, shadcn/
 ## Project Structure
 
 - `/src/components/` — UI components.
-  - `ui/` — shadcn/ui primitives.
+  - `ui/` — copied Radix/Tailwind UI primitives.
   - `auth/` — login components (`LoginArea`, `AuthDialog`, `AccountSwitcher`).
   - `wallet/` — wallet UI (`WalletPanel`, `WalletDialog`, `WalletBadge`, `SendDialog`, `ReceiveDialog`).
   - `howItWorks/` — landing-page explainer sections.
@@ -48,7 +51,7 @@ Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, Vite, shadcn/
   - Top-level: `persona.ts`, `personaCrypto.ts`, `personaKey.ts`, `personaPost.ts`, `appRelays.ts`, `appBlossom.ts`, `nip49Storage.ts`, `genUserName.ts`, `polyfills.ts`, `utils.ts`, `env.ts`.
 - `/src/contexts/` — React context providers (`AppContext`).
 - `/src/dev/` — dev harnesses for slice-by-slice testing (`WalletHarness`, `InferencePayHarness`). Routed under `/dev/*` in `AppRouter.tsx`.
-- `/test/vitest/` — Vitest setup and testing utilities including the `TestApp` wrapper.
+- `/test/node/` — node:test setup and testing utilities including the `TestApp` wrapper.
 - `/test/manual/` — manual and E2E Node scripts for wallet, PPQ, and media workflows.
 - `/public/` — static assets.
 - `App.tsx` — **already configured** with `QueryClientProvider`, `NostrProvider`, `UnheadProvider`, `AppProvider`, `NostrLoginProvider`. **Read before editing**; changes are rarely needed.
@@ -106,7 +109,7 @@ Kinds below 1000 are "legacy"; their storage behavior is per-kind (e.g. kind 1 i
 **CRITICAL:** Nostr private keys (`nsec`) are stored **in plaintext in `localStorage`**. Any JavaScript running on the origin can steal them. A single XSS = permanent, unrecoverable key theft across every Nostr client the user ever touches. **Treat XSS mitigation as the top-priority security concern.**
 
 - **Never** use `dangerouslySetInnerHTML`, `innerHTML`, or `document.write` with event data, URL params, or other untrusted strings.
-- **CSP is defense-in-depth**, not primary defense. `index.html` ships a restrictive CSP (`script-src 'self'`, `default-src 'none'`). Never relax it with `'unsafe-eval'`, `'unsafe-inline'` on `script-src`, or wildcard sources.
+- **CSP is defense-in-depth**, not primary defense. `public/index.html` ships a restrictive CSP (`script-src 'self'`, `default-src 'none'`). Never relax it with `'unsafe-eval'`, `'unsafe-inline'` on `script-src`, or wildcard sources.
 - **Sanitize every event-sourced URL** (`sanitizeUrl()` — https-only allowlist) before using it as `href`, `src`, iframe `src`, or CSS `url()`.
 - **Sanitize every event-sourced string interpolated into CSS**. A malicious `font-family` or `url()` value can break out of the CSS context and inject rules.
 
@@ -354,9 +357,9 @@ For font installation, color-scheme changes, light/dark theming, or the `isolate
 
 ## Writing Tests vs. Running Tests
 
-**Running the existing test script — always do it.** After any code change, run the project's test/validation script. **Your task is not complete until it passes.** The script typically covers TypeScript compilation, ESLint, and existing tests.
+**Running the existing test script — always do it.** After any code change, run the project's test/validation script. **Your task is not complete until it passes.** The script typically covers TypeScript compilation, Biome, node:test, the esbuild build, and PWA smoke checks.
 
-**Writing new test files — don't, unless the user asks.** If the user explicitly requests tests, describes a bug to diagnose with a test, or reports that a problem persists after a fix, load the **`testing`** skill for the project's Vitest + `TestApp` setup and policy.
+**Writing new test files — don't, unless the user asks.** If the user explicitly requests tests, describes a bug to diagnose with a test, or reports that a problem persists after a fix, load the **`testing`** skill, then adapt its older Vitest guidance to the current node:test helpers in `test/node`.
 
 ## Validating Your Changes
 

@@ -1,7 +1,8 @@
-import { type NostrEvent, type NostrMetadata, NSchema as n } from '@nostrify/nostrify';
+import type { NostrEvent, NostrMetadata } from '@nostrify/types';
 import { useNostr } from '@nostrify/react';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
+import { parseNostrMetadata } from '@/lib/nostrMetadata';
 
 export function useAuthor(pubkey: string | undefined) {
   const { nostr } = useNostr();
@@ -22,12 +23,12 @@ export function useAuthor(pubkey: string | undefined) {
         throw new Error('No event found');
       }
 
-      try {
-        const metadata = n.json().pipe(n.metadata()).parse(event.content);
+      const metadata = parseNostrMetadata(event.content);
+      if (metadata) {
         return { metadata, event };
-      } catch {
-        return { event };
       }
+
+      return { event };
     },
     staleTime: 5 * 60 * 1000, // Keep cached data fresh for 5 minutes
     retry: 3,

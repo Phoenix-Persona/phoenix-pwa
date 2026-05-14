@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, statSync } from "node:fs";
-import { cp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
@@ -13,6 +13,15 @@ const distDir = path.join(REPO_ROOT, "dist");
 const assetsDir = path.join(distDir, "assets");
 const metaDir = path.join(REPO_ROOT, ".tmp", "build");
 const sourceHtmlPath = repoPath("public", "index.html");
+const walletWasmSourcePath = repoPath(
+  "node_modules",
+  "@breeztech",
+  "breez-sdk-spark",
+  "web",
+  "breez_sdk_spark_wasm_bg.wasm",
+);
+const walletWasmOutputPath = path.join(assetsDir, "breez_sdk_spark_wasm_bg.wasm");
+const fontOutputDir = path.join(assetsDir, "files");
 
 function repoPath(...parts) {
   return path.join(REPO_ROOT, ...parts);
@@ -56,6 +65,21 @@ function aliasPlugin() {
   return {
     name: "zuka-alias",
     setup(build) {
+      build.onResolve({ filter: /^@nostrify\/nostrify$/ }, () => ({
+        path: repoPath("src", "lib", "vendor", "nostrifyRuntime.ts"),
+      }));
+      build.onResolve({ filter: /@nostrify\/nostrify\/dist\/NSchema\.js$/ }, () => ({
+        path: repoPath("src", "lib", "vendor", "nostrifySchemaShim.ts"),
+      }));
+      build.onResolve({ filter: /\/node_modules\/@nostrify\/nostrify\/dist\/NSchema\.js$/ }, () => ({
+        path: repoPath("src", "lib", "vendor", "nostrifySchemaShim.ts"),
+      }));
+      build.onResolve({ filter: /^\.\/NSchema\.js$/ }, (args) => {
+        if (!args.importer.includes(`${path.sep}@nostrify${path.sep}nostrify${path.sep}dist${path.sep}`)) {
+          return undefined;
+        }
+        return { path: repoPath("src", "lib", "vendor", "nostrifySchemaShim.ts") };
+      });
       build.onResolve({ filter: /^@\/test(\/.*)?$/ }, (args) => ({
         path: resolveLocalModule(
           repoPath("test", "node", args.path.replace(/^@\/test\/?/, "")),
@@ -85,6 +109,22 @@ async function buildCss() {
   return `assets/${finalName}`;
 }
 
+async function copyWalletWasm() {
+  await cp(walletWasmSourcePath, walletWasmOutputPath);
+}
+
+async function copyFontFiles() {
+  await mkdir(fontOutputDir, { recursive: true });
+  for (const family of ["fraunces", "inter"]) {
+    const sourceDir = repoPath("node_modules", "@fontsource-variable", family, "files");
+    for (const entry of await readdir(sourceDir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith(".woff2")) {
+        await cp(path.join(sourceDir, entry.name), path.join(fontOutputDir, entry.name));
+      }
+    }
+  }
+}
+
 async function buildJs() {
   const result = await esbuild.build({
     entryPoints: [repoPath("src", "main.tsx")],
@@ -93,6 +133,7 @@ async function buildJs() {
     format: "esm",
     platform: "browser",
     target: "esnext",
+    jsx: "automatic",
     outdir: assetsDir,
     entryNames: "[name]-[hash]",
     chunkNames: "chunk-[name]-[hash]",
@@ -135,6 +176,8 @@ await mkdir(assetsDir, { recursive: true });
 await cp(repoPath("public"), distDir, { recursive: true });
 
 const cssPath = await buildCss();
+await copyWalletWasm();
+await copyFontFiles();
 const jsPath = await buildJs();
 await writeHtml({ jsPath, cssPath });
 

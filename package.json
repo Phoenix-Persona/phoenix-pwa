@@ -15,8 +15,11 @@
     "test:integration": "node scripts/test-node.mjs --integration",
     "test:integration:ci": "node scripts/test-node.mjs --integration",
     "test:all": "npm run test:unit && npm run test:integration && node scripts/build.mjs && node scripts/verify-build.mjs && echo 'All tests passed!'",
-    "test:ci": "npm run test:unit:ci && npm run test:integration:ci && node scripts/build.mjs && node scripts/verify-build.mjs && echo 'All tests passed!'",
+    "test:ci": "npm run test:unit:ci && npm run test:integration:ci && node scripts/build.mjs && node scripts/verify-build.mjs && npm run check:bundle-budget && npm run test:pwa && echo 'All tests passed!'",
     "smoke:dev": "node scripts/smoke-dev.mjs",
+    "smoke:browser": "node scripts/smoke-browser.mjs",
+    "smoke:dist": "node scripts/smoke-dist.mjs",
+    "test:pwa": "node scripts/build.mjs && npm run smoke:dist && npm run smoke:browser",
     "analyze:bundle": "node scripts/analyze-bundle.mjs",
     "check:bundle-budget": "node scripts/check-bundle-budget.mjs",
     "postinstall": "mkdir -p public/ffmpeg && cp -f node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.js node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.wasm public/ffmpeg/",
@@ -57,8 +60,7 @@
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.14.2",
     "tailwind-merge": "^3.5.0",
-    "tw-animate-css": "^1.2.0",
-    "zod": "^4.3.6"
+    "tw-animate-css": "^1.2.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.13",
@@ -78,6 +80,7 @@
     "esbuild": "^0.28.0",
     "expect": "^30.3.0",
     "jsdom": "^29.1.0",
+    "playwright": "^1.59.1",
     "tailwindcss": "^4.2.4",
     "tailwindcss-safe-area": "^1.3.0",
     "typescript": "^6.0.3",

@@ -73,9 +73,8 @@ interface PersonaPictureFieldProps {
 const DEFAULT_IMAGE_MODEL = "gpt-image-1";
 
 /**
- * Pull the canonical URL out of a Blossom upload result. Nostrify's
- * BlossomUploader returns NIP-94 imeta tags; the first `url` tag is
- * the upload's canonical address.
+ * Pull the canonical URL out of Blossom NIP-94-style upload tags. The
+ * first `url` tag is the upload's canonical address.
  */
 function urlFromUploadTags(tags: string[][]): string | null {
   for (const tag of tags) {

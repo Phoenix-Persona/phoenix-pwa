@@ -162,7 +162,7 @@ mitigated (V2) with separate operator keypairs per unlinkable group.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  Zuka PWA  (React 19 + Vite + TailwindCSS 4 + shadcn/ui)      │
+│  Zuka PWA  (React 19 + esbuild + TailwindCSS 4 + Radix UI)    │
 │                                                                  │
 │  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────────┐  │
 │  │ Character   │  │ Dashboard /  │  │ Wallet UI               │  │
@@ -615,7 +615,8 @@ constructive, not just resilient.
 
 ## 11. Project structure
 
-The repo today is MKStack's React/Vite/Tailwind/Nostrify boilerplate plus
+The repo began as MKStack's React/Vite/Tailwind/Nostrify boilerplate and now
+uses explicit esbuild, Tailwind CLI, node:test, and Biome tooling plus
 an early sketch of the user-signs-encrypted-persona-event scheme — which
 matches the architecture in §3 closely. Most of the persona files need
 adaptation, not a full rewrite. Replace what the new stack obsoletes.
@@ -630,7 +631,7 @@ adaptation, not a full rewrite. Replace what the new stack obsoletes.
 
 **Reuse with adaptation.** Architecture matches §3; update to §5 schema:
 - `src/lib/persona.ts`, `personaCrypto.ts`, `personaKey.ts`, `personaPost.ts`
-  → align the persona Zod schema to the §5.2 plaintext payload (add
+  → align the persona runtime schema to the §5.2 plaintext payload (add
   `persona.dTag` field for the stable per-persona d-tag, switch
   `wallet.kind` from `breeze` to `spark`, drop voice fields, embed
   the Spark wallet seed, the `model_prefs` section). The current code

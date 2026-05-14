@@ -155,7 +155,7 @@ for each candidate:
    tryDecryptPhoenixEnvelope(content, pubkey, signer)        ← lib/personaCrypto.ts:55
       │ signer.nip44.decrypt(operatorPubkey, ciphertext)     ← may throw → null
       │ JSON.parse(plaintext)                                ← may throw → null
-      │ phoenixEnvelopeSchema.safeParse                      ← Zod validation
+      │ parseEnvelope / local runtime validators             ← schema validation
       │ getPublicKey(decode(envelope.config.personaNsec))    ← derived-key match
       ▼
    PhoenixEnvelope | null
@@ -323,11 +323,11 @@ getEffectiveBlossomServers(config.blossomServerMetadata, useAppBlossomServers)
                                                              ← lib/appBlossom.ts:44
    │  app servers + user servers, deduped, app first per BUD-03
    ▼
-new BlossomUploader({ servers, signer: user.signer })        ← @nostrify/nostrify/uploaders
+uploadFileToBlossom({ file, signer: user.signer, servers })  ← lib/blossomUpload.ts
    │
    ▼
-uploader.upload(file)
-   │  Signs kind 24242 auth events under the hood (BUD-11)
+PUT /upload to the first accepting Blossom server
+   │  Signs kind 24242 auth events for upload authorization
    ▼
 returns NIP-94 imeta-shaped tags: [["url", ...], ["x", <sha256>], ...]
 ```
@@ -440,7 +440,7 @@ plumb work next.
 | `usePpqImage` / `generateImage`         | No page calls it       | (no image gen in UI)                     |
 | `usePpqLightningTopup`, `usePpqTopupStatus` | No page              | (no wallet UI)                           |
 | `usePpqNwcAutoTopup`                    | No page                | (no wallet UI)                           |
-| `BlossomUploader` via `useUploadFile`   | `AuthDialog` (avatar)  | (Onboard publishes empty `picture`; Dashboard composer doesn't attach images) |
+| Blossom upload via `useUploadFile`      | `AuthDialog` (avatar)  | (Onboard publishes empty `picture`; Dashboard composer doesn't attach images) |
 
 **Style endpoint migration** — when replacing `styleClient.ts` with
 `usePpqInference`, the relevant call sites are `Onboard.tsx:136` and

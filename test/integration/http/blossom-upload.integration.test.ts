@@ -14,7 +14,7 @@ describe("uploadFileToBlossom", () => {
     }
   });
 
-  it("uploads through BlossomUploader to a local Blossom-shaped server", async () => {
+  it("uploads to a local Blossom-shaped server", async () => {
     const server = await startServer();
     const file = new File(["hello blossom"], "hello.txt", {
       type: "text/plain",

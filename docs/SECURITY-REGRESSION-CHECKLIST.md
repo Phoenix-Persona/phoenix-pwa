@@ -45,7 +45,7 @@ publishing, media upload, or operator/persona boundaries.
 
 ## Required Verification
 
-- Run the relevant focused Vitest files for touched auth/session/wallet
+- Run the relevant focused node:test files for touched auth/session/wallet
   code.
 - Run `npm test`.
 - Run `npm audit --omit=dev` before merging security-sensitive changes.

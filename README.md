@@ -25,7 +25,7 @@ The authoritative design document is **[`PROJECT.md`](./dev/PROJECT.md)**.
 
 ## Tech stack
 
-- **Web** — React 19, Vite, TailwindCSS 4, shadcn/ui
+- **Web** — React 19, esbuild, TailwindCSS 4, Radix/Tailwind UI primitives
 - **Native** — Capacitor 8 (Android shipped; iOS scaffolding in place)
 - **Nostr** — Nostrify (`@nostrify/react`), NIP-44 (encrypted backups), NIP-49 (at-rest nsec encryption), NIP-57 (zaps), NIP-65 (relay list), NIP-78 (encrypted application data — kind 30078), NIP-92 (imeta media)
 - **Agent harness (V2)** — [`pi-mono`](https://github.com/earendil-works/pi) (`pi-agent-core` runtime, `pi-ai` LLM client, `pi-web-ui` chat components)
