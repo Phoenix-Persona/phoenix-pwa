@@ -11,6 +11,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 - Started the project changelog.
 - Added `docs/PRODUCT.md` as the release-facing product model and scope guide.
+- Added `docs-drift-audit` and `changelog-release` repo-local agent skills.
 
 ### Changed
 
