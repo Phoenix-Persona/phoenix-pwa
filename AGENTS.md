@@ -63,7 +63,7 @@ Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, esbuild, Radi
 
 ## UI Components
 
-Components in `@/components/ui` are unstyled, accessible primitives styled with Tailwind. They follow a consistent pattern using `React.forwardRef` and the `cn()` class-merge utility, and many are built on Radix UI primitives. When you need a specific component, list the directory (`ls src/components/ui/`) or import from `@/components/ui/<name>` — all common primitives are present (buttons, inputs, dialogs, dropdowns, forms, tables, etc.).
+Components in `@/components/ui` are unstyled, accessible primitives styled with Tailwind. They follow a consistent pattern using `React.forwardRef` and the `cn()` class-merge utility, and many are built on Radix UI primitives. When you need a specific component, list the directory (`ls src/components/ui/`) or import from `@/components/ui/<name>` — this repo intentionally keeps only the primitives it uses.
 
 ## System Prompt Management
 
@@ -290,7 +290,7 @@ Canonical defaults live in `src/lib/appRelays.ts` (`APP_RELAYS`) and `src/lib/ap
 
 - **`NostrSync`** auto-loads the user's NIP-65 relay list on login and writes it into `AppContext`.
 - **Automatic publishing** — updating the relay config publishes a new kind 10002 event when the user is logged in.
-- A drop-in settings UI (`RelayListManager`) is available as the **`relay-management`** skill.
+- The settings UI is implemented in `src/components/RelayListManager.tsx`.
 
 ## Routing
 
@@ -361,7 +361,7 @@ For font installation, color-scheme changes, light/dark theming, or the `isolate
 
 **Running the existing test script — always do it.** After any code change, run the project's test/validation script. **Your task is not complete until it passes.** The script typically covers TypeScript compilation, Biome, node:test, the esbuild build, and PWA smoke checks.
 
-**Writing new test files — don't, unless the user asks.** If the user explicitly requests tests, describes a bug to diagnose with a test, or reports that a problem persists after a fix, load the **`testing`** skill, then adapt its older Vitest guidance to the current node:test helpers in `test/node`.
+**Writing new test files — don't, unless the user asks.** If the user explicitly requests tests, describes a bug to diagnose with a test, or reports that a problem persists after a fix, use the current `node:test` helpers in `test/node`. For integration-test harness patterns, read `test/integration/README.md`.
 
 ## Validating Your Changes
 
