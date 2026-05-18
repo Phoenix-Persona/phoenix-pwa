@@ -1,5 +1,13 @@
 import { QueryClient } from "@tanstack/react-query";
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import {
   afterEach,
   beforeEach,
@@ -12,6 +20,10 @@ import {
   mockModule,
 } from "@/test/api";
 
+import {
+  PersonaPictureStager,
+  type StagedPersonaPicture,
+} from "@/components/PersonaPictureStager";
 import { usePersonaComposer } from "@/hooks/usePersonaComposer";
 import { useWallet } from "@/hooks/useWallet";
 import type { WalletHandle } from "@/lib/wallet/types";
@@ -51,6 +63,8 @@ const walletMocks = hoisted(() => ({
   })),
 }));
 
+let restoreObjectUrlStubs: (() => void) | undefined;
+
 mockModule("@/lib/wallet/client", () => ({
   generateMnemonic: walletMocks.generateMnemonic,
   connectWallet: walletMocks.connectWallet,
@@ -70,6 +84,8 @@ describe("AI usage integration", () => {
 
   afterEach(async () => {
     cleanup();
+    restoreObjectUrlStubs?.();
+    restoreObjectUrlStubs = undefined;
     await harness?.cleanup();
     harness = undefined;
   });
@@ -297,6 +313,208 @@ describe("AI usage integration", () => {
       currency: "USD",
     });
   });
+
+  it("rejects manual PPQ top-up before payment when the wallet cannot cover the invoice", async () => {
+    const operator = await operatorEnvelopeEvent({
+      operator: testKeys.operator,
+      wallet: { kind: "spark", seed: MNEMONIC },
+      ppq: { api_key: "api-insufficient", credit_id: "credit-insufficient" },
+    });
+    harness = await createServicesHarness({
+      events: [operator.event],
+      logins: [loginFor(testKeys.operator)],
+      queryClient: testQueryClient(),
+      withHttp: true,
+    });
+    if (!harness.http) throw new Error("HTTP harness was not started.");
+    harness.http.on("POST", "/credits/balance", () => ({
+      json: { balance_usd: 1 },
+    }));
+    harness.http.on("GET", "/queries/history?page=1&page_count=20&all_keys=true", () => ({
+      json: { data: [] },
+    }));
+    harness.http.on("POST", "/topup/create/btc-lightning", () => ({
+      json: {
+        invoice_id: "invoice-too-large",
+        expires_at: 1_800_000_000,
+        amount: 99,
+        currency: "USD",
+        lightning_invoice: "lnbc1toolarge",
+        crypto_amount_due: "0.001",
+      },
+    }));
+
+    const wallet = renderHook(
+      () =>
+        useWallet({
+          walletId: `persona:${testKeys.persona.pubkey}`,
+          mnemonic: MNEMONIC,
+          autoTopup: {
+            enabled: false,
+            thresholdUsd: 5,
+            topupAmountUsd: 99,
+            fundingSource: "persona",
+          },
+        }),
+      { wrapper: harness.wrapper },
+    );
+
+    await waitFor(() => expect(wallet.result.current.handle).toBeDefined());
+    await act(async () => {
+      await expect(
+        wallet.result.current.manualTopup(99, "persona"),
+      ).rejects.toMatchObject({
+        name: "WalletError",
+        message: expect.stringContaining("requires 100000 sats"),
+      });
+    });
+    expect(walletMocks.sendBolt11).not.toHaveBeenCalled();
+  });
+
+  it("rejects manual PPQ top-up when the PPQ invoice expires after payment", async () => {
+    const operator = await operatorEnvelopeEvent({
+      operator: testKeys.operator,
+      wallet: { kind: "spark", seed: MNEMONIC },
+      ppq: { api_key: "api-expired", credit_id: "credit-expired" },
+    });
+    harness = await createServicesHarness({
+      events: [operator.event],
+      logins: [loginFor(testKeys.operator)],
+      queryClient: testQueryClient(),
+      withHttp: true,
+    });
+    if (!harness.http) throw new Error("HTTP harness was not started.");
+    harness.http.on("POST", "/credits/balance", () => ({
+      json: { balance_usd: 1 },
+    }));
+    harness.http.on("GET", "/queries/history?page=1&page_count=20&all_keys=true", () => ({
+      json: { data: [] },
+    }));
+    harness.http.on("POST", "/topup/create/btc-lightning", () => ({
+      json: {
+        invoice_id: "invoice-expired",
+        expires_at: 1_800_000_000,
+        amount: 12,
+        currency: "USD",
+        lightning_invoice: "lnbc1expired",
+        crypto_amount_due: "0.000001",
+      },
+    }));
+    harness.http.on("GET", "/topup/status/invoice-expired", () => ({
+      json: {
+        invoice_id: "invoice-expired",
+        status: "Expired",
+        amount: 12,
+        currency: "USD",
+      },
+    }));
+
+    const wallet = renderHook(
+      () =>
+        useWallet({
+          walletId: `persona:${testKeys.persona.pubkey}`,
+          mnemonic: MNEMONIC,
+          autoTopup: {
+            enabled: false,
+            thresholdUsd: 5,
+            topupAmountUsd: 12,
+            fundingSource: "persona",
+          },
+        }),
+      { wrapper: harness.wrapper },
+    );
+
+    await waitFor(() => expect(wallet.result.current.handle).toBeDefined());
+    await act(async () => {
+      await expect(
+        wallet.result.current.manualTopup(12, "persona"),
+      ).rejects.toMatchObject({
+        name: "WalletError",
+        message: expect.stringContaining("without settling: Expired"),
+      });
+    });
+    expect(walletMocks.sendBolt11).toHaveBeenCalledWith(
+      expect.anything(),
+      { paymentRequest: "lnbc1expired" },
+    );
+    expect(wallet.result.current.manualTopupResult).toBeUndefined();
+  });
+
+  it("generates a persona picture through PPQ without publishing it", async () => {
+    const operator = await operatorEnvelopeEvent({
+      operator: testKeys.operator,
+      wallet: { kind: "spark", seed: MNEMONIC },
+      ppq: { api_key: "api-image", credit_id: "credit-image" },
+    });
+    harness = await createServicesHarness({
+      events: [operator.event],
+      logins: [loginFor(testKeys.operator)],
+      queryClient: testQueryClient(),
+      withHttp: true,
+    });
+    if (!harness.http) throw new Error("HTTP harness was not started.");
+    harness.http.on("POST", "/credits/balance", () => ({
+      json: { balance_usd: 10 },
+    }));
+    harness.http.on("POST", "/v1/images/generations", (req) => ({
+      json: {
+        created: 1_800_000_000,
+        model: "gpt-image-1",
+        cost: 0.02,
+        data: [
+          {
+            url: `${harness?.httpUrl}/portrait.png`,
+            content_type: "image/png",
+          },
+        ],
+        request: JSON.parse(req.bodyText),
+      },
+    }));
+    harness.http.on("GET", "/portrait.png", () => ({
+      headers: { "content-type": "image/png" },
+      body: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+    }));
+    const objectUrlStubs = installObjectUrlStubs("blob:generated-portrait");
+    const onChange = mockFn((picture: StagedPersonaPicture | null) => picture);
+
+    render(
+      <PersonaPictureStager
+        value={null}
+        onChange={onChange}
+        promptHint="Generate a portrait"
+      />,
+      { wrapper: harness.wrapper },
+    );
+
+    fireEvent.change(await screen.findByLabelText(/image prompt/i), {
+      target: { value: "photorealistic portrait for a civic journalist" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^generate$/i }));
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledOnce());
+    const staged = onChange.mock.calls[0]?.[0] as StagedPersonaPicture;
+    expect(staged.source).toBe("ppq");
+    expect(staged.previewUrl).toBe("blob:generated-portrait");
+    expect(staged.file.name).toBe("persona-portrait.png");
+    expect(objectUrlStubs.createObjectURL).toHaveBeenCalledOnce();
+    const imageRequest = harness.http.requests.find(
+      (req) => req.path === "/v1/images/generations",
+    );
+    expect(imageRequest?.headers.authorization).toBe("Bearer api-image");
+    expect(JSON.parse(imageRequest!.bodyText)).toEqual(
+      expect.objectContaining({
+        model: "gpt-image-1",
+        size: "1:1",
+        n: 1,
+      }),
+    );
+    expect(
+      harness.relay.getEvents({
+        authors: [testKeys.persona.pubkey],
+        kinds: [0, 1],
+      }),
+    ).toHaveLength(0);
+  });
 });
 
 function testQueryClient(): QueryClient {
@@ -306,4 +524,43 @@ function testQueryClient(): QueryClient {
       mutations: { retry: false },
     },
   });
+}
+
+type UrlWithObjectUrls = typeof URL & {
+  createObjectURL?: (object: Blob | MediaSource) => string;
+  revokeObjectURL?: (url: string) => void;
+};
+
+function installObjectUrlStubs(previewUrl: string): {
+  createObjectURL: ReturnType<typeof mockFn>;
+  revokeObjectURL: ReturnType<typeof mockFn>;
+} {
+  const url = URL as UrlWithObjectUrls;
+  const createObjectURL = mockFn(() => previewUrl);
+  const revokeObjectURL = mockFn(() => undefined);
+  const createDescriptor = Object.getOwnPropertyDescriptor(url, "createObjectURL");
+  const revokeDescriptor = Object.getOwnPropertyDescriptor(url, "revokeObjectURL");
+  restoreObjectUrlStubs = () => {
+    if (createDescriptor) {
+      Object.defineProperty(url, "createObjectURL", createDescriptor);
+    } else {
+      Reflect.deleteProperty(url, "createObjectURL");
+    }
+    if (revokeDescriptor) {
+      Object.defineProperty(url, "revokeObjectURL", revokeDescriptor);
+    } else {
+      Reflect.deleteProperty(url, "revokeObjectURL");
+    }
+  };
+  Object.defineProperty(url, "createObjectURL", {
+    configurable: true,
+    writable: true,
+    value: createObjectURL,
+  });
+  Object.defineProperty(url, "revokeObjectURL", {
+    configurable: true,
+    writable: true,
+    value: revokeObjectURL,
+  });
+  return { createObjectURL, revokeObjectURL };
 }
