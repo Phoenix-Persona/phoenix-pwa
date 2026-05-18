@@ -1,26 +1,36 @@
-# Zuka Project Plan
+# Zuka Agent Guide
 
-**Read [`PROJECT.md`](./dev/PROJECT.md) first.** It is the authoritative design document for Zuka — the user-facing problem, the identity model, the persona Nostr schema, the wallet model, the AI capabilities, the V1 scope, and the demo arc. When this file and `PROJECT.md` disagree on *what* to build, **`PROJECT.md` wins**. This file describes *how* to build on the codebase (Nostr conventions, security, file layout, lint rules).
+**Start with [`docs/INDEX.md`](./docs/INDEX.md).** Product intent lives in
+[`docs/PRODUCT.md`](./docs/PRODUCT.md); implementation maps live in
+[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) and
+[`docs/DATA-FLOW.md`](./docs/DATA-FLOW.md). This file describes *how* to build
+on the codebase: Nostr conventions, security rules, file layout, validation,
+and agent workflow.
 
-V1 has shipped. Per-feature plans live under [`dev/plans/`](./dev/plans/); shipped plans stay there as historical context, with a status banner at the top.
+Per-feature plans live under [`dev/plans/`](./dev/plans/); shipped plans stay
+there as historical context.
 
 **Doc indexes:** [`docs/INDEX.md`](./docs/INDEX.md) (engineering & architecture) · [`dev/INDEX.md`](./dev/INDEX.md) (design plan, parallel build streams).
 Current build/test/lint/smoke tooling is summarized in [`docs/CURRENT-STACK.md`](./docs/CURRENT-STACK.md).
 
-**Zuka-specific stack additions** (beyond the MKStack base described below):
+**Zuka-specific stack additions**:
 
-- **`pi-mono`** ([github.com/earendil-works/pi](https://github.com/earendil-works/pi)) — agent runtime (`pi-agent-core`), unified LLM API (`pi-ai`), web chat components (`pi-web-ui`)
-- **PPQ** (`ppq.ai`) — OpenAI-compatible inference API, paid per-request in sats over Lightning
-- **Breez Spark SDK** — per-persona Bitcoin Lightning wallet; seed phrase recoverable from the encrypted kind 30078 backup
-- **NIP-49** for at-rest persona-nsec encryption; **NIP-44** for the encrypted backup event; **NIP-57** for donations
+- **PPQ** (`ppq.ai`) — OpenAI-compatible inference API used through app-owned PPQ clients.
+- **Breez Spark SDK** — per-persona and operator Bitcoin Lightning wallets; persona wallet seeds are recoverable from encrypted kind 30078 backups.
+- **NIP-49** for at-rest fresh operator-nsec encryption; **NIP-44** for encrypted backup events; **NIP-57** for donations.
 
-**Reuse with adaptation — don't blindly extend, don't blindly rewrite.** The early `src/lib/persona*` and `src/hooks/usePersona*` sketch matches the user/persona architecture in PROJECT.md §3 closely; adapt it to the §5 schema (stable per-persona d-tag stored as `persona.dTag` and reused on every update, no app-specific tags — discovery is scan-and-decrypt for stronger anti-fingerprinting; embedded Breez Spark wallet seed; `model_prefs`) rather than rewriting from scratch. The Vercel `/style` endpoint plan in `src/lib/styleClient.ts` is gone — replace with a `pi-ai` PPQ client (PROJECT.md §6). PROJECT.md §11 lists exactly what to reuse, rewrite, replace, add, and delete.
+The current app uses a form-based persona creator and direct PPQ clients.
+`pi-mono` / agent-driven interview work is deferred and documented only as
+future context under `dev/docs/`.
 
 ---
 
 # Project Overview
 
-Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, esbuild, Radix/Tailwind UI primitives, and Nostrify, extended with `pi-mono` (agent runtime), PPQ (Lightning-paid AI inference), and the Breez Spark SDK (per-persona Lightning wallet).
+Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, esbuild,
+Radix/Tailwind UI primitives, and Nostrify, extended with PPQ
+(Lightning-paid AI inference) and the Breez Spark SDK (operator and
+per-persona Lightning wallets).
 
 ## Technology Stack
 
@@ -43,8 +53,8 @@ Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, esbuild, Radi
   - `auth/` — login components (`LoginArea`, `AuthDialog`, `AccountSwitcher`).
   - `wallet/` — wallet UI (`WalletPanel`, `WalletDialog`, `WalletBadge`, `SendDialog`, `ReceiveDialog`).
   - `howItWorks/` — landing-page explainer sections.
-- `/src/hooks/` — custom hooks. Discover the full set with `ls src/hooks/`. Key ones: `useNostr`, `useAuthor`, `useCurrentUser`, `useNostrPublish`, `useUploadFile`, `useAppContext`, `useTheme`, `useToast`, `useLoggedInAccounts`, `useLoginActions`, `useIsMobile`. Zuka-specific: `usePersona`, `usePersonaPublish`, `useOperatorEnvelope`, `useDeletePersona`, `useWallet`, `usePpqAccount`, `usePpqInference`, `usePpqImage`, `usePpqVideo`, `usePpqTopup`, `useCrossPost`, `useInstallPrompt`, `useRegisterPersonaLightningAddress`, `useUsernameAvailability`.
-- `/src/pages/` — page components wired into React Router. Current set: `Index`, `Onboard`, `Dashboard`, `EditPersona`, `MyPersonas`, `PersonaFeed`, `Verify`, `Settings`, `NIP19Page`, `NotFound`.
+- `/src/hooks/` — custom hooks. Discover the full set with `ls src/hooks/`. Key ones: `useNostr`, `useAuthor`, `useCurrentUser`, `useNostrPublish`, `useUploadFile`, `useAppContext`, `useTheme`, `useToast`, `useLoggedInAccounts`, `useLoginActions`, `useIsMobile`. Zuka-specific: `usePersona`, `usePersonaPublish`, `useOperatorEnvelope`, `useOperatorWallet`, `useDeletePersona`, `useWallet`, `usePpqAccount`, `usePpqInference`, `usePpqImage`, `usePpqVideo`, `usePpqTopup`, `useGenerateVideoPipeline`, `useCrossPost`, `useInstallPrompt`, `useUsernameAvailability`.
+- `/src/pages/` — page components wired into React Router. Current set: `Index`, `Onboard`, `Dashboard`, `EditPersona`, `MyPersonas`, `PersonaFeed`, `Settings`, `NIP19Page`, `NotFound`.
 - `/src/lib/` — utility functions and shared logic.
   - `wallet/` — Breez Spark wallet (init, NWC, lightning address).
   - `operator/` — operator-envelope crypto and storage.
@@ -108,7 +118,11 @@ Kinds below 1000 are "legacy"; their storage behavior is per-kind (e.g. kind 1 i
 
 ### Nostr Security Model
 
-**CRITICAL:** Nostr private keys (`nsec`) are stored **in plaintext in `localStorage`**. Any JavaScript running on the origin can steal them. A single XSS = permanent, unrecoverable key theft across every Nostr client the user ever touches. **Treat XSS mitigation as the top-priority security concern.**
+**CRITICAL:** any plaintext `nsec` present in JavaScript memory can be stolen by
+XSS. Zuka keeps active Nostr login state in memory, stores fresh generated
+operator keys as NIP-49 `ncryptsec`, and stores persona nsecs inside encrypted
+kind 30078 backups plus runtime memory. A single XSS can still steal active
+session secrets. **Treat XSS mitigation as the top-priority security concern.**
 
 - **Never** use `dangerouslySetInnerHTML`, `innerHTML`, or `document.write` with event data, URL params, or other untrusted strings.
 - **CSP is defense-in-depth**, not primary defense. `public/index.html` ships a restrictive CSP (`script-src 'self'`, `default-src 'none'`). Never relax it with `'unsafe-eval'`, `'unsafe-inline'` on `script-src`, or wildcard sources.

@@ -1,9 +1,6 @@
 # Glossary
 
-> Mirrors `dev/PROJECT.md` §13. Source of truth is `dev/PROJECT.md`; if
-> this disagrees, that wins — update this file.
-
-- **Operator** *(PROJECT.md §3)* — the human's Nostr identity. Signs
+- **Operator** — the human's Nostr identity. Signs
   encrypted persona backups (kind 30078) and nothing else under
   Zuka. Never publishes kind 0 or kind 1 under Zuka; to outside
   observers it's just a publisher of opaque ciphertext events. Can be
@@ -11,7 +8,7 @@
   fresh Zuka-generated keypair (stored locally as NIP-49 ncryptsec,
   one passphrase per device).
 
-- **Persona keypair** *(PROJECT.md §3)* — a separate Nostr keypair
+- **Persona keypair** — a separate Nostr keypair
   generated per persona. Publishes the persona's kind 0 (profile) and
   kind 1 (posts). The nsec is stored only inside the operator's
   encrypted kind 30078 backup; never written to disk by Zuka.
@@ -25,14 +22,12 @@
   by one operator.
 
 - **PPQ** — `ppq.ai`. OpenAI-compatible inference API. Zuka uses
-  PPQ's **credits system**: a per-persona `credit_id` funded by
-  Lightning from the persona's Spark wallet (NWC auto-topup) auths
-  every API request via a bearer token. See `../dev/docs/ppq.md`.
+  PPQ's credits system through operator-scoped credentials and wallet-funded
+  topups. See `../dev/docs/ppq.md`.
 
-- **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit. V1 uses
-  **`pi-ai`** (LLM client) only. `pi-agent-core` (agent runtime) and
-  `pi-web-ui` (chat surface) are reserved for the V2 agent-driven
-  wizard. See `../dev/docs/pi-mono.md`.
+- **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit investigated
+  for a future agent-driven wizard. It is not part of the current runtime
+  dependency graph.
 
 - **Spark / Breez Spark SDK** — `@breeztech/breez-sdk-spark`. Breez's
   wrapping of Lightspark's Spark protocol. Per-persona Lightning
@@ -80,5 +75,6 @@
 
 ## Source
 
-- `dev/PROJECT.md` §3 (identity model — canonical)
-- `dev/PROJECT.md` §13 (canonical for everything else)
+- [`PRODUCT.md`](./PRODUCT.md)
+- [`THREAT-MODEL.md`](./THREAT-MODEL.md)
+- [`PERSONA-SCHEMA.md`](./PERSONA-SCHEMA.md)

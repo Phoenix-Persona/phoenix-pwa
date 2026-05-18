@@ -1,12 +1,12 @@
 # PPQ (PayPerQ)
 
-OpenAI-compatible inference API. Zuka routes **all** AI inference
-through PPQ. Auth is via PPQ's **credits system**: a unique `credit_id`
-per persona, funded with Lightning, auths every API request via a
-bearer token tied to that credit_id.
+OpenAI-compatible inference API. Zuka routes AI inference through PPQ. Auth is
+via PPQ's credits system: a `credit_id` plus bearer token. Current production
+credentials are stored in the encrypted operator envelope and topups are paid
+from the selected Spark wallet.
 
-> Zuka usage: `dev/PROJECT.md` §6 for per-task model defaults and §7
-> for the wallet → PPQ payment story.
+> Current Zuka usage: see `docs/DATA-FLOW.md`, `docs/PRODUCT.md`, and
+> `src/hooks/usePpqAccount.ts`.
 
 ## Endpoint
 
@@ -30,11 +30,11 @@ ownership for the API.
 **Flow:**
 
 1. `POST /accounts/create` → `{ api_key, credit_id }`. Persist these.
-2. `POST /topup/create/btc-lightning` → BOLT11 invoice. Pay it from
-   the persona's Spark wallet to fund the credit_id.
-3. `POST /nwc-auto-topup/connect` with the wallet's NIP-47 NWC URL →
-   PPQ pulls the next chunk of credit on-demand whenever the balance
-   dips below a configured threshold. Hands-off after this.
+2. `POST /topup/create/btc-lightning` -> BOLT11 invoice. Pay it from the
+   selected Spark wallet to fund the credit_id.
+3. Optional `POST /nwc-auto-topup/connect` with a wallet NIP-47 NWC URL wires
+   PPQ-managed auto-topup. The current app-owned wallet path orchestrates
+   topups through `useWallet` and `lib/wallet/autoTopup.ts`.
 4. Use `Authorization: Bearer ppq_<token>` on every API request.
 
 The credits system covers **the whole PPQ API surface** — chat,
@@ -52,12 +52,12 @@ system covers everything. Zuka uses credits across the board.
 
 | Endpoint                         | Purpose                                                          |
 | -------------------------------- | ---------------------------------------------------------------- |
-| `POST /chat/completions`         | Text generation (Claude, GPT, Gemini, etc.) — via `pi-ai`        |
+| `POST /chat/completions`         | Text generation (Claude, GPT, Gemini, etc.)        |
 | `POST /v1/images/generations`    | Image generation                                                 |
-| `POST /v1/audio/speech`          | TTS — voice sample (V1) + post audio (V1.5)                      |
+| `POST /v1/audio/speech`          | TTS reference endpoint; not part of current release UX            |
 | `POST /v1/audio/transcriptions`  | STT (Deepgram Nova-3) — not used by Zuka yet                  |
-| `POST /v1/videos`                | Video generation (V2 stretch)                                    |
-| `GET  /v1/models`                | List available models (used by Settings)                         |
+| `POST /v1/videos`                | Video generation                                                  |
+| `GET  /v1/models`                | List available models                                             |
 | `POST /accounts/create`          | Create a PPQ account (api_key + credit_id)                       |
 | `POST /credits/balance`          | Read account balance                                             |
 | `POST /topup/create/btc-lightning` | Get a Lightning invoice for credit top-up                      |
@@ -65,22 +65,20 @@ system covers everything. Zuka uses credits across the board.
 
 ## Default models per task
 
-From `dev/PROJECT.md` §6. Operators override per-persona; selections
-persist in the encrypted kind 30078 backup under `model_prefs`.
+Defaults are defined in source and can be persisted in encrypted kind 30078
+backups under `model_prefs`.
 
 | Task                    | Default            | Endpoint                   |
 | ----------------------- | ------------------ | -------------------------- |
 | Persona text styling    | `claude-sonnet-4.5`| `/chat/completions`        |
 | Profile / post image    | `gpt-image-1`      | `/v1/images/generations`   |
-| Voice sample / TTS      | (deferred to V2)   | `/v1/audio/speech`         |
-| Video (V2)              | TBD                | `/v1/videos`               |
+| Voice sample / TTS      | not exposed in release UX | `/v1/audio/speech` |
+| Video                   | `seedance-2-fast` via pipeline code | `/v1/videos` |
 
 ### Voice models on PPQ (V2)
 
-TTS is deferred to V2 per PROJECT.md §6 — no L402-compatible TTS
-provider was identified, and V1 doesn't grow the credits surface for
-voice features it isn't shipping. The notes below are reference for the
-V2 work.
+TTS is not exposed in the current release UX. The notes below are reference for
+future work.
 
 `/v1/audio/speech` is OpenAI-compatible. Two providers on PPQ:
 
@@ -89,13 +87,10 @@ V2 work.
 - **ElevenLabs** — `eleven_multilingual_v2`, `eleven_flash_v2_5`. Max
   5000 chars/request.
 
-`tts-1-hd` is **not available** on PPQ — they migrated. The persona
-schema in code currently has `model_prefs.tts` required with default
-`"openai/tts-1-hd"`; this should be relaxed to `nullable().optional()`
-when voice flows are explicitly punted to V2.
+`tts-1-hd` availability should be verified before any future audio feature uses
+it; PPQ model availability changes over time.
 
-The Settings page reads `/v1/models` at runtime so we don't have to
-hard-code the list.
+Model listing is available through the client for future model-picker work.
 
 ## Pricing
 
@@ -114,5 +109,5 @@ hard-code the list.
 
 - `ppq.ai` — site
 - `ppq.ai/api-docs` — full API docs (credits, L402, model lists)
-- `dev/PROJECT.md` §6 (AI capabilities), §7 (wallet → PPQ flow), §10
-- `./pi-mono.md` — how `pi-ai` is configured against PPQ
+- `docs/PRODUCT.md` — product scope
+- `docs/DATA-FLOW.md` — current PPQ call paths

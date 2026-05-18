@@ -4,9 +4,9 @@ Content-addressed media protocol for Nostr. Blobs are addressed by their
 sha256 hash and served over HTTP. Auth uses Nostr-signed events instead of
 traditional credentials.
 
-> Zuka usage: profile picture, reference image, voice sample, post
-> images, post audio (PROJECT.md §5.4). Voice samples are public — no
-> encryption needed at rest on Blossom.
+> Zuka usage: profile pictures, canonical reference images, post images, and
+> generated videos. Blossom media is public; do not upload private persona
+> secrets.
 
 ## Endpoints
 
@@ -43,15 +43,13 @@ Full list: `github.com/hzrd149/blossom`.
 | ----------------- | -------------- | ---------------------------------------- |
 | Profile picture   | Blossom        | kind 0 `picture` + kind 30078            |
 | Reference image   | Blossom        | kind 30078 (seeds future image gens)     |
-| Voice sample      | Blossom        | kind 0 `phoenix.voice_sample`            |
 | Post images       | Blossom        | kind 1 `imeta` tags (NIP-92)             |
-| Post audio (V1.5) | Blossom        | kind 1 `imeta` tags                      |
+| Generated videos  | Blossom        | kind 1 `imeta` tags (NIP-92)             |
 
 The scaffold already wraps uploads via `useUploadFile`
 (`src/hooks/useUploadFile.ts`) and `src/lib/appBlossom.ts`. The reference-image
-flow (PROJECT.md §6 "Likeness consistency") needs the **upload sha256
-preserved** so subsequent image generations can pass the canonical reference
-image as input.
+flow keeps the canonical reference image URL so subsequent image/video
+generations can condition on it.
 
 ## Related Nostr events
 
@@ -63,5 +61,6 @@ image as input.
 ## Source
 
 - `github.com/hzrd149/blossom` — protocol spec and BUDs
-- PROJECT.md §5.4 (media), §6 (likeness consistency), §11 (existing
-  `appBlossom.ts`, `useUploadFile.ts`)
+- `docs/PERSONA-SCHEMA.md`
+- `src/lib/appBlossom.ts`
+- `src/hooks/useUploadFile.ts`

@@ -10,12 +10,20 @@ and this project follows [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Started the project changelog.
+- Added `docs/PRODUCT.md` as the release-facing product model and scope guide.
 
 ### Changed
+
+- Reworked README and documentation indexes for release readiness.
+- Consolidated architecture, schema, data-flow, scope, and security docs around
+  the current implementation.
 
 ### Deprecated
 
 ### Removed
+
+- Removed the stale `dev/PROJECT.md` master plan after migrating durable
+  content into the docs system.
 
 ### Fixed
 

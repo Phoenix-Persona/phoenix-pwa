@@ -250,8 +250,8 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   async function handleSave() {
     if (!user) return;
 
-    // Prefer the d-tag stored inside the encrypted payload (PROJECT.md
-    // §5.2). Fall back to the event's own tag for personas authored
+    // Prefer the d-tag stored inside the encrypted payload. Fall back to
+    // the event's own tag for personas authored
     // before persona.dTag landed.
     const dTag =
       original.dTag ?? backupEvent.tags.find(([n]) => n === "d")?.[1];

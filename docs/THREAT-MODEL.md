@@ -2,8 +2,9 @@
 
 What Zuka protects, what it doesn't, and where the secrets live.
 
-> Source of truth: `dev/PROJECT.md` §3. If this disagrees with §3, §3 wins
-> — update this file.
+> Companion docs: [`PRODUCT.md`](./PRODUCT.md),
+> [`AUTH-SESSION-MODEL.md`](./AUTH-SESSION-MODEL.md), and
+> [`PERSONA-SCHEMA.md`](./PERSONA-SCHEMA.md).
 
 ## What we're protecting
 
@@ -16,8 +17,7 @@ public personas a given operator is responsible for.
 
 ## Identity layout (two-level)
 
-Zuka uses a two-level identity model (PROJECT.md §3,
-`docs/GLOSSARY.md`):
+Zuka uses a two-level identity model:
 
 - **Operator** — the human's Nostr identity. Signs encrypted persona
   backups (kind 30078). **Never publishes kind 0 or kind 1 under
@@ -79,11 +79,13 @@ These are explicit limits, not oversights:
 compromises that operator nsec can decrypt every persona's backup and
 operate every voice.
 
-V1 is **one operator per device**. Multi-operator-per-device — the
-remedy for activists who need persona groups that *can't* fall
-together — is V2.
+The app can switch between logged-in operator accounts, but those accounts must
+remain isolated. Runtime state, wallet handles, PPQ credentials, and query
+caches are scoped to the active operator pubkey and cleared on operator switch.
+Operators that need persona groups that cannot share fate should use separate
+operator identities.
 
-This is a deliberate trade-off (PROJECT.md §3). A persona-only model
+This is a deliberate trade-off. A persona-only model
 (no operator-level layer) would mean each persona has its own root nsec
 to safeguard separately, multi-device sync requires copying every
 persona nsec to every device, and losing one persona's nsec loses that
@@ -94,7 +96,7 @@ persona's wallet entirely.
 | Secret              | Form                          | Location                                                  |
 | ------------------- | ----------------------------- | --------------------------------------------------------- |
 | Operator nsec (BYO) | Whatever the signer uses      | NIP-07 extension / NIP-46 remote signer / pasted nsec     |
-| Operator nsec (fresh) | NIP-49 ncryptsec            | `localStorage` on the device, one passphrase per device   |
+| Operator nsec (fresh) | NIP-49 ncryptsec            | `secureStorage`; web fallback is localStorage, native uses Keychain/KeyStore |
 | Passphrase          | UTF-8 NFKC-normalized         | Operator's head; held in memory while unlocking           |
 | Persona nsec        | Plaintext (hex) inside backup | Encrypted kind 30078 event on relays + memory only        |
 | Wallet seed (BIP-39)| Plaintext inside backup       | Encrypted kind 30078 event on relays + memory only        |
@@ -147,16 +149,14 @@ every wallet, and post as every persona under that operator.
 
 ## Open
 
-- **`dev/PROJECT.md` §10 #1** — minimum-viable answer for the abuse-
-  vector question for HRF judges. Talking points: cost-throttling
-  (bad actors burn sats; donations sustain real voices),
-  pseudonymous-not-anonymous (relay-level mute / block / labels),
-  upstream-LLM safety inherited via PPQ, Verify page surfaces persona
-  age. Owner: Anaïse for demo positioning.
+- **Abuse-vector positioning.** Talking points: cost-throttling (bad actors
+  burn sats; donations sustain real voices), pseudonymous-not-anonymous
+  (relay-level mute / block / labels still apply), upstream LLM safety inherited
+  via PPQ, and public persona history/zap/post age is visible to observers.
 
 ## Source
 
-- `dev/PROJECT.md` §3 (canonical for the identity model), §10
+- `docs/PRODUCT.md` — product and identity model
 - `docs/AUTH-SESSION-MODEL.md` — auth/session persistence and cleanup rules
 - `docs/SECURITY-REGRESSION-CHECKLIST.md` — PR review checklist
 - `docs/GLOSSARY.md` — "Operator", "Persona keypair"

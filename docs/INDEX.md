@@ -1,34 +1,48 @@
-# docs/
+# Documentation Index
 
-Engineering reference for agents working on Zuka. **Start with
-[`ARCHITECTURE.md`](./ARCHITECTURE.md)** — it's the map of `src/`.
+Documentation for release users, maintainers, and agents working on Zuka.
 
-Source of truth for design intent is [`../dev/PROJECT.md`](../dev/PROJECT.md);
-these docs distill or extend it for engineers reading code.
+Start here:
 
-CI status lives in GitHub Actions: [`CI`](https://github.com/zuka-org/zuka-pwa/actions/workflows/ci.yml)
-and [`Security`](https://github.com/zuka-org/zuka-pwa/actions/workflows/security.yml).
-Branch protection expectations are documented in
-[`BRANCH-PROTECTION.md`](./BRANCH-PROTECTION.md).
+1. [`README.md`](../README.md) — short project overview and commands.
+2. [`PRODUCT.md`](./PRODUCT.md) — product model, release scope, and non-goals.
+3. [`ARCHITECTURE.md`](./ARCHITECTURE.md) — map of `src/` and current routes.
+4. [`DATA-FLOW.md`](./DATA-FLOW.md) — user flows traced through current code.
 
-## Zuka-specific
+## Core Docs
 
 | Doc | What it's for |
 | --- | --- |
-| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Directory map of `src/`, provider stack, route table, per-file one-liners. **Read first.** |
-| [`AUTH-SESSION-MODEL.md`](./AUTH-SESSION-MODEL.md) | Hard-cut auth/session persistence rules, operator isolation, cleanup boundary, and dev-only env pins. |
-| [`BRANCH-PROTECTION.md`](./BRANCH-PROTECTION.md) | Required CI/security checks for `dev` and `main`. |
-| [`CURRENT-STACK.md`](./CURRENT-STACK.md) | Current build, test, lint, browser smoke, and bundle-budget policy. |
-| [`DATA-FLOW.md`](./DATA-FLOW.md) | Traces user actions through actual code: persona creation, compose + publish, PPQ flows, etc. |
-| [`PERSONA-SCHEMA.md`](./PERSONA-SCHEMA.md) | The three Nostr events Zuka publishes per persona (kind 0, kind 30078, kind 1). Mirrors `PROJECT.md` §5. |
+| [`PRODUCT.md`](./PRODUCT.md) | Product model, audience, identity model, release scope, and demo arc. |
+| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Directory map of `src/`, provider stack, route table, and per-file notes. |
+| [`DATA-FLOW.md`](./DATA-FLOW.md) | Current call paths for login, persona creation, compose, wallet, PPQ, media, and sync. |
+| [`PERSONA-SCHEMA.md`](./PERSONA-SCHEMA.md) | Persona Nostr schema: kind 0 profile, encrypted kind 30078 backup, kind 1 posts, and media tags. |
+| [`AUTH-SESSION-MODEL.md`](./AUTH-SESSION-MODEL.md) | Auth/session persistence, operator isolation, cleanup boundary, and dev-only env pins. |
+| [`THREAT-MODEL.md`](./THREAT-MODEL.md) | What Zuka protects, what it does not protect, and where secrets live. |
 | [`SECURITY-REGRESSION-CHECKLIST.md`](./SECURITY-REGRESSION-CHECKLIST.md) | PR checklist for secrets, operator isolation, Nostr trust boundaries, wallets, and PPQ. |
-| [`THREAT-MODEL.md`](./THREAT-MODEL.md) | What Zuka protects, what it doesn't, where secrets live. Mirrors `PROJECT.md` §3. |
-| [`SCOPE.md`](./SCOPE.md) | V1 / V1.5 / V2 / out-of-scope checklist. Mirrors `PROJECT.md` §8. |
-| [`GLOSSARY.md`](./GLOSSARY.md) | Vocabulary: user keypair, persona keypair, PPQ, pi-mono, NIP-44/49/57/78, etc. |
+| [`CURRENT-STACK.md`](./CURRENT-STACK.md) | Current build, test, lint, browser smoke, and bundle-budget policy. |
+| [`SCOPE.md`](./SCOPE.md) | Release, deferred, and out-of-scope feature list. |
+| [`GLOSSARY.md`](./GLOSSARY.md) | Vocabulary for operator/persona identity, Nostr, wallets, PPQ, and media. |
 | [`NIP.md`](./NIP.md) | Custom Nostr event kinds and schemas defined by Zuka. |
+| [`BRANCH-PROTECTION.md`](./BRANCH-PROTECTION.md) | Required CI/security checks for `dev` and `main`. |
 
-## Third-party guides
+## Test Docs
 
-Guides for the external libraries and protocols Zuka depends on
-(`@nostrify`, NIPs, Blossom, PPQ, `pi-mono`, Breez Spark) live under
-[`../dev/docs/`](../dev/INDEX.md#third-party-guides).
+| Doc | What it's for |
+| --- | --- |
+| [`../test/README.md`](../test/README.md) | Automated, integration, manual, and validation script test layout. |
+| [`../test/integration/README.md`](../test/integration/README.md) | Integration relay, HTTP mocks, fixtures, and render harnesses. |
+| [`../test/manual/README.md`](../test/manual/README.md) | Manual network/spend test scripts. |
+| [`../test/manual/RELEASE-CHECKLIST.md`](../test/manual/RELEASE-CHECKLIST.md) | Release smoke cadence for real PPQ, wallet, Blossom, and media workflows. |
+
+## Development Records
+
+| Path | What it's for |
+| --- | --- |
+| [`../dev/plans/`](../dev/plans/) | Historical and active implementation plans. |
+| [`../dev/reports/`](../dev/reports/) | Audit, migration, and spike reports. |
+| [`../dev/docs/`](../dev/docs/) | Third-party protocol/library notes. Some entries are forward-looking or archival; verify against `package.json` and source before treating them as current implementation. |
+
+CI status lives in GitHub Actions:
+[`CI`](https://github.com/zuka-org/zuka-pwa/actions/workflows/ci.yml) and
+[`Security`](https://github.com/zuka-org/zuka-pwa/actions/workflows/security.yml).

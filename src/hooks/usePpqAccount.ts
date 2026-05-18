@@ -1,7 +1,7 @@
 /**
  * React entry point for the operator's PPQ account.
  *
- * Resolution priority (PROJECT.md §6 / `dev/.env.example`):
+ * Resolution priority:
  *
  *   1. **Dev env override**: `VITE_PPQ_API_KEY` (+ optional
  *      `VITE_PPQ_CREDIT_ID`). Pins a known account outside production;

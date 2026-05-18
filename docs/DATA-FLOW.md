@@ -1,8 +1,7 @@
 # Data Flow
 
-The seams in `src/`. PROJECT.md §12 says "the wallet/agent/Nostr/image-gen
-seams are where bugs will live" — this doc traces the current call paths so
-engineers do not need to grep across pages, hooks, and lib helpers.
+The seams in `src/`. This doc traces current call paths so engineers do not
+need to grep across pages, hooks, and lib helpers.
 
 > Companion to `docs/ARCHITECTURE.md`. The architecture doc tells you what
 > each file does; this doc tells you what calls what. Source of truth is the
@@ -18,8 +17,8 @@ engineers do not need to grep across pages, hooks, and lib helpers.
 | List/load personas | `MyPersonas`, `Dashboard` | `useMyPersonas`, `usePersona` | Scan-and-decrypt operator-authored kind 30078 events |
 | Compose + publish | `DashboardComposerCard` | `usePersonaComposer`, `usePersonaPublish`, `useCrossPost` | PPQ chat, Nostr kind 1, optional webhook |
 | Post wizard | `PostWizardDialog` | `usePpqInference` | PPQ chat |
-| Video composer | `VideoComposerDialog` | `useGenerateVideoPipeline`, `usePpqVideo`, `useUploadFile` | PPQ video, Blossom, Nostr publish |
-| Wallet / PPQ | `WalletDialog`, `WalletPanel` | `useWallet`, `usePpqAccount`, `usePpqTopup` | Breez Spark, PPQ account/balance/history/topups |
+| Video composer | `VideoComposerDialog` | `useGenerateVideoPipeline`, `useUploadFile`, `usePpqAccount`, `usePersonaPublish` | PPQ image/video/chat, Blossom, Nostr publish |
+| Wallet / PPQ | `WalletDialog`, `WalletPanel` | `useWallet`, `usePpqAccount` | Breez Spark, PPQ account/balance/history/topups |
 | Public feed | `PersonaFeed` | `useAuthor`, `usePersonaPosts` | Relays: kind 0 and kind 1 by persona author |
 | Relay / Blossom sync | app mount | `NostrSync` | Relays: kind 10002 and 10063 by operator author |
 
@@ -107,9 +106,9 @@ Persona wallet UI can show Lightning Address details. Operator wallet UI
 intentionally hides Lightning Address fields because Zuka does not configure an
 operator Lightning Address.
 
-`PersonaFeed` is public. It reads kind 0 metadata and kind 1 posts by persona
-pubkey. `Verify` shows public persona provenance without disclosing the
-operator; the operator-to-persona relationship remains encrypted-only.
+`PersonaFeed` is public. It reads kind 0 metadata, kind 1 posts, replies,
+reactions, and zap receipts by persona pubkey. The operator-to-persona
+relationship remains encrypted-only and is not disclosed on public pages.
 
 ## Test Infrastructure
 

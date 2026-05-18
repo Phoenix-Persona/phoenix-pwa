@@ -1,6 +1,6 @@
 # Test Suite
 
-Zuka has three test layers:
+Zuka has four test areas:
 
 - `src/**/*.test.ts(x)` contains colocated unit and focused component tests.
 - `test/integration/` contains automated integration tests that run against local in-memory Nostr relay and HTTP mock servers.
@@ -9,7 +9,7 @@ Zuka has three test layers:
 
 Before demos or releases, use [`test/manual/RELEASE-CHECKLIST.md`](./manual/RELEASE-CHECKLIST.md) for the real spend/network smoke cadence.
 
-Generated reports, compiled test bundles, and temporary build metadata belong under `.tmp/`. Do not commit `test-results/`, `.eslintcache`, root ESLint config files, or other runner-specific output directories.
+Generated reports, compiled test bundles, and temporary build metadata belong under `.tmp/`. Do not commit `test-results/`, Biome caches, or other runner-specific output directories.
 
 ## Integration Relay
 

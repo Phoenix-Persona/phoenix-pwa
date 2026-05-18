@@ -5,11 +5,12 @@
  * The operator wallet is the *funder* of AI inference: creation costs
  * (when those grow), default fallback when a persona's wallet is
  * empty, and the source of any auto-topup the operator initiates from
- * the header. Per-persona wallets exist separately (see PROJECT.md
- * §7) and receive donations on behalf of each persona; they are not
+ * the header. Per-persona wallets exist separately and receive donations on
+ * behalf of each persona; they are not
  * the operator's funder.
  *
- * Privacy posture matches the persona pattern (PROJECT.md §5.2):
+ * Privacy posture matches the persona pattern documented in
+ * `docs/PERSONA-SCHEMA.md`:
  *   - kind 30078 event with a fresh random UUID d-tag (no Phoenix
  *     fingerprint in tags)
  *   - NIP-44 self-encryption to the operator's own pubkey

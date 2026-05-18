@@ -4,7 +4,7 @@ A map of `src/`. Read this first. Source of truth is the code — when this
 doc disagrees with what's on disk, the code wins; update this file.
 
 > **Identity model.** Zuka uses an **operator + persona split**
-> (`dev/PROJECT.md` §3). The operator signs in with a single Nostr
+> (see `docs/PRODUCT.md` and `docs/THREAT-MODEL.md`). The operator signs in with a single Nostr
 > identity that NIP-44-self-encrypts each persona's config as a kind
 > 30078 event. Each persona has its own separate keypair that publishes
 > its public kind 0 profile and kind 1 posts. The link from persona ↔
@@ -12,7 +12,7 @@ doc disagrees with what's on disk, the code wins; update this file.
 > keypair" appears in some passing prose as a synonym; prefer
 > "operator.")
 >
-> **kind-30078 tag scheme.** Per `dev/PROJECT.md` §5.2, the only tag is
+> **kind-30078 tag scheme.** The only tag is
 > `["d", "<opaque random uuid>"]`, **stable per persona** (generated
 > at creation, stored as `persona.dTag` inside the encrypted plaintext,
 > reused on every update). No `t`, no `alt`. Externally a Zuka
@@ -55,8 +55,12 @@ AppProvider                          (config: theme, relays, Blossom)        ←
 | `/onboard`          | `Onboard`       | yes        | Details + picture persona creation wizard. |
 | `/my-personas`      | `MyPersonas`    | yes        | Grid of operator's decrypted personas. |
 | `/dashboard/:npub`  | `Dashboard`     | yes        | Per-persona compose + recent posts.  |
+| `/dashboard/:npub/edit` | `EditPersona` | yes      | Edit persona profile, system prompt, cross-posting, and wallet identity fields. |
 | `/p/:npub`          | `PersonaFeed`   | no         | Public feed for any persona.         |
-| `/verify/:npub`     | `Verify`        | no         | Public attestation — operator deliberately not disclosed. |
+| `/settings`         | `Settings`      | yes        | Account, relays, Blossom servers, and Nostr viewer settings. |
+| `/dev/wallet`       | `WalletHarness` | dev        | Wallet development harness.          |
+| `/dev/inference-pay` | `InferencePayHarness` | dev  | PPQ payment development harness.     |
+| `/dev/ppq-pay`      | `InferencePayHarness` | dev     | Alias for PPQ payment harness.       |
 | `/:nip19`           | `NIP19Page`     | no         | Catch-all for raw npub/note/naddr.   |
 | `*`                 | `NotFound`      | no         |                                      |
 
@@ -140,8 +144,8 @@ Pure logic and HTTP clients. No React imports.
 | `usePpqAccount`      | Resolves env/operator-envelope PPQ account, mints credentials when needed, refreshes balance, rotates operator credentials. |
 | `usePpqInference`    | Mutation: chat completion. Used by AI Assist, post wizard, and persona voice styling. |
 | `usePpqImage`        | Mutation: image generation. Used by persona picture staging and profile image generation. |
-| `usePpqVideo`        | `usePpqVideoSubmit` + `usePpqVideoJob(id)` polling pair. Default model `seedance-2-fast`. |
-| `usePpqTopup`        | Lightning topup, status polling, and NIP-47 auto-topup helpers. Wallet UI uses PPQ account and usage activity state through `useWallet`. |
+| `usePpqVideo`        | Standalone `usePpqVideoSubmit` + `usePpqVideoJob(id)` polling pair. The dashboard video composer uses `useGenerateVideoPipeline` instead. |
+| `usePpqTopup`        | Standalone Lightning topup and status polling helpers. Wallet UI topup orchestration lives in `useWallet` and `lib/wallet/autoTopup.ts`. |
 
 ### Misc
 
@@ -171,19 +175,20 @@ Pure logic and HTTP clients. No React imports.
 | `PostBody.tsx`        | Body renderer with link/mention parsing.                              |
 | `Skeletons.tsx`       | `PersonaHeaderSkeleton`, `PersonaGridSkeleton`, `PostListSkeleton`.   |
 | `ImigongoBand.tsx`    | Decorative band + seal (Rwandan geometric pattern).                   |
-| `HowItWorks.tsx` + `howItWorks/{Build,Speak,Outlive}Visual.tsx` | Marketing section + supporting illustrations. |
+| `HowItWorks.tsx` + `howItWorks/{Build,Speak,Outlive,Sustain}Visual.tsx` | Marketing section + supporting illustrations. |
 
 ### `components/auth/`
 
 | File                  | What it does                                                          |
 | --------------------- | --------------------------------------------------------------------- |
 | `LoginArea.tsx`       | Either the "Join" button (logged out) or the `AccountSwitcher` (logged in). |
-| `AccountSwitcher.tsx` | Multi-persona dropdown with switch / log out / add. Drives `useLoggedInAccounts.setLogin/removeLogin`. |
+| `AccountSwitcher.tsx` | Multi-operator account dropdown with switch / log out / add. Drives `useLoggedInAccounts.setLogin/removeLogin`. |
 | `AuthDialog.tsx`      | Six-step modal: welcome → generate → secure → profile → login → connect. Handles nsec / extension / nostrconnect / bunker login. **The nostrconnect listening effect (lines 197-232) is subtle** — its dep array is intentionally limited to avoid tearing down in-flight subscriptions on re-render. |
 
 ### `components/ui/`
 
-56 files. **Copied UI primitives — keep edits scoped and consistent.**
+Copied UI primitives. **This directory intentionally keeps only primitives the
+app uses; check the directory before importing.**
 App-specific UI lives one level up.
 
 ## `src/pages/`
@@ -195,9 +200,9 @@ App-specific UI lives one level up.
 | `MyPersonas.tsx`  | Grid of operator's personas via `useMyPersonas`.                          |
 | `Dashboard.tsx`   | Per-persona: header, wallet, PPQ-backed composer, post wizard, video composer, recent posts. |
 | `PersonaFeed.tsx` | Public read-only feed. Anyone can view.                                   |
-| `Verify.tsx`      | Public attestation page. Explicitly states the operator is **not** disclosed. |
 | `NIP19Page.tsx`   | Resolves raw npub/nprofile/note/nevent/naddr URLs.                        |
 | `NotFound.tsx`    | 404.                                                                      |
+| `Settings.tsx`    | Account, relay, Blossom, and external Nostr viewer settings.              |
 
 ## `src/contexts/`
 
@@ -224,16 +229,16 @@ Validation scripts for node:test, source policy, build verification, bundle
 analysis/budgets, and PWA smoke checks. Root `scripts/` is reserved for app
 build/dev/shared-env scripts.
 
-Production tests are colocated next to source: `App.test.tsx`,
-`lib/genUserName.test.ts`, `lib/persona.test.ts`. New tests should follow
-that convention.
+Production unit and focused component tests are colocated next to source, for
+example `src/lib/genUserName.test.ts` and `src/lib/persona.test.ts`.
+Integration tests live under `test/integration/`.
 
 ## Storage keys
 
 | Key                   | Owner                | Contents                                       |
 | --------------------- | -------------------- | ---------------------------------------------- |
 | `nostr:app-config`    | `AppProvider`        | Theme, relay metadata, Blossom server metadata. Runtime-validated on read. |
-| `nostr:login`         | `NostrLoginProvider` | All saved logins (nsec / bunker / extension).  |
+| `nostr:login`         | `NostrLoginProvider` | In-memory active login store. The storage key is retained for Nostrify compatibility, but `appNostrLoginStorage` is not persistent. |
 | `phoenix:ppq:account` | `lib/ppq/storage.ts` | Legacy local PPQ cache key cleared during operator session cleanup. |
 
 **No persona keys live in `localStorage`.** Persona nsecs live inside the
@@ -254,6 +259,4 @@ operator's signer. See `lib/personaKey.ts:1-9`.
 
 - Code in `src/` (canonical).
 - `docs/DATA-FLOW.md` — the seams traced through real call paths.
-- `dev/PROJECT.md` — design doc / master plan. Aligned on the identity
-  model (§3), dependencies (§4 — Breez Spark SDK + PPQ credits), and
-  tag-omission stance.
+- `docs/PRODUCT.md` — product model, release scope, and non-goals.

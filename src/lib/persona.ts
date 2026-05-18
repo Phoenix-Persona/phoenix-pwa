@@ -44,10 +44,10 @@
  * The persona's kind 0 profile bio is the right place to disclose AI
  * usage; individual posts stay metadata-clean.
  *
- * Schema: PROJECT.md §5.2 inner-payload structure.
+ * Schema: docs/PERSONA-SCHEMA.md inner-payload structure.
  * Privacy override: tags-on-the-envelope follow the existing untrackable
  * design rather than §5.2 which would tag-leak Phoenix usage.
- * See `dev/PROJECT.md` §5.
+ * See `docs/PERSONA-SCHEMA.md`.
  */
 
 import { getPublicKey } from "nostr-tools/pure";
@@ -452,7 +452,7 @@ export function isCandidatePersonaEvent(event: NostrEvent): boolean {
 // ─────────── Defaults ───────────
 
 /**
- * Default model preferences per task. PROJECT.md §6 — model strings
+ * Default model preferences per task. Model strings
  * follow whatever PPQ's `/v1/models` returns; the strings below are
  * placeholders adjusted post-Spike A.
  */

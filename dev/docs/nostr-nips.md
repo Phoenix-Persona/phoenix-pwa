@@ -20,8 +20,8 @@ Kind ranges:
 Zuka's kind 30078 is addressable; kind 0 is replaceable; kind 1 is regular.
 
 ### NIP-44 — Encrypted Payloads (Versioned)
-Used for the persona's encrypted backup (kind 30078, encrypted to the
-persona's own pubkey). Version 2 uses secp256k1 ECDH → HKDF →
+Used for encrypted operator and persona backups (kind 30078, encrypted to the
+operator's own pubkey). Version 2 uses secp256k1 ECDH -> HKDF ->
 ChaCha20 + HMAC-SHA256, base64-encoded. Plaintext is padded to obscure
 length. **Audited by Cure53 (Dec 2023).**
 
@@ -29,14 +29,14 @@ Use the signer's NIP-44 helpers (Nostrify exposes these on the signer
 class) — do not roll your own.
 
 ### NIP-49 — Private Key Encryption (`ncryptsec`)
-At-rest passphrase encryption for the persona's nsec in `localStorage`.
+At-rest passphrase encryption for fresh Zuka-generated operator nsecs.
 Format: `scrypt(password, salt, log_n, r=8, p=1)` → 32-byte symmetric
 key → XChaCha20-Poly1305 over the raw 32-byte private key, bech32-encoded
 with prefix `ncryptsec`. Output before bech32 is 91 bytes.
 
 `log_n` controls difficulty (16 ≈ 100ms / 64MiB; 20 ≈ 2s / 1GiB).
 
-**PROJECT.md §10 #6 is open:** one passphrase per device or per persona?
+Zuka uses one passphrase per device for fresh generated operator keys.
 
 ### NIP-57 — Lightning Zaps
 Donation flow. Two events:
@@ -46,12 +46,11 @@ Donation flow. Two events:
   query parameter. The recipient's lnurl server returns a BOLT11 invoice
   whose description hash commits to this event.
 - **kind 9735** — *zap receipt*, published by the recipient's lnurl
-  server after the invoice is paid. Surfaced on the public persona feed
-  (this is the "donation moment" of the demo, PROJECT.md §9).
+  server after the invoice is paid. Surfaced on the public persona feed.
 
-For Zuka to **receive** zaps natively, kind 0 must advertise `lud16`
-(Lightning Address). For a Zuka-hosted Lightning Address, an LNURL-pay
-endpoint must resolve to the Breez Spark wallet — see PROJECT.md §10 #2.
+For Zuka to **receive** zaps natively, persona kind 0 must advertise `lud16`
+(Lightning Address). Zuka uses Breez's hosted `breez.tips` LNURL server rather
+than a Zuka-hosted LNURL endpoint.
 
 ### NIP-78 — Application-specific data (kind 30078)
 Used for the persona's encrypted backup. `d` tag = an opaque random UUID
@@ -60,8 +59,7 @@ encrypted plaintext as `persona.dTag`, reused on every update so
 addressable-event semantics replace the prior version). No other tags.
 Content is NIP-44 ciphertext encrypted to the user's own pubkey. The lack of any Zuka-identifying tag means a
 backup is externally indistinguishable from any other NIP-78 app data;
-discovery is scan-and-decrypt. Schema in PROJECT.md §5.2 /
-`docs/PERSONA-SCHEMA.md`.
+discovery is scan-and-decrypt. Schema lives in `docs/PERSONA-SCHEMA.md`.
 
 ### NIP-92 — Media Attachments (`imeta` tag)
 Adds inline metadata to a media URL referenced in event content. Zuka
@@ -99,9 +97,7 @@ Companion to NIP-92. Defines the field set used inside `imeta`: `url`, `m`
 | Tag       | Where         | Value                                            |
 | --------- | ------------- | ------------------------------------------------ |
 | `d`       | kind 30078    | opaque UUID, stable per persona (`persona.dTag`) |
-| `t`       | kind 1        | `"phoenix"`, region/cause (e.g. `"rwanda"`)      |
-| `client`  | kind 1        | `"phoenix"` (auto-added by `useNostrPublish`)    |
-| `alt`     | kind 1        | Short summary for accessibility                  |
+| `t`       | kind 1        | Optional topical discovery tags. Zuka does not add app-identifying `t` tags. |
 | `imeta`   | kind 1        | Per attachment (NIP-92)                          |
 | `p`       | kind 9734/5   | Recipient pubkey                                 |
 | `e`       | kind 9734/5   | Event being zapped (optional)                    |
@@ -111,4 +107,5 @@ Companion to NIP-92. Defines the field set used inside `imeta`: `url`, `m`
 ## Source
 
 - `github.com/nostr-protocol/nips`
-- PROJECT.md §5 (schema), §7.2 (zaps)
+- `docs/PERSONA-SCHEMA.md`
+- `docs/THREAT-MODEL.md`
