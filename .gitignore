@@ -65,3 +65,6 @@ android/*.jks
 android/*.keystore
 
 .tmp/
+.claude/
+.vscode/
+SCRATCH.md
