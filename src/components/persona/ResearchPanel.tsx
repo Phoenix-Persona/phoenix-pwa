@@ -37,6 +37,7 @@ import {
   useResearchSearch,
   type ResearchSearchInput,
 } from "@/hooks/useResearchSearch";
+import type { PpqAccountOptions } from "@/hooks/usePpqAccount";
 import { useToast } from "@/hooks/useToast";
 import type { SearchResult } from "@/lib/ppq/search";
 import { cn } from "@/lib/utils";
@@ -100,8 +101,8 @@ const CURATED_TOPICS: CuratedTopic[] = [
   { source: "x-user", label: "@Jambonewsnet", handle: "Jambonewsnet" },
 ];
 
-/** Match `@handle` (single token, optional leading @, no spaces). */
-const HANDLE_RE = /^@?([A-Za-z0-9_]{1,32})$/;
+/** Match explicit `@handle` searches. Bare single-word topics stay web searches. */
+const HANDLE_RE = /^@([A-Za-z0-9_]{1,32})$/;
 
 export interface ResearchPanelProps {
   open: boolean;
@@ -110,12 +111,13 @@ export interface ResearchPanelProps {
   onAddSource: (url: string) => void;
   /** Append a quoted block to the composer's Idea textarea. */
   onQuoteIntoIdea: (text: string) => void;
+  ppqAccountOptions?: PpqAccountOptions;
 }
 
 export function ResearchPanel(props: ResearchPanelProps) {
-  const { open, onOpenChange, onAddSource, onQuoteIntoIdea } = props;
+  const { open, onOpenChange, onAddSource, onQuoteIntoIdea, ppqAccountOptions } = props;
   const { toast } = useToast();
-  const research = useResearchSearch();
+  const research = useResearchSearch(ppqAccountOptions);
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);

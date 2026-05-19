@@ -1,33 +1,37 @@
 import { useState } from "react";
-import { RotateCw } from "lucide-react";
+import { RotateCw, Settings2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/useToast";
 import type { UseWalletResult } from "@/hooks/useWallet";
 import type { AutoTopupConfig, PpqFundingSource } from "@/lib/wallet/types";
 import { fmtMoney } from "./WalletPanelFormat";
-import {
-  OperatorBackupStatus,
-  PpqUsageActivity,
-  SecretRow,
-  type OperatorWalletDiagnostics,
-} from "./WalletPanelSections";
+import { PpqUsageActivity, SecretRow } from "./WalletPanelSections";
 
 interface PpqFundingSectionProps {
   wallet: UseWalletResult;
   walletScope: "persona" | "operator";
-  operatorDiagnostics: OperatorWalletDiagnostics | undefined;
   onAutoTopupSave: ((config: AutoTopupConfig) => void | Promise<void>) | undefined;
 }
 
 export function PpqFundingSection({
   wallet,
   walletScope,
-  operatorDiagnostics,
   onAutoTopupSave,
 }: PpqFundingSectionProps) {
   const { toast } = useToast();
@@ -48,6 +52,7 @@ export function PpqFundingSection({
   const [manualTopupInput, setManualTopupInput] = useState(
     String(wallet.autoTopup.topupAmountUsd),
   );
+  const [autoSettingsOpen, setAutoSettingsOpen] = useState(false);
   const [autoTopupError, setAutoTopupError] = useState<string | null>(null);
   const [manualTopupError, setManualTopupError] = useState<string | null>(null);
   const [rotatePpqError, setRotatePpqError] = useState<string | null>(null);
@@ -167,124 +172,162 @@ export function PpqFundingSection({
         ) : null}
       </section>
 
-      <section className="space-y-2 rounded-md border bg-muted/20 p-2.5">
+      <section className="space-y-3 rounded-md border bg-muted/20 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-medium">Top-ups</p>
-          <div className="flex items-center gap-1.5">
-            {wallet.fundingSources.length > 1 ? (
-              <div
-                className="flex rounded-md bg-muted p-0.5"
-                aria-label="PPQ funding source"
-              >
-                {wallet.fundingSources.map((option) => (
-                  <Button
-                    key={option.source}
-                    type="button"
-                    variant={
-                      fundingSource === option.source ? "secondary" : "ghost"
-                    }
-                    size="sm"
-                    aria-label={`Fund from ${option.label}`}
-                    disabled={!option.isAvailable}
-                    onClick={() => setFundingSource(option.source)}
-                    className="h-7 px-2 text-xs"
-                  >
-                    {option.label}
-                  </Button>
-                ))}
+          <p className="text-sm font-medium">Funding source</p>
+          {wallet.fundingSources.length > 1 ? (
+            <div
+              className="flex rounded-md bg-muted p-0.5"
+              aria-label="PPQ funding source"
+            >
+              {wallet.fundingSources.map((option) => (
+                <Button
+                  key={option.source}
+                  type="button"
+                  variant={
+                    fundingSource === option.source ? "secondary" : "ghost"
+                  }
+                  size="sm"
+                  aria-label={`Fund from ${option.label}`}
+                  disabled={!option.isAvailable}
+                  onClick={() => setFundingSource(option.source)}
+                  className="h-7 px-2 text-xs"
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {wallet.fundingSources[0]?.label ?? "Wallet"}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2 rounded-md border bg-background/60 p-2.5">
+          <p className="text-sm font-medium">Manual top-up</p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <Label htmlFor="ppq-manual-amount" className="text-xs">
+                Amount
+              </Label>
+              <Input
+                id="ppq-manual-amount"
+                aria-label="Manual top-up amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                inputMode="decimal"
+                value={manualTopupInput}
+                className="h-8"
+                onChange={(event) => setManualTopupInput(event.target.value)}
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 self-end"
+              onClick={runManualTopup}
+              disabled={wallet.isManualTopupRunning}
+            >
+              {wallet.isManualTopupRunning ? "Topping up..." : "Top up now"}
+            </Button>
+          </div>
+          {manualTopupError || wallet.manualTopupError ? (
+            <p className="text-xs text-destructive">
+              {manualTopupError ?? wallet.manualTopupError?.message}
+            </p>
+          ) : null}
+          {wallet.manualTopupResult ? (
+            <p className="text-xs text-muted-foreground">
+              Last manual top-up: {fmtMoney(wallet.manualTopupResult.toppedUpUsd)} ·{" "}
+              {wallet.manualTopupResult.status}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="space-y-2 rounded-md border bg-background/60 p-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-medium">Auto top-up</p>
+              <p className="text-xs text-muted-foreground">
+                {autoTopupEnabled
+                  ? `Runs below $${thresholdInput || wallet.autoTopup.thresholdUsd}.`
+                  : "Disabled until you turn it on."}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label="Edit auto top-up"
+              onClick={() => setAutoSettingsOpen((open) => !open)}
+              className="h-8"
+            >
+              <Settings2 className="mr-2 size-3.5" aria-hidden="true" />
+              Edit
+            </Button>
+          </div>
+
+          {autoSettingsOpen ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="ppq-auto-topup-enabled"
+                  checked={autoTopupEnabled}
+                  onCheckedChange={(checked) => setAutoTopupEnabled(checked === true)}
+                />
+                <Label htmlFor="ppq-auto-topup-enabled" className="text-sm">
+                  Enable auto top-up
+                </Label>
               </div>
-            ) : null}
-            <Checkbox
-              id="ppq-auto-topup-enabled"
-              checked={autoTopupEnabled}
-              onCheckedChange={(checked) => setAutoTopupEnabled(checked === true)}
-            />
-            <Label htmlFor="ppq-auto-topup-enabled" className="text-sm">
-              Auto
-            </Label>
-          </div>
+              <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                <div className="space-y-1.5">
+                  <Label htmlFor="ppq-auto-threshold" className="text-xs">
+                    Auto below
+                  </Label>
+                  <Input
+                    id="ppq-auto-threshold"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={thresholdInput}
+                    className="h-8"
+                    onChange={(event) => setThresholdInput(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ppq-auto-amount" className="text-xs">
+                    Buy
+                  </Label>
+                  <Input
+                    id="ppq-auto-amount"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={topupAmountInput}
+                    className="h-8"
+                    onChange={(event) => setTopupAmountInput(event.target.value)}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={saveAutoTopup}
+                  disabled={isSavingAutoTopup}
+                  className="col-span-2 h-8 sm:col-span-1"
+                >
+                  {isSavingAutoTopup ? "Saving..." : "Save"}
+                </Button>
+              </div>
+              {autoTopupError ? (
+                <p className="text-xs text-destructive">{autoTopupError}</p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
-        <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-          <div className="space-y-1.5">
-            <Label htmlFor="ppq-auto-threshold" className="text-xs">
-              Auto below
-            </Label>
-            <Input
-              id="ppq-auto-threshold"
-              type="number"
-              min="0.01"
-              step="0.01"
-              inputMode="decimal"
-              value={thresholdInput}
-              className="h-8"
-              onChange={(event) => setThresholdInput(event.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="ppq-auto-amount" className="text-xs">
-              Buy
-            </Label>
-            <Input
-              id="ppq-auto-amount"
-              type="number"
-              min="0.01"
-              step="0.01"
-              inputMode="decimal"
-              value={topupAmountInput}
-              className="h-8"
-              onChange={(event) => setTopupAmountInput(event.target.value)}
-            />
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            onClick={saveAutoTopup}
-            disabled={isSavingAutoTopup}
-            className="col-span-2 h-8 sm:col-span-1"
-          >
-            {isSavingAutoTopup ? "Saving..." : "Save"}
-          </Button>
-        </div>
-        {autoTopupError ? (
-          <p className="text-xs text-destructive">{autoTopupError}</p>
-        ) : null}
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <Label htmlFor="ppq-manual-amount" className="text-xs">
-              Manual top-up
-            </Label>
-            <Input
-              id="ppq-manual-amount"
-              type="number"
-              min="0.01"
-              step="0.01"
-              inputMode="decimal"
-              value={manualTopupInput}
-              className="h-8"
-              onChange={(event) => setManualTopupInput(event.target.value)}
-            />
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            className="h-8 self-end"
-            onClick={runManualTopup}
-            disabled={wallet.isManualTopupRunning}
-          >
-            {wallet.isManualTopupRunning ? "Topping up..." : "Top up now"}
-          </Button>
-        </div>
-        {manualTopupError || wallet.manualTopupError ? (
-          <p className="text-xs text-destructive">
-            {manualTopupError ?? wallet.manualTopupError?.message}
-          </p>
-        ) : null}
-        {wallet.manualTopupResult ? (
-          <p className="text-xs text-muted-foreground">
-            Last manual top-up: {fmtMoney(wallet.manualTopupResult.toppedUpUsd)} ·{" "}
-            {wallet.manualTopupResult.status}
-          </p>
-        ) : null}
       </section>
 
       <section className="space-y-2">
@@ -293,21 +336,40 @@ export function PpqFundingSection({
             Active PPQ credentials
           </p>
           {walletScope === "operator" ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={rotatePpqCredentials}
-              disabled={wallet.isPpqRotating}
-              aria-label="Rotate PPQ credentials"
-              className="h-8"
-            >
-              <RotateCw
-                className={`mr-2 size-3.5 ${wallet.isPpqRotating ? "animate-spin" : ""}`}
-                aria-hidden="true"
-              />
-              {wallet.isPpqRotating ? "Rotating..." : "Rotate"}
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={wallet.isPpqRotating}
+                  aria-label="Rotate PPQ credentials"
+                  className="h-8"
+                >
+                  <RotateCw
+                    className={`mr-2 size-3.5 ${wallet.isPpqRotating ? "animate-spin" : ""}`}
+                    aria-hidden="true"
+                  />
+                  {wallet.isPpqRotating ? "Rotating..." : "Rotate"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Rotate PPQ credentials?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This replaces the operator wallet's active PPQ API key. New
+                    AI requests will use the rotated credentials after the
+                    backup is updated.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={rotatePpqCredentials}>
+                    Rotate credentials
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           ) : null}
         </div>
         {walletScope === "operator" && (rotatePpqError || wallet.ppqRotateError) ? (
@@ -329,10 +391,6 @@ export function PpqFundingSection({
           revealLabel="PPQ API key"
         />
       </section>
-
-      {walletScope === "operator" && operatorDiagnostics ? (
-        <OperatorBackupStatus diagnostics={operatorDiagnostics} />
-      ) : null}
 
       <PpqUsageActivity
         items={wallet.ppqQueryHistory}

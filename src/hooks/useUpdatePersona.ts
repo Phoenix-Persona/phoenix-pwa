@@ -147,6 +147,7 @@ export function useUpdatePersona() {
         version: envelope.version,
         persona: updated,
         wallet: updatedWallet,
+        ppq: envelope.ppq,
         model_prefs: envelope.model_prefs,
         settings: envelope.settings,
       };

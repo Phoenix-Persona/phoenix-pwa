@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useUploadFile } from "@/hooks/useUploadFile";
 import { usePpqImage } from "@/hooks/usePpqImage";
+import type { PpqAccountOptions } from "@/hooks/usePpqAccount";
 import { useToast } from "@/hooks/useToast";
 import { generatePollinationsImage } from "@/lib/pollinations/client";
 import { PpqError } from "@/lib/ppq/types";
@@ -66,6 +67,7 @@ interface PersonaPictureFieldProps {
    * server preferences.
    */
   blossomServers?: string[];
+  ppqAccountOptions?: PpqAccountOptions;
   className?: string;
 }
 
@@ -98,11 +100,12 @@ export function PersonaPictureField({
   allowFreeFallback = false,
   signer,
   blossomServers,
+  ppqAccountOptions,
   className,
 }: PersonaPictureFieldProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const upload = useUploadFile({ signer, blossomServers });
-  const generate = usePpqImage();
+  const generate = usePpqImage(ppqAccountOptions);
   const { toast } = useToast();
 
   const [prompt, setPrompt] = useState(promptHint ?? "");

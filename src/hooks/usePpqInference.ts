@@ -7,15 +7,16 @@
  *     messages: [{ role: "user", content: "hello" }],
  *   });
  *
- * The hook will auto-create a ppq.ai account on first use if one hasn't been
- * persisted yet, so callers don't need to coordinate with `usePpqAccount`.
+ * The hook will auto-create a ppq.ai account in the requested scope on first
+ * use if one hasn't been persisted yet, so callers don't need to coordinate
+ * with `usePpqAccount`.
  */
 
 import { useMutation, type UseMutationResult } from "@tanstack/react-query";
 
 import { chatCompletion } from "@/lib/ppq/client";
 import type { PpqChatRequest, PpqChatResponse } from "@/lib/ppq/types";
-import { usePpqAccount } from "./usePpqAccount";
+import { usePpqAccount, type PpqAccountOptions } from "./usePpqAccount";
 
 export const DEFAULT_INFERENCE_MODEL = "claude-sonnet-4.5";
 
@@ -23,13 +24,15 @@ export type PpqInferenceVars = Omit<PpqChatRequest, "model"> & {
   model?: string;
 };
 
-export function usePpqInference(): UseMutationResult<
+export function usePpqInference(
+  accountOptions?: PpqAccountOptions,
+): UseMutationResult<
   PpqChatResponse,
   Error,
   PpqInferenceVars
 > {
-  // Resolution lives in usePpqAccount: env > operator envelope > mint.
-  const { account, ensureAccount } = usePpqAccount();
+  // Resolution lives in usePpqAccount: operator or persona envelope > mint.
+  const { account, ensureAccount } = usePpqAccount(accountOptions);
 
   return useMutation({
     mutationFn: async (vars) => {

@@ -187,4 +187,66 @@ describe("usePpqAccount", () => {
     expect(mocks.operator.ensureWithPpq).toHaveBeenCalledWith(fresh);
     expect(mocks.createAccount).toHaveBeenCalledOnce();
   });
+
+  it("mints and persists a distinct persona PPQ account without touching the operator envelope", async () => {
+    const fresh = { api_key: "api-persona", credit_id: "credit-persona" };
+    const persistPersonaPpq = mockFn().mockResolvedValue(undefined);
+    mocks.operator.envelope = {
+      ppq: { api_key: "api-operator", credit_id: "credit-operator" },
+    };
+    mocks.createAccount.mockResolvedValue(fresh);
+
+    const { result } = renderHook(
+      () =>
+        usePpqAccount({
+          scope: "persona",
+          ownerKey: "persona-pubkey",
+          account: undefined,
+          isLoading: false,
+          persistAccount: persistPersonaPpq,
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.account).toBeNull());
+
+    await act(async () => {
+      await expect(result.current.ensureAccount()).resolves.toEqual(fresh);
+    });
+
+    expect(persistPersonaPpq).toHaveBeenCalledWith(fresh);
+    expect(mocks.operator.ensureWithPpq).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.account).toEqual(fresh));
+  });
+
+  it("uses existing persona PPQ credentials instead of the operator credentials", async () => {
+    const personaAccount = {
+      api_key: "api-persona-existing",
+      credit_id: "credit-persona-existing",
+    };
+    mocks.operator.envelope = {
+      ppq: { api_key: "api-operator", credit_id: "credit-operator" },
+    };
+
+    const { result } = renderHook(
+      () =>
+        usePpqAccount({
+          scope: "persona",
+          ownerKey: "persona-pubkey",
+          account: personaAccount,
+          isLoading: false,
+          persistAccount: mockFn().mockResolvedValue(undefined),
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.account).toEqual(personaAccount));
+
+    await act(async () => {
+      await expect(result.current.ensureAccount()).resolves.toEqual(personaAccount);
+    });
+
+    expect(mocks.createAccount).not.toHaveBeenCalled();
+    expect(result.current.account).not.toEqual(mocks.operator.envelope.ppq);
+  });
 });

@@ -6,7 +6,7 @@
  * land separately on this page when they're ready.
  */
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { X } from "lucide-react";
 
@@ -29,6 +29,7 @@ import { useAuthor } from "@/hooks/useAuthor";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import { usePersonaComposer } from "@/hooks/usePersonaComposer";
+import { usePersonaPpqAccountOptions } from "@/hooks/usePersonaPpqAccountOptions";
 import { usePersona, usePersonaPosts } from "@/hooks/usePersona";
 import { useOperatorWallet } from "@/hooks/useOperatorWallet";
 import { useWallet } from "@/hooks/useWallet";
@@ -90,6 +91,17 @@ const Dashboard = () => {
     () => autoTopupConfigFromPersisted(envelope?.wallet?.auto_topup),
     [envelope?.wallet?.auto_topup],
   );
+  const refetchPersonaEnvelope = useCallback(async () => {
+    const refreshed = await persona.refetch();
+    return refreshed.data?.envelope ?? null;
+  }, [persona.refetch]);
+  const ppqAccountOptions = usePersonaPpqAccountOptions({
+    npub,
+    backupEvent: persona.data?.event,
+    envelope,
+    isLoading: persona.isLoading,
+    refetchEnvelope: refetchPersonaEnvelope,
+  });
   const stylingModel =
     envelope?.model_prefs?.agent ?? "anthropic/claude-sonnet-4.5";
   const operatorFundingWallet = useMemo(
@@ -119,6 +131,7 @@ const Dashboard = () => {
     mnemonic: walletSeed,
     autoTopup: walletAutoTopup,
     operatorFundingWallet,
+    ppqAccountOptions,
   });
   const showDonateHandleNudge =
     Boolean(personaConfig && walletSeed) &&
@@ -131,6 +144,7 @@ const Dashboard = () => {
     stylingModel,
     crossPostEnabled,
     wallet,
+    ppqAccountOptions,
     onPublished: () => {
       posts.refetch();
     },
@@ -221,7 +235,6 @@ const Dashboard = () => {
           </section>
         ) : personaConfig ? (
           <PersonaHero
-            eyebrow="Composer"
             name={personaConfig.name}
             bio={publicBio || undefined}
             pictureUrl={picture ?? null}
@@ -335,6 +348,7 @@ const Dashboard = () => {
               crossPostEnabled={crossPostEnabled}
               crossPost={personaConfig.cross_post}
               walletSeed={walletSeed}
+              ppqAccountOptions={ppqAccountOptions}
               isPublishing={composer.isPublishing}
               isStyling={composer.isStyling}
               onRawChange={setRaw}
@@ -375,9 +389,6 @@ const Dashboard = () => {
               <h2 className="font-display text-2xl font-medium tracking-tight">
                 Recent posts
               </h2>
-              <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-medium">
-                Live on relays
-              </span>
             </div>
             {posts.isLoading ? (
               <PostListSkeleton count={2} />
@@ -416,6 +427,7 @@ const Dashboard = () => {
           sourcesInput={sourcesInput}
           hintsInput={hintsInput}
           personaAvatarUrl={picture ?? undefined}
+          ppqAccountOptions={ppqAccountOptions}
           onPublished={() => {
             posts.refetch();
             setRaw("");
@@ -432,6 +444,7 @@ const Dashboard = () => {
           persona={personaConfig}
           model={stylingModel}
           walletSeed={walletSeed}
+          ppqAccountOptions={ppqAccountOptions}
           onUseDraft={(draft, sourceUrls) => {
             setRaw(draft);
             setSourcesInput((prev) => appendSourceUrls(prev, sourceUrls));

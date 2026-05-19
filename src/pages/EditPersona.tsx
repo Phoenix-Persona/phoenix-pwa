@@ -19,7 +19,7 @@
  * re-mounts the form rather than re-using stale state.
  */
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import type { NostrEvent } from "@nostrify/nostrify";
@@ -36,7 +36,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import { usePersona } from "@/hooks/usePersona";
+import { usePersonaPpqAccountOptions } from "@/hooks/usePersonaPpqAccountOptions";
 import { usePersonaPublicProfile } from "@/hooks/usePersonaPublicProfile";
+import type { PpqAccountOptions } from "@/hooks/usePpqAccount";
 import { useToast } from "@/hooks/useToast";
 import { useUpdatePersona } from "@/hooks/useUpdatePersona";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
@@ -53,6 +55,17 @@ const EditPersona = () => {
   usePageMeta({ title: "Edit persona — Zuka" });
   const { user } = useCurrentUser();
   const personaQ = usePersona(npub);
+  const refetchPersonaEnvelope = useCallback(async () => {
+    const refreshed = await personaQ.refetch();
+    return refreshed.data?.envelope ?? null;
+  }, [personaQ.refetch]);
+  const ppqAccountOptions = usePersonaPpqAccountOptions({
+    npub,
+    backupEvent: personaQ.data?.event,
+    envelope: personaQ.data?.envelope,
+    isLoading: personaQ.isLoading,
+    refetchEnvelope: refetchPersonaEnvelope,
+  });
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -112,6 +125,7 @@ const EditPersona = () => {
               npub={npub}
               backupEvent={personaQ.data.event}
               envelope={personaQ.data.envelope}
+              ppqAccountOptions={ppqAccountOptions}
             />
           )}
         </div>
@@ -124,13 +138,19 @@ interface EditPersonaFormProps {
   npub: string;
   backupEvent: NostrEvent;
   envelope: PhoenixEnvelope;
+  ppqAccountOptions: PpqAccountOptions;
 }
 
 function lightningUsernameFromAddress(address: string | undefined): string | undefined {
   return address?.split("@")[0];
 }
 
-function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) {
+function EditPersonaForm({
+  npub,
+  backupEvent,
+  envelope,
+  ppqAccountOptions,
+}: EditPersonaFormProps) {
   const navigate = useNavigate();
   const { user } = useCurrentUser();
   const { toast } = useToast();
@@ -366,6 +386,7 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
           onBioChange={setBio}
           onPictureUrlChange={setPictureUrl}
           pictureSigner={personaSigner}
+          ppqAccountOptions={ppqAccountOptions}
         />
 
         <EditPersonaSystemPromptField
@@ -375,6 +396,7 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
           bio={bio}
           systemPrompt={systemPrompt}
           onSystemPromptChange={setSystemPrompt}
+          ppqAccountOptions={ppqAccountOptions}
         />
 
         {crossPostEnabled ? (

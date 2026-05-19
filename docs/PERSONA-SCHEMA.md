@@ -81,6 +81,10 @@ JSON envelope with an app discriminator:
       "funding_source": "persona"
     }
   },
+  "ppq": {
+    "credit_id": "credit_...",
+    "api_key": "ppq_..."
+  },
   "model_prefs": {
     "agent": "anthropic/claude-sonnet-4.5",
     "image": "openai/gpt-image-1",
@@ -92,6 +96,13 @@ JSON envelope with an app discriminator:
   }
 }
 ```
+
+`ppq` stores the persona's own PPQ credit account. Persona AI actions
+such as composer styling, AI Assist, research, image generation, post wizard,
+and video generation use this account instead of the operator's PPQ
+credentials. If a persona backup does not have `ppq`, the first persona AI
+action mints a PPQ account and republishes the same encrypted backup with the
+new field.
 
 Validation happens after decrypting:
 

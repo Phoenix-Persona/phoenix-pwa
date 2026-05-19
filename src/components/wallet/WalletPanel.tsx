@@ -114,7 +114,6 @@ export function WalletPanel({
           <PpqFundingSection
             wallet={wallet}
             walletScope={walletScope}
-            operatorDiagnostics={operatorDiagnostics}
             onAutoTopupSave={onAutoTopupSave}
           />
         </TabsContent>

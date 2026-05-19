@@ -18,6 +18,7 @@
  *     version: 1,                  schema version (only 1 accepted)
  *     persona: { pubkey, nsec, name, system_prompt, ... },
  *     wallet?: { kind, seed, lnurl? },         (optional for now; required once wallet wiring lands)
+ *     ppq?: { credit_id, api_key },            persona-scoped AI credentials
  *     model_prefs?: { agent, image, tts, video? },
  *     settings?:    { default_relays }
  *   }
@@ -53,6 +54,7 @@
 import { getPublicKey } from "nostr-tools/pure";
 import { nip19 } from "nostr-tools";
 import type { NostrEvent } from "@nostrify/nostrify";
+import type { PpqAccount } from "./ppq/types";
 
 export const PERSONA_KIND = 30078;
 export const PHOENIX_PAYLOAD_APP = "phoenix-persona";
@@ -118,6 +120,7 @@ export interface PhoenixEnvelope {
   version: typeof PHOENIX_PAYLOAD_VERSION;
   persona: Persona;
   wallet?: PersonaWallet;
+  ppq?: PpqAccount;
   model_prefs?: PersonaModelPrefs;
   settings?: PersonaSettings;
 }
@@ -249,6 +252,17 @@ function parseModelPrefs(value: unknown): PersonaModelPrefs | undefined | null {
   };
 }
 
+function parsePpqAccount(value: unknown): PpqAccount | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  if (!isStringLength(value.api_key, 1, 4096)) return null;
+  if (!isStringLength(value.credit_id, 0, 512)) return null;
+  return {
+    api_key: value.api_key,
+    credit_id: value.credit_id,
+  };
+}
+
 function parseSettings(value: unknown): PersonaSettings | undefined | null {
   if (value === undefined) return undefined;
   if (!isRecord(value)) return null;
@@ -328,14 +342,16 @@ function parseEnvelope(value: unknown): PhoenixEnvelope | null {
   const persona = parsePersona(value.persona);
   if (!persona) return null;
   const wallet = value.wallet === undefined ? undefined : parsePersonaWallet(value.wallet);
+  const ppq = parsePpqAccount(value.ppq);
   const modelPrefs = parseModelPrefs(value.model_prefs);
   const settings = parseSettings(value.settings);
-  if (wallet === null || modelPrefs === null || settings === null) return null;
+  if (wallet === null || ppq === null || modelPrefs === null || settings === null) return null;
   return {
     app: PHOENIX_PAYLOAD_APP,
     version: PHOENIX_PAYLOAD_VERSION,
     persona,
     ...(wallet !== undefined ? { wallet } : {}),
+    ...(ppq !== undefined ? { ppq } : {}),
     ...(modelPrefs !== undefined ? { model_prefs: modelPrefs } : {}),
     ...(settings !== undefined ? { settings } : {}),
   };

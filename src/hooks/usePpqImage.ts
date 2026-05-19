@@ -13,15 +13,17 @@ import { useMutation, type UseMutationResult } from "@tanstack/react-query";
 
 import { generateImage } from "@/lib/ppq/client";
 import type { PpqImageRequest, PpqImageResponse } from "@/lib/ppq/types";
-import { usePpqAccount } from "./usePpqAccount";
+import { usePpqAccount, type PpqAccountOptions } from "./usePpqAccount";
 
-export function usePpqImage(): UseMutationResult<
+export function usePpqImage(
+  accountOptions?: PpqAccountOptions,
+): UseMutationResult<
   PpqImageResponse,
   Error,
   PpqImageRequest
 > {
-  // Resolution lives in usePpqAccount: env > operator envelope > mint.
-  const { account, ensureAccount } = usePpqAccount();
+  // Resolution lives in usePpqAccount: operator or persona envelope > mint.
+  const { account, ensureAccount } = usePpqAccount(accountOptions);
 
   return useMutation({
     mutationFn: async (req) => {

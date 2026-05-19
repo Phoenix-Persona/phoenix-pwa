@@ -110,7 +110,7 @@ export interface SendResult {
 export type PpqFundingSource = "operator" | "persona";
 
 /**
- * Default-on policy: when ppq.ai's USD balance dips below `thresholdUsd`,
+ * Auto top-up policy: when enabled and ppq.ai's USD balance dips below `thresholdUsd`,
  * buy `topupAmountUsd` more credits by paying a Lightning invoice issued
  * by ppq.ai out of the selected Spark wallet.
  */
@@ -134,11 +134,10 @@ export interface PersistedAutoTopupConfig {
 }
 
 /**
- * Default policy: if the ppq.ai credit balance dips below $5, buy another
- * $5 in credits from the persona's Spark wallet.
+ * Default policy: keep auto top-up off until the operator opts in.
  */
 export const DEFAULT_AUTO_TOPUP_CONFIG: AutoTopupConfig = {
-  enabled: true,
+  enabled: false,
   thresholdUsd: 5,
   topupAmountUsd: 5,
   fundingSource: "operator",

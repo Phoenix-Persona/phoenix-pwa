@@ -22,6 +22,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { usePpqInference, getInferenceText } from "@/hooks/usePpqInference";
+import type { PpqAccountOptions } from "@/hooks/usePpqAccount";
 import { useResearchSearch } from "@/hooks/useResearchSearch";
 import { useToast } from "@/hooks/useToast";
 import type { SearchResult } from "@/lib/ppq/search";
@@ -50,6 +51,7 @@ export interface PostWizardDialogProps {
   persona: Persona;
   model: string;
   walletSeed: string | undefined;
+  ppqAccountOptions?: PpqAccountOptions;
   onUseDraft: (text: string, sourceUrls: string[]) => void;
 }
 
@@ -128,11 +130,12 @@ export function PostWizardDialog({
   persona,
   model,
   walletSeed,
+  ppqAccountOptions,
   onUseDraft,
 }: PostWizardDialogProps) {
   const { toast } = useToast();
-  const research = useResearchSearch();
-  const inference = usePpqInference();
+  const research = useResearchSearch(ppqAccountOptions);
+  const inference = usePpqInference(ppqAccountOptions);
 
   const [step, setStep] = useState<WizardStep>("topic");
   const [selectedTopicId, setSelectedTopicId] = useState<string>("cause");

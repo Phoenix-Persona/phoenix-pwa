@@ -42,7 +42,7 @@ import type {
   PpqTopupMethod,
   PpqTopupStatusResponse,
 } from "@/lib/ppq/types";
-import { usePpqAccount } from "./usePpqAccount";
+import { usePpqAccount, type PpqAccountOptions } from "./usePpqAccount";
 
 export interface PpqTopupVars {
   amount: number;
@@ -57,12 +57,14 @@ export interface PpqTopupResult {
   bolt11?: string;
 }
 
-export function usePpqLightningTopup(): UseMutationResult<
+export function usePpqLightningTopup(
+  accountOptions?: PpqAccountOptions,
+): UseMutationResult<
   PpqTopupResult,
   Error,
   PpqTopupVars
 > {
-  const { ensureAccount } = usePpqAccount();
+  const { ensureAccount } = usePpqAccount(accountOptions);
 
   return useMutation({
     mutationFn: async ({ amount, currency = "USD", method = "btc-lightning" }) => {

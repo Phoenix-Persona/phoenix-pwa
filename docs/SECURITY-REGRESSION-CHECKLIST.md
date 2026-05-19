@@ -37,8 +37,10 @@ publishing, media upload, or operator/persona boundaries.
 ## Wallets and PPQ
 
 - Operator wallet and persona wallet IDs cannot collide.
-- PPQ credentials are read from the active operator envelope or dev-only
-  env pins, never legacy global localStorage.
+- Operator PPQ credentials are read from the active operator envelope or
+  dev-only env pins, never legacy global localStorage.
+- Persona AI flows use the active persona envelope PPQ account, not the
+  operator's PPQ account.
 - PPQ rotation writes back to the current operator envelope.
 - Auto-topup source selection cannot silently fall back to another
   operator's wallet.

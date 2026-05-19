@@ -36,7 +36,7 @@ import type {
   PpqVideoStatusResponse,
   PpqVideoSubmitResponse,
 } from "@/lib/ppq/types";
-import { usePpqAccount } from "./usePpqAccount";
+import { usePpqAccount, type PpqAccountOptions } from "./usePpqAccount";
 
 export const DEFAULT_VIDEO_MODEL = "seedance-2-fast";
 
@@ -44,12 +44,14 @@ export type PpqVideoSubmitVars = Omit<PpqVideoRequest, "model"> & {
   model?: string;
 };
 
-export function usePpqVideoSubmit(): UseMutationResult<
+export function usePpqVideoSubmit(
+  accountOptions?: PpqAccountOptions,
+): UseMutationResult<
   PpqVideoSubmitResponse,
   Error,
   PpqVideoSubmitVars
 > {
-  const { ensureAccount } = usePpqAccount();
+  const { ensureAccount } = usePpqAccount(accountOptions);
 
   return useMutation({
     mutationFn: async (vars) => {

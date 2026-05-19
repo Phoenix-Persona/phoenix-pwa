@@ -184,4 +184,36 @@ describe("DashboardComposerCard", () => {
 
     expect(props.onRawChange).toHaveBeenCalledWith("Generated video brief");
   });
+
+  it("disables discard when the composer has no draft fields to clear", () => {
+    renderComposer({ raw: "", sourcesInput: "", hintsInput: "" });
+
+    expect(screen.getByRole("button", { name: /^discard$/i })).toHaveAttribute(
+      "disabled",
+    );
+  });
+
+  it("highlights Publish instead of Style in voice on the post tab", () => {
+    renderComposer();
+
+    expect(screen.getByRole("button", { name: /style in voice/i })).toHaveClass(
+      "border",
+    );
+    expect(screen.getByRole("button", { name: /^publish$/i })).toHaveClass(
+      "shadow-primary/20",
+    );
+  });
+
+  it("highlights Generate video instead of Style in voice on the video tab", () => {
+    renderComposer();
+
+    openVideoTab();
+
+    expect(screen.getByRole("button", { name: /style in voice/i })).toHaveClass(
+      "border",
+    );
+    expect(screen.getByRole("button", { name: /generate video/i })).toHaveClass(
+      "shadow-primary/20",
+    );
+  });
 });

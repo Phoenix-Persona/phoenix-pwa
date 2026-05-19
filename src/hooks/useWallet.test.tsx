@@ -98,6 +98,12 @@ describe("useWallet", () => {
           walletId: "persona:abc",
           mnemonic:
             "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+          autoTopup: {
+            enabled: true,
+            thresholdUsd: 5,
+            topupAmountUsd: 5,
+            fundingSource: "persona",
+          },
         }),
       { wrapper },
     );
@@ -119,6 +125,12 @@ describe("useWallet", () => {
           walletId: "persona:abc",
           mnemonic:
             "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+          autoTopup: {
+            enabled: true,
+            thresholdUsd: 5,
+            topupAmountUsd: 5,
+            fundingSource: "persona",
+          },
         }),
       { wrapper },
     );

@@ -9,7 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Added persona-scoped PPQ credentials inside encrypted persona backups.
+
 ### Changed
+
+- Routed persona AI Assist, composer styling, research, image, post wizard, and
+  video generation through the active persona PPQ account.
+- Cleaned up wallet and dashboard copy: operator wallets no longer expose
+  Lightning Address UI, wallet transfer actions now use deposit/withdraw copy,
+  and auto top-up settings are hidden until edited.
 
 ### Deprecated
 
@@ -17,7 +25,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Fixed bare research-topic searches being misclassified as X handles.
+- Fixed the redundant mobile burger menu by consolidating app navigation into
+  the profile menu.
+
 ### Security
+
+- Isolated persona AI credentials from operator credentials to prevent PPQ
+  account bleed across personas and operator sessions.
 
 ## [0.1.0-beta.1] - 2026-05-18
 

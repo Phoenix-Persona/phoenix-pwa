@@ -94,12 +94,13 @@ describe("AI usage integration", () => {
     const operator = await operatorEnvelopeEvent({
       operator: testKeys.operator,
       wallet: { kind: "spark", seed: MNEMONIC },
-      ppq: { api_key: "api-voice", credit_id: "credit-voice" },
+      ppq: { api_key: "api-operator", credit_id: "credit-operator" },
     });
     const persona = await personaEnvelopeEvent({
       operator: testKeys.operator,
       persona: testKeys.persona,
       name: "Amina Voice",
+      ppq: { api_key: "api-voice", credit_id: "credit-voice" },
     });
     harness = await createServicesHarness({
       events: [operator.event, persona.event],
@@ -136,6 +137,13 @@ describe("AI usage integration", () => {
           wallet: {
             refreshInfo: mockFn(),
             refreshPpqBalance: mockFn(),
+          },
+          ppqAccountOptions: {
+            scope: "persona",
+            ownerKey: persona.envelope.persona.pubkey,
+            account: persona.envelope.ppq,
+            isLoading: false,
+            persistAccount: mockFn().mockResolvedValue(undefined),
           },
       }),
       { wrapper: harness.wrapper },

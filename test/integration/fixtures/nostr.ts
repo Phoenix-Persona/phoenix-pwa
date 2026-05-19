@@ -7,6 +7,7 @@ import { nip19 } from "nostr-tools";
 
 import { encryptPhoenixEnvelope } from "@/lib/personaCrypto";
 import type { Persona, PhoenixEnvelope } from "@/lib/persona";
+import type { PpqAccount } from "@/lib/ppq/types";
 import {
   PHOENIX_OPERATOR_APP,
   PHOENIX_OPERATOR_VERSION,
@@ -110,6 +111,7 @@ export async function personaEnvelopeEvent(args: {
   persona: TestKeypair;
   dTag?: string;
   name?: string;
+  ppq?: PpqAccount;
   createdAt?: number;
 }): Promise<{ event: NostrEvent; envelope: PhoenixEnvelope }> {
   const dTag = args.dTag ?? "persona-fixture";
@@ -119,7 +121,7 @@ export async function personaEnvelopeEvent(args: {
     createdAt: args.createdAt ?? 1_700_000_000,
   });
   const ciphertext = await encryptPhoenixEnvelope(
-    { persona },
+    { persona, ppq: args.ppq },
     args.operator.pubkey,
     args.operator.signer,
   );
@@ -128,6 +130,7 @@ export async function personaEnvelopeEvent(args: {
     app: "phoenix-persona",
     version: 1,
     persona,
+    ppq: args.ppq,
   };
 
   return {

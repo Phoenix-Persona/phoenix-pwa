@@ -51,6 +51,7 @@ import { postToTwitterIntent } from "@/lib/twitter/intent";
 import type { Persona } from "@/lib/persona";
 import { BrandedVideo } from "@/components/BrandedVideo";
 import { XLogo } from "@/components/icons/XLogo";
+import type { PpqAccountOptions } from "@/hooks/usePpqAccount";
 
 /**
  * localStorage key for the picked background-music track id. An
@@ -82,6 +83,7 @@ export interface VideoComposerDialogProps {
   hintsInput: string;
   /** Persona's avatar — feeds the grok-imagine-edit preview as `image_url`. */
   personaAvatarUrl?: string;
+  ppqAccountOptions?: PpqAccountOptions;
   /** Called once a kind 1 has been published; Dashboard refetches posts. */
   onPublished?: () => void;
 }
@@ -95,6 +97,7 @@ export function VideoComposerDialog(props: VideoComposerDialogProps) {
     sourcesInput,
     hintsInput,
     personaAvatarUrl,
+    ppqAccountOptions,
     onPublished,
   } = props;
   const { toast } = useToast();
@@ -114,6 +117,7 @@ export function VideoComposerDialog(props: VideoComposerDialogProps) {
     sources,
     hints: hintsInput,
     personaAvatarUrl,
+    ppqAccountOptions,
   });
   const { phase } = pipeline;
 

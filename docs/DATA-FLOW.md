@@ -15,10 +15,10 @@ need to grep across pages, hooks, and lib helpers.
 | Operator wallet | app mount / header retry | `OperatorWalletInit`, `useOperatorEnvelope`, `useOperatorWallet` | Breez Spark seed in encrypted operator envelope |
 | Persona creation | `Onboard` | `useCreatePersona`, `PersonaPictureStager`, `AiAssistButton` | Nostr kind 30078 + kind 0, Blossom, Breez Spark, PPQ image/chat |
 | List/load personas | `MyPersonas`, `Dashboard` | `useMyPersonas`, `usePersona` | Scan-and-decrypt operator-authored kind 30078 events |
-| Compose + publish | `DashboardComposerCard` | `usePersonaComposer`, `usePersonaPublish`, `useCrossPost` | PPQ chat, Nostr kind 1, optional webhook |
-| Post wizard | `PostWizardDialog` | `usePpqInference` | PPQ chat |
-| Video composer | `VideoComposerDialog` | `useGenerateVideoPipeline`, `useUploadFile`, `usePpqAccount`, `usePersonaPublish` | PPQ image/video/chat, Blossom, Nostr publish |
-| Wallet / PPQ | `WalletDialog`, `WalletPanel` | `useWallet`, `usePpqAccount` | Breez Spark, PPQ account/balance/history/topups |
+| Compose + publish | `DashboardComposerCard` | `usePersonaComposer`, `usePersonaPublish`, `useCrossPost`, `usePersonaPpqAccountOptions` | Persona-scoped PPQ chat, Nostr kind 1, optional webhook |
+| Post wizard | `PostWizardDialog` | `usePpqInference` | Persona-scoped PPQ chat |
+| Video composer | `VideoComposerDialog` | `useGenerateVideoPipeline`, `useUploadFile`, `usePersonaPpqAccountOptions`, `usePersonaPublish` | Persona-scoped PPQ image/video/chat, Blossom, Nostr publish |
+| Wallet / PPQ | `WalletDialog`, `WalletPanel` | `useWallet`, `usePpqAccount` | Breez Spark, scoped PPQ account/balance/history/topups |
 | Public feed | `PersonaFeed` | `useAuthor`, `usePersonaPosts` | Relays: kind 0 and kind 1 by persona author |
 | Relay / Blossom sync | app mount | `NostrSync` | Relays: kind 10002 and 10063 by operator author |
 
@@ -51,6 +51,10 @@ production, existing operator-envelope PPQ credentials, then newly minted PPQ
 credentials saved back into the operator envelope. The legacy
 `phoenix:ppq:account` localStorage key is only cleared for old-cache cleanup.
 
+Operator PPQ credentials fund operator-level surfaces only. Persona AI flows
+pass `usePersonaPpqAccountOptions` into PPQ hooks so each persona reads or
+mints credentials inside its own encrypted persona backup.
+
 ## Persona Creation
 
 `Onboard` is a two-step wizard: details, then picture. The display name,
@@ -82,9 +86,9 @@ would leak app participation.
 ## Compose, Publish, And Media
 
 `Dashboard` owns composer state and passes it into `DashboardComposerCard`.
-`usePersonaComposer.styleInVoice()` sends the raw idea to PPQ chat using the
-persona system prompt as the system message. On success it refreshes the
-persona wallet and PPQ balance state.
+`usePersonaComposer.styleInVoice()` sends the raw idea to the persona-scoped
+PPQ account using the persona system prompt as the system message. On success
+it refreshes the persona wallet and PPQ balance state.
 
 `usePersonaComposer.publishTextOnly()` builds a kind 1 template through
 `buildPersonaPostTemplate`, signs it with the persona nsec through
@@ -94,17 +98,18 @@ and the persona has a webhook, the same published event is dispatched through
 Nostr publish.
 
 AI Assist controls use `AiAssistField` / `AiAssistButton`, which call
-`usePpqInference` and replace only the field they are attached to. Post wizard
-flows also use PPQ chat. Video flows use `useGenerateVideoPipeline` to create
-video jobs through PPQ, upload outputs to Blossom, and publish persona events.
+`usePpqInference` with the active persona PPQ scope and replace only the field
+they are attached to. Post wizard flows also use persona PPQ chat. Video flows
+use `useGenerateVideoPipeline` to create video jobs through persona PPQ, upload
+outputs to Blossom, and publish persona events.
 
 ## Wallet And Public Surfaces
 
 `useWallet` connects persona wallets from the encrypted persona envelope seed,
-reads payment history, exposes receive/send helpers, and manages PPQ topups.
-Persona wallet UI can show Lightning Address details. Operator wallet UI
-intentionally hides Lightning Address fields because Zuka does not configure an
-operator Lightning Address.
+reads payment history, exposes deposit/withdraw helpers, and manages scoped PPQ
+topups. Persona wallet UI can show Lightning Address details. Operator wallet
+UI intentionally hides Lightning Address fields because Zuka does not configure
+an operator Lightning Address.
 
 `PersonaFeed` is public. It reads kind 0 metadata, kind 1 posts, replies,
 reactions, and zap receipts by persona pubkey. The operator-to-persona

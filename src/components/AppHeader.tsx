@@ -1,20 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Menu, Settings as SettingsIcon, Zap } from "lucide-react";
+import { Loader2, Zap } from "lucide-react";
 
 import { FlagStripe } from "@/components/ImigongoBand";
 import { LoginArea } from "@/components/auth/LoginArea";
 import { WalletBadge } from "@/components/wallet/WalletBadge";
 import { WalletDialog } from "@/components/wallet/WalletDialog";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-  SheetClose,
-} from "@/components/ui/sheet";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useOperatorWallet } from "@/hooks/useOperatorWallet";
 import { useToast } from "@/hooks/useToast";
@@ -141,65 +133,6 @@ export function AppHeader() {
             </Button>
           ) : null}
           <LoginArea className="max-w-60" />
-
-          {/* Mobile menu trigger */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="md:hidden"
-                aria-label="Open menu"
-              >
-                <Menu className="size-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-72 pt-safe pr-safe" showCloseButton={false}>
-              <SheetHeader>
-                <SheetTitle className="font-display text-2xl">Zuka</SheetTitle>
-              </SheetHeader>
-              <nav className="px-4 pb-6 flex flex-col gap-1 text-base font-medium">
-                {isLoggedIn && (
-                  <>
-                    <SheetClose asChild>
-                      <Link
-                        to="/my-personas"
-                        className="rounded-lg px-3 py-3 hover:bg-muted transition-colors"
-                      >
-                        My personas
-                      </Link>
-                    </SheetClose>
-                    <SheetClose asChild>
-                      <Link
-                        to="/onboard"
-                        className="rounded-lg px-3 py-3 hover:bg-muted transition-colors"
-                      >
-                        New persona
-                      </Link>
-                    </SheetClose>
-                    <SheetClose asChild>
-                      <Link
-                        to="/settings"
-                        className="rounded-lg px-3 py-3 hover:bg-muted transition-colors flex items-center gap-2"
-                      >
-                        <SettingsIcon className="size-4" />
-                        Settings
-                      </Link>
-                    </SheetClose>
-                    <div className="my-2 border-t border-border" />
-                  </>
-                )}
-                <SheetClose asChild>
-                  <Link
-                    to="/"
-                    className="rounded-lg px-3 py-3 text-muted-foreground hover:bg-muted transition-colors"
-                  >
-                    Home
-                  </Link>
-                </SheetClose>
-              </nav>
-            </SheetContent>
-          </Sheet>
         </div>
       </div>
 
@@ -213,11 +146,6 @@ export function AppHeader() {
           open={walletOpen}
           onOpenChange={setWalletOpen}
           personaName="Operator"
-          operatorDiagnostics={{
-            hasEnvelopeEvent: Boolean(operator.event),
-            hasWalletBackup: Boolean(operator.envelope?.wallet?.seed),
-            hasPpqBackup: Boolean(operator.envelope?.ppq),
-          }}
         />
       ) : null}
     </header>

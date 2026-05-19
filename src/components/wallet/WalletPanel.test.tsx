@@ -155,14 +155,14 @@ describe("WalletPanel", () => {
     expect(screen.getByRole("tab", { name: /lightning/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /ai credits/i })).toBeInTheDocument();
     expect(screen.getByText("12,345 sats")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /receive/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /deposit/i })).toBeInTheDocument();
     expect(screen.queryByText("AI credits (PPQ)")).not.toBeInTheDocument();
 
     activateTab(/ai credits/i);
 
     expect(screen.getByText("AI credits (PPQ)")).toBeInTheDocument();
     expect(screen.getByText("$4.25")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /receive/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /deposit/i })).not.toBeInTheDocument();
   });
 
   it("keeps the PPQ charge id and API key hidden until revealed", () => {
@@ -188,6 +188,7 @@ describe("WalletPanel", () => {
     renderWallet(wallet, { onAutoTopupSave });
 
     activateTab(/ai credits/i);
+    fireEvent.click(screen.getByRole("button", { name: /edit auto top-up/i }));
     fireEvent.change(screen.getByLabelText(/auto below/i), {
       target: { value: "7" },
     });
@@ -218,6 +219,7 @@ describe("WalletPanel", () => {
     renderWallet(wallet, { onAutoTopupSave });
 
     activateTab(/ai credits/i);
+    fireEvent.click(screen.getByRole("button", { name: /edit auto top-up/i }));
     fireEvent.click(screen.getByRole("button", { name: /fund from operator/i }));
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -231,13 +233,15 @@ describe("WalletPanel", () => {
     );
   });
 
-  it("renders compact PPQ top-up controls", () => {
+  it("separates manual and auto top-up controls and hides auto settings", () => {
     renderWallet();
 
     activateTab(/ai credits/i);
 
-    expect(screen.getByLabelText(/auto below/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^buy$/i)).toBeInTheDocument();
+    expect(screen.getByText("Manual top-up")).toBeInTheDocument();
+    expect(screen.getByText("Auto top-up")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/auto below/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /edit auto top-up/i })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /fund from persona/i }),
     ).toBeInTheDocument();
@@ -292,14 +296,14 @@ describe("WalletPanel", () => {
     renderWallet(makeWallet(), { walletScope: "operator" });
 
     expect(screen.getByText("12,345 sats")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /receive/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /deposit/i })).toBeInTheDocument();
     expect(screen.queryByText("Lightning Address")).not.toBeInTheDocument();
     expect(screen.queryByText("voice@breez.tips")).not.toBeInTheDocument();
     expect(screen.queryByTestId("qr-code")).not.toBeInTheDocument();
   });
 
-  it("shows operator envelope diagnostics only for the operator wallet", () => {
-    const { unmount } = render(
+  it("does not render operator envelope diagnostics in the wallet", () => {
+    render(
       <MemoryRouter>
         <WalletPanel
           wallet={makeWallet()}
@@ -315,22 +319,18 @@ describe("WalletPanel", () => {
 
     activateTab(/ai credits/i);
 
-    expect(screen.getByText("Operator backup status")).toBeInTheDocument();
-    expect(screen.getByText("Backup event found")).toBeInTheDocument();
-    expect(screen.getByText("Wallet seed backed up")).toBeInTheDocument();
-    expect(screen.getByText("AI credentials backed up")).toBeInTheDocument();
-
-    unmount();
-    renderWallet(makeWallet(), { walletScope: "persona" });
     expect(screen.queryByText("Operator backup status")).not.toBeInTheDocument();
   });
 
-  it("rotates PPQ credentials from the operator wallet", async () => {
+  it("requires confirmation before rotating operator PPQ credentials", async () => {
     const wallet = makeWallet();
     renderWallet(wallet, { walletScope: "operator" });
 
     activateTab(/ai credits/i);
     fireEvent.click(screen.getByRole("button", { name: /rotate ppq credentials/i }));
+
+    expect(wallet.rotatePpqAccount).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /rotate credentials/i }));
 
     await waitFor(() => expect(wallet.rotatePpqAccount).toHaveBeenCalledOnce());
   });

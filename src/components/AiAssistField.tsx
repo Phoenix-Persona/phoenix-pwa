@@ -14,6 +14,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { getInferenceText, usePpqInference } from "@/hooks/usePpqInference";
+import type { PpqAccountOptions } from "@/hooks/usePpqAccount";
 import { cn } from "@/lib/utils";
 
 export interface AiAssistFieldContext {
@@ -29,6 +30,7 @@ type AiAssistButtonProps = AiAssistFieldContext & {
   className?: string;
   disabled?: boolean;
   title?: string;
+  ppqAccountOptions?: PpqAccountOptions;
 };
 
 const SYSTEM_PROMPT =
@@ -43,8 +45,9 @@ export function AiAssistButton({
   className,
   disabled,
   title,
+  ppqAccountOptions,
 }: AiAssistButtonProps) {
-  const inference = usePpqInference();
+  const inference = usePpqInference(ppqAccountOptions);
   const [open, setOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
   const [preview, setPreview] = useState("");

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ChevronDown, LogOut, Settings, UserIcon, UserPlus } from 'lucide-react';
+import { ChevronDown, Home, LogOut, PlusCircle, Settings, UserIcon, UserPlus, Users } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,6 +63,33 @@ export function AccountSwitcher({ onAddAccountClick }: AccountSwitcherProps) {
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link
+            to="/"
+            className='flex items-center gap-2 cursor-pointer p-2 rounded-md'
+          >
+            <Home className='w-4 h-4' />
+            <span>Home</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link
+            to="/my-personas"
+            className='flex items-center gap-2 cursor-pointer p-2 rounded-md'
+          >
+            <Users className='w-4 h-4' />
+            <span>My personas</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link
+            to="/onboard"
+            className='flex items-center gap-2 cursor-pointer p-2 rounded-md'
+          >
+            <PlusCircle className='w-4 h-4' />
+            <span>New persona</span>
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link
             to="/settings"

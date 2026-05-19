@@ -38,11 +38,11 @@ export function OperatorWalletView({
       <section className="grid grid-cols-2 gap-2">
         <Button variant="outline" onClick={onReceive} className="justify-start">
           <ArrowDownLeft className="h-4 w-4 mr-2" />
-          Receive
+          Deposit
         </Button>
         <Button variant="outline" onClick={onSend} className="justify-start">
           <ArrowUpRight className="h-4 w-4 mr-2" />
-          Send
+          Withdraw
         </Button>
       </section>
 

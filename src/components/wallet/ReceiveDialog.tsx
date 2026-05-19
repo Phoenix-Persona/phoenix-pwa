@@ -1,5 +1,5 @@
 /**
- * Receive — generate a BOLT11 invoice the user can pay from any
+ * Deposit — generate a BOLT11 invoice the user can pay from any
  * Lightning wallet. Shows the QR + raw invoice. While the invoice is
  * displayed the dialog subscribes to the SDK's event stream and
  * dismisses itself once the matching `paymentSucceeded` event lands —
@@ -135,10 +135,10 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Receive sats</DialogTitle>
+          <DialogTitle>Deposit sats</DialogTitle>
           <DialogDescription>
             Generate a BOLT11 invoice. Pay it from any Lightning wallet to fund
-            this persona.
+            this wallet.
           </DialogDescription>
         </DialogHeader>
 

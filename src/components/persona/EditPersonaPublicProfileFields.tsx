@@ -2,6 +2,7 @@ import type { NostrSigner } from "@nostrify/types";
 
 import { AiAssistButton } from "@/components/AiAssistField";
 import { PersonaPictureField } from "@/components/PersonaPictureField";
+import type { PpqAccountOptions } from "@/hooks/usePpqAccount";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SPARK_LN_DOMAIN } from "@/lib/wallet/lightningAddress";
@@ -31,6 +32,7 @@ export interface EditPersonaPublicProfileFieldsProps {
   pictureSigner: NostrSigner;
   /** Optional persona-specific Blossom server override. */
   pictureBlossomServers?: string[];
+  ppqAccountOptions?: PpqAccountOptions;
 }
 
 export function EditPersonaPublicProfileFields({
@@ -46,6 +48,7 @@ export function EditPersonaPublicProfileFields({
   allowFreeFallback = false,
   pictureSigner,
   pictureBlossomServers,
+  ppqAccountOptions,
 }: EditPersonaPublicProfileFieldsProps) {
   return (
     <>
@@ -67,6 +70,7 @@ export function EditPersonaPublicProfileFields({
               `Current system prompt: ${fieldContextValue(systemPrompt)}`,
             ]}
             onReplace={onBioChange}
+            ppqAccountOptions={ppqAccountOptions}
           />
         </div>
         <Textarea
@@ -91,6 +95,7 @@ export function EditPersonaPublicProfileFields({
           allowFreeFallback={allowFreeFallback}
           signer={pictureSigner}
           blossomServers={pictureBlossomServers}
+          ppqAccountOptions={ppqAccountOptions}
         />
       </div>
     </>

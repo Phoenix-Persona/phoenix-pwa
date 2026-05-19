@@ -12,16 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { UseWalletResult } from "@/hooks/useWallet";
 import { cn } from "@/lib/utils";
+import { fmtMoney, fmtSats } from "./WalletPanelFormat";
 
 interface WalletBadgeProps {
   wallet: UseWalletResult;
   onClick?: () => void;
   /** Render with cream-on-charcoal styling for placement on dark backgrounds. */
   inverse?: boolean;
-}
-
-function fmtSats(n: number): string {
-  return n.toLocaleString("en-US");
 }
 
 const INVERSE_CLASS =
@@ -48,16 +45,25 @@ export function WalletBadge({ wallet, onClick, inverse = false }: WalletBadgePro
     );
   }
   const sats = wallet.info?.balanceSats ?? 0;
+  const aiCredits = Number.isFinite(wallet.ppqBalanceUsd)
+    ? fmtMoney(wallet.ppqBalanceUsd)
+    : undefined;
+  const balanceLabel = aiCredits
+    ? `${fmtSats(sats)}, ${aiCredits} AI credits`
+    : fmtSats(sats);
   return (
     <Button
       variant="outline"
       size="sm"
       onClick={onClick}
-      aria-label={`Wallet: ${fmtSats(sats)} sats — open wallet panel`}
+      aria-label={`Wallet: ${balanceLabel} — open wallet panel`}
       className={cn(inverse && INVERSE_CLASS)}
     >
       <Zap className="h-4 w-4 mr-1 text-rw-gold" aria-hidden />
-      {fmtSats(sats)} sats
+      {fmtSats(sats)}
+      {aiCredits ? (
+        <span className="ml-1 text-muted-foreground">· {aiCredits} AI</span>
+      ) : null}
     </Button>
   );
 }

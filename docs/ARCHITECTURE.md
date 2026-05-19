@@ -141,9 +141,10 @@ Pure logic and HTTP clients. No React imports.
 
 | Hook                 | What it does                                                              |
 | -------------------- | ------------------------------------------------------------------------- |
-| `usePpqAccount`      | Resolves env/operator-envelope PPQ account, mints credentials when needed, refreshes balance, rotates operator credentials. |
-| `usePpqInference`    | Mutation: chat completion. Used by AI Assist, post wizard, and persona voice styling. |
-| `usePpqImage`        | Mutation: image generation. Used by persona picture staging and profile image generation. |
+| `usePpqAccount`      | Resolves scoped PPQ accounts. Operator scope reads dev env/operator envelope; persona scope reads and mints inside the active persona backup. Refreshes balance and rotates operator credentials. |
+| `usePersonaPpqAccountOptions` | Builds persona-scoped PPQ options and republishes the encrypted persona backup after minting persona credentials. |
+| `usePpqInference`    | Mutation: chat completion. Used by AI Assist, post wizard, and persona voice styling with optional persona scope. |
+| `usePpqImage`        | Mutation: image generation. Used by persona picture staging and profile image generation with optional persona scope. |
 | `usePpqVideo`        | Standalone `usePpqVideoSubmit` + `usePpqVideoJob(id)` polling pair. The dashboard video composer uses `useGenerateVideoPipeline` instead. |
 | `usePpqTopup`        | Standalone Lightning topup and status polling helpers. Wallet UI topup orchestration lives in `useWallet` and `lib/wallet/autoTopup.ts`. |
 

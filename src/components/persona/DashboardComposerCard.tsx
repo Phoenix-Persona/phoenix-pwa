@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { AiAssistButton } from "@/components/AiAssistField";
 import { ResearchPanel } from "@/components/persona/ResearchPanel";
+import type { PpqAccountOptions } from "@/hooks/usePpqAccount";
 import type { Persona } from "@/lib/persona";
 
 interface DashboardComposerCardProps {
@@ -19,6 +20,7 @@ interface DashboardComposerCardProps {
   crossPostEnabled: boolean;
   crossPost: Persona["cross_post"];
   walletSeed: string | undefined;
+  ppqAccountOptions?: PpqAccountOptions;
   isPublishing: boolean;
   isStyling: boolean;
   onRawChange: (value: string) => void;
@@ -55,6 +57,7 @@ export function DashboardComposerCard({
   crossPostEnabled,
   crossPost,
   walletSeed,
+  ppqAccountOptions,
   isPublishing,
   isStyling,
   onRawChange,
@@ -72,6 +75,9 @@ export function DashboardComposerCard({
   const [researchOpen, setResearchOpen] = useState(false);
 
   const showCrossPost = crossPostEnabled && Boolean(crossPost?.webhook_url);
+  const hasDraft = Boolean(
+    raw.trim() || sourcesInput.trim() || hintsInput.trim(),
+  );
   const styleDisabled = isStyling || isPublishing || !raw.trim() || !walletSeed;
   const styleTitle = !walletSeed
     ? "Create a new persona to enable AI styling"
@@ -189,7 +195,7 @@ export function DashboardComposerCard({
               <Button
                 variant="ghost"
                 onClick={onDiscard}
-                disabled={isPublishing || isStyling}
+                disabled={isPublishing || isStyling || !hasDraft}
               >
                 Discard
               </Button>
@@ -217,11 +223,12 @@ export function DashboardComposerCard({
                   disabled={assistDisabled}
                   title={assistTitle}
                   className="h-9 rounded-md"
+                  ppqAccountOptions={ppqAccountOptions}
                 />
                 <Button
                   onClick={onStyle}
+                  variant="outline"
                   disabled={styleDisabled}
-                  className="shadow-lg shadow-primary/20"
                   title={styleTitle}
                 >
                   {isStyling ? (
@@ -240,9 +247,9 @@ export function DashboardComposerCard({
                   )}
                 </Button>
                 <Button
-                  variant="outline"
                   onClick={onPost}
                   disabled={isPublishing || isStyling || !raw.trim()}
+                  className="shadow-lg shadow-primary/20"
                   title="Publish a text-only kind 1 note"
                 >
                   {isPublishing ? (
@@ -322,7 +329,7 @@ export function DashboardComposerCard({
                 <Button
                   variant="ghost"
                   onClick={onDiscard}
-                  disabled={isPublishing || isStyling}
+                  disabled={isPublishing || isStyling || !hasDraft}
                 >
                   Discard
                 </Button>
@@ -350,11 +357,12 @@ export function DashboardComposerCard({
                     disabled={assistDisabled}
                     title={assistTitle}
                     className="h-9 rounded-md"
+                    ppqAccountOptions={ppqAccountOptions}
                   />
                   <Button
                     onClick={onStyle}
+                    variant="outline"
                     disabled={styleDisabled}
-                    className="shadow-lg shadow-primary/20"
                     title={styleTitle}
                   >
                     {isStyling ? (
@@ -373,9 +381,9 @@ export function DashboardComposerCard({
                     )}
                   </Button>
                   <Button
-                    variant="outline"
                     onClick={onOpenVideo}
                     disabled={!raw.trim() || isPublishing || isStyling}
+                    className="shadow-lg shadow-primary/20"
                     title="Open the video composer (Seedance i2v chain → stitched MP4 → kind 1)"
                   >
                     <Sparkles className="mr-2 size-4" aria-hidden="true" />
@@ -399,6 +407,7 @@ export function DashboardComposerCard({
         onOpenChange={setResearchOpen}
         onAddSource={onAppendSource}
         onQuoteIntoIdea={onAppendIdea}
+        ppqAccountOptions={ppqAccountOptions}
       />
     </Card>
   );

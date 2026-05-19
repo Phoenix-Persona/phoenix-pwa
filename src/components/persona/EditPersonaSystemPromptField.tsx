@@ -1,4 +1,5 @@
 import { AiAssistButton } from "@/components/AiAssistField";
+import type { PpqAccountOptions } from "@/hooks/usePpqAccount";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SPARK_LN_DOMAIN } from "@/lib/wallet/lightningAddress";
@@ -9,6 +10,7 @@ export interface EditPersonaSystemPromptFieldProps {
   lightningUsername: string;
   bio: string;
   systemPrompt: string;
+  ppqAccountOptions?: PpqAccountOptions;
   onSystemPromptChange: (value: string) => void;
 }
 
@@ -18,6 +20,7 @@ export function EditPersonaSystemPromptField({
   lightningUsername,
   bio,
   systemPrompt,
+  ppqAccountOptions,
   onSystemPromptChange,
 }: EditPersonaSystemPromptFieldProps) {
   return (
@@ -39,6 +42,7 @@ export function EditPersonaSystemPromptField({
             `Current bio: ${fieldContextValue(bio)}`,
           ]}
           onReplace={onSystemPromptChange}
+          ppqAccountOptions={ppqAccountOptions}
         />
       </div>
       <Textarea

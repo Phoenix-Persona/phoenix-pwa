@@ -65,7 +65,7 @@ import {
 } from "@/lib/visualPromptGuards";
 
 import { usePersonaPublish } from "./usePersonaPublish";
-import { usePpqAccount } from "./usePpqAccount";
+import { usePpqAccount, type PpqAccountOptions } from "./usePpqAccount";
 
 const SEEDANCE_MODEL = "seedance-2-fast";
 const SEEDANCE_ASPECT = "9:16" as const;
@@ -166,6 +166,7 @@ export interface UseGenerateVideoPipelineArgs {
    * preview so the generated face matches the established persona.
    */
   personaAvatarUrl?: string;
+  ppqAccountOptions?: PpqAccountOptions;
 }
 
 /** Per-run knobs the dialog passes when locking in duration. */
@@ -203,9 +204,9 @@ export interface UseGenerateVideoPipelineResult {
 export function useGenerateVideoPipeline(
   args: UseGenerateVideoPipelineArgs,
 ): UseGenerateVideoPipelineResult {
-  const { persona, idea, sources, hints, personaAvatarUrl } = args;
+  const { persona, idea, sources, hints, personaAvatarUrl, ppqAccountOptions } = args;
 
-  const { account, ensureAccount } = usePpqAccount();
+  const { account, ensureAccount } = usePpqAccount(ppqAccountOptions);
   const personaSigner = useMemo(
     () => createPersonaSigner(persona.nsec),
     [persona.nsec],

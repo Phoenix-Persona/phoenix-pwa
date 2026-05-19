@@ -22,8 +22,10 @@
   by one operator.
 
 - **PPQ** — `ppq.ai`. OpenAI-compatible inference API. Zuka uses
-  PPQ's credits system through operator-scoped credentials and wallet-funded
-  topups. See `../dev/docs/ppq.md`.
+  PPQ's credits system through encrypted credentials and wallet-funded
+  topups. Operator-level actions use the operator envelope credentials;
+  persona AI actions use credentials stored in that persona's encrypted
+  backup. See `../dev/docs/ppq.md`.
 
 - **pi-mono** — `github.com/earendil-works/pi`. Agent toolkit investigated
   for a future agent-driven wizard. It is not part of the current runtime
