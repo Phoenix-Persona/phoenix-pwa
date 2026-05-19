@@ -31,6 +31,7 @@ import type { NostrEvent } from "@nostrify/nostrify";
 import type { PhoenixEnvelope } from "@/lib/persona";
 import type { Nip44Signer } from "@/lib/personaCrypto";
 import { npubToHex } from "@/lib/nostrIds";
+import { withNostrQueryTimeout } from "@/lib/nostrQuery";
 import { queryKeys } from "@/lib/queryKeys";
 import {
   classifyEncryptedAppDataEvent,
@@ -38,6 +39,8 @@ import {
   operatorEncryptedAppDataQuery,
 } from "./useEncryptedAppData";
 import { useCurrentUser } from "./useCurrentUser";
+
+const PERSONA_PUBLIC_QUERY_TIMEOUT_MS = 3000;
 
 export function clearPersonaDecryptCache(): void {
   clearEncryptedAppDataDecryptCache();
@@ -178,7 +181,7 @@ export function usePersonaActivityStats(pubkeys: string[] | undefined) {
             limit: Math.min(500, sorted.length * 100),
           },
         ],
-        { signal: c.signal }
+        { signal: withNostrQueryTimeout(c.signal, PERSONA_PUBLIC_QUERY_TIMEOUT_MS) }
       );
 
       for (const ev of events) {
@@ -231,7 +234,7 @@ export function usePersonaPosts(npub: string | undefined, limit = 50) {
             limit,
           },
         ],
-        { signal: c.signal }
+        { signal: withNostrQueryTimeout(c.signal, PERSONA_PUBLIC_QUERY_TIMEOUT_MS) }
       );
 
       return events.sort((a, b) => b.created_at - a.created_at);

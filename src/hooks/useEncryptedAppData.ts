@@ -8,6 +8,7 @@ import {
   parseOperatorEnvelope,
   type OperatorEnvelope,
 } from "@/lib/operator";
+import { withNostrQueryTimeout } from "@/lib/nostrQuery";
 import {
   isCandidatePersonaEvent,
   parsePhoenixEnvelope,
@@ -63,7 +64,7 @@ export function operatorEncryptedAppDataQuery(
             limit: ENCRYPTED_APP_DATA_QUERY_LIMIT,
           },
         ],
-        { signal: withTimeout(signal) },
+        { signal: withNostrQueryTimeout(signal, ENCRYPTED_APP_DATA_QUERY_TIMEOUT_MS) },
       );
       return latestEncryptedEventsPerD(events);
     },
@@ -102,26 +103,6 @@ export function upsertEncryptedAppDataEvent(
   event: NostrEvent,
 ): NostrEvent[] {
   return latestEncryptedEventsPerD([event, ...(current ?? [])]);
-}
-
-function withTimeout(signal: AbortSignal | undefined): AbortSignal {
-  const controller = new AbortController();
-  const timeoutId = globalThis.setTimeout(() => {
-    controller.abort();
-  }, ENCRYPTED_APP_DATA_QUERY_TIMEOUT_MS);
-
-  if (signal?.aborted) {
-    controller.abort();
-  } else {
-    signal?.addEventListener("abort", () => controller.abort(), { once: true });
-  }
-
-  controller.signal.addEventListener(
-    "abort",
-    () => globalThis.clearTimeout(timeoutId),
-    { once: true },
-  );
-  return controller.signal;
 }
 
 function latestEncryptedEventsPerD(events: NostrEvent[]): NostrEvent[] {
