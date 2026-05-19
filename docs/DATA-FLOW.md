@@ -74,10 +74,11 @@ the encrypted kind 30078 backup and in memory while the persona is active.
 
 ## Persona Loading
 
-`useMyPersonas` and `usePersona` query the current operator's kind 30078
-events by author only. They intentionally do not use Zuka-specific tags. Each
-candidate event must decrypt through the operator signer and validate as a
-Zuka persona envelope before the app shows it.
+`useMyPersonas`, `usePersona`, and `useOperatorEnvelope` share one query for
+the current operator's kind 30078 events by author only. They intentionally do
+not use Zuka-specific tags. The shared query dedupes the latest event per
+`d` tag, applies a 5 second absolute timeout, and keeps a memory-only decrypt
+classification cache for the page session.
 
 Loading one persona still scans and decrypts the operator's candidate backup
 events, then picks the envelope whose embedded persona pubkey matches the

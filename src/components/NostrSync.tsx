@@ -18,6 +18,7 @@ function invalidateUserDependentCaches(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: queryKeys.persona.allMine() });
   queryClient.invalidateQueries({ queryKey: queryKeys.persona.allDetails() });
   queryClient.invalidateQueries({ queryKey: queryKeys.persona.allPosts() });
+  queryClient.invalidateQueries({ queryKey: queryKeys.encryptedAppData.all() });
   queryClient.invalidateQueries({ queryKey: queryKeys.nostr.authors() });
 }
 

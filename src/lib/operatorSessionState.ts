@@ -1,6 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 
-import { clearPersonaDecryptCache } from "@/hooks/usePersona";
+import { clearEncryptedAppDataDecryptCache } from "@/hooks/useEncryptedAppData";
 import {
   clearPersistedNostrLogin,
   clearSessionUnlocked,
@@ -24,13 +24,14 @@ export async function clearOperatorRuntimeState(
   queryClient?.removeQueries({ queryKey: queryKeys.wallet.allPayments() });
   queryClient?.removeQueries({ queryKey: queryKeys.persona.allMine() });
   queryClient?.removeQueries({ queryKey: queryKeys.persona.allDetails() });
+  queryClient?.removeQueries({ queryKey: queryKeys.encryptedAppData.all() });
   queryClient?.removeQueries({
     queryKey: previousPubkey
       ? queryKeys.operator.envelope(previousPubkey)
       : queryKeys.operator.all(),
     exact: Boolean(previousPubkey),
   });
-  clearPersonaDecryptCache();
+  clearEncryptedAppDataDecryptCache();
   await clearAllVideoChains();
 }
 

@@ -24,6 +24,11 @@ export const queryKeys = {
       ["persona-public-profile", pubkey ?? ""] as const,
     allPublicProfiles: () => ["persona-public-profile"] as const,
   },
+  encryptedAppData: {
+    all: () => ["encrypted-app-data"] as const,
+    events: (userPubkey: string | undefined) =>
+      ["encrypted-app-data", "events", userPubkey ?? ""] as const,
+  },
   wallet: {
     allDetails: () => ["wallet"] as const,
     detail: (walletId: string | undefined) => ["wallet", walletId ?? ""] as const,

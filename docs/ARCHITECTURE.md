@@ -90,6 +90,7 @@ Pure logic and HTTP clients. No React imports.
 | `personaCrypto.ts`| `encryptPhoenixEnvelope` / `tryDecryptPhoenixEnvelope` — operator-self-encrypted NIP-44 ciphertext. |
 | `personaKey.ts`   | Persona keypair generation, nsec ↔ keypair, `signWithPersona()`.            |
 | `personaPost.ts`  | `buildPersonaPostTemplate` — kind 1 with **no Zuka-identifying tags** (no `client`, no operator pubkey, no persona name). Read lines 1-19 for what's deliberately omitted. |
+| `queryKeys.ts`    | Central TanStack Query keys, including the shared encrypted-app-data kind 30078 scan used by operator and persona hooks. |
 
 ### PPQ layer
 
@@ -117,8 +118,9 @@ Pure logic and HTTP clients. No React imports.
 
 | Hook                  | Signature                                  | Notes                                                         |
 | --------------------- | ------------------------------------------ | ------------------------------------------------------------- |
-| `usePersona(npub)`    | `useQuery → { event, config } \| null`    | Scans operator's kind 30078s, decrypts each, matches `personaPubkey`. Slow by design (privacy). |
-| `useMyPersonas()`     | `useQuery → { event, config, npub }[]`    | Scan-and-decrypt across all of the operator's kind 30078s; returns Zuka-shaped envelopes. |
+| `useEncryptedAppData` | internal helpers                           | Shared operator-authored kind 30078 query, latest-per-d dedupe, 5s absolute timeout, and memory-only decrypt classification cache. |
+| `usePersona(npub)`    | `useQuery → { event, config } \| null`    | Consumes the shared kind 30078 scan, decrypts/classifies candidates, matches `personaPubkey`. Slow by design (privacy). |
+| `useMyPersonas()`     | `useQuery → { event, config, npub }[]`    | Consumes the shared kind 30078 scan and returns Zuka-shaped persona envelopes. |
 | `usePersonaPosts(npub, limit)` | `useQuery → NostrEvent[]`         | Public kind 1 query by author pubkey. Anyone can call.        |
 | `useCreatePersona()`  | `useMutation`                              | Creates persona envelope, mints wallet seed, optionally registers persona Lightning Address, and publishes kind 30078 + persona kind 0. |
 | `useUpdatePersona()`  | `useMutation`                              | Reuses the stable persona d-tag, updates encrypted backup, and publishes kind 0 when public profile fields change. |

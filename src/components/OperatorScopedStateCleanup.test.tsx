@@ -10,15 +10,15 @@ const mocks = hoisted(() => ({
   currentUser: {
     user: { pubkey: "operator-old" } as { pubkey: string } | undefined,
   },
-  clearPersonaDecryptCache: mockFn(),
+  clearEncryptedAppDataDecryptCache: mockFn(),
 }));
 
 mockModule("@/hooks/useCurrentUser", () => ({
   useCurrentUser: () => mocks.currentUser,
 }));
 
-mockModule("@/hooks/usePersona", () => ({
-  clearPersonaDecryptCache: mocks.clearPersonaDecryptCache,
+mockModule("@/hooks/useEncryptedAppData", () => ({
+  clearEncryptedAppDataDecryptCache: mocks.clearEncryptedAppDataDecryptCache,
 }));
 
 function renderWithClient(client: QueryClient) {
@@ -33,7 +33,7 @@ describe("OperatorScopedStateCleanup", () => {
   beforeEach(() => {
     window.localStorage.clear();
     mocks.currentUser.user = { pubkey: "operator-old" };
-    mocks.clearPersonaDecryptCache.mockClear();
+    mocks.clearEncryptedAppDataDecryptCache.mockClear();
   });
 
   it("hard-clears the legacy global PPQ account cache on mount", async () => {
@@ -60,6 +60,7 @@ describe("OperatorScopedStateCleanup", () => {
       balanceSats: 10,
     });
     client.setQueryData(queryKeys.wallet.payments("operator:operator-old"), []);
+    client.setQueryData(queryKeys.encryptedAppData.events("operator-old"), []);
 
     const view = renderWithClient(client);
     mocks.currentUser.user = { pubkey: "operator-new" };
@@ -74,6 +75,9 @@ describe("OperatorScopedStateCleanup", () => {
     expect(
       client.getQueryData(queryKeys.wallet.payments("operator:operator-old")),
     ).toBeUndefined();
-    expect(mocks.clearPersonaDecryptCache).toHaveBeenCalledTimes(1);
+    expect(
+      client.getQueryData(queryKeys.encryptedAppData.events("operator-old")),
+    ).toBeUndefined();
+    expect(mocks.clearEncryptedAppDataDecryptCache).toHaveBeenCalledTimes(1);
   });
 });

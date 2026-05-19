@@ -28,11 +28,8 @@ import {
   buildOperatorEventTemplate,
   encryptOperatorEnvelope,
   generateOperatorDTag,
-  isCandidateOperatorEvent,
-  OPERATOR_KIND,
   PHOENIX_OPERATOR_APP,
   PHOENIX_OPERATOR_VERSION,
-  tryDecryptOperatorEnvelope,
   type OperatorEnvelope,
   type OperatorEnvelopeInput,
   type OperatorPpqAccount,
@@ -47,6 +44,11 @@ import {
   type AutoTopupConfig,
 } from "@/lib/wallet/types";
 import type { PersonaWallet } from "@/lib/persona";
+import {
+  classifyEncryptedAppDataEvent,
+  operatorEncryptedAppDataQuery,
+  upsertEncryptedAppDataEvent,
+} from "./useEncryptedAppData";
 
 import { useCurrentUser } from "./useCurrentUser";
 
@@ -64,23 +66,15 @@ async function findOperatorEnvelope(
   userPubkey: string,
   signer: Nip44Signer,
 ): Promise<OperatorEnvelopeState | null> {
-  const latestPerD = new Map<string, NostrEvent>();
   for (const ev of events) {
-    if (!isCandidateOperatorEvent(ev)) continue;
-    const d = eventDTag(ev);
-    if (!d) continue;
-    const existing = latestPerD.get(d);
-    if (!existing || existing.created_at < ev.created_at) {
-      latestPerD.set(d, ev);
+    const classified = await classifyEncryptedAppDataEvent(
+      ev,
+      userPubkey,
+      signer,
+    );
+    if (classified.type === "operator") {
+      return { event: ev, envelope: classified.envelope };
     }
-  }
-
-  const sorted = [...latestPerD.values()].sort(
-    (a, b) => b.created_at - a.created_at,
-  );
-  for (const ev of sorted) {
-    const env = await tryDecryptOperatorEnvelope(ev.content, userPubkey, signer);
-    if (env) return { event: ev, envelope: env };
   }
   return null;
 }
@@ -106,16 +100,10 @@ export function useOperatorEnvelope() {
     enabled: Boolean(user),
     queryFn: async (c): Promise<OperatorEnvelopeState | null> => {
       if (!user) return null;
-      const events = await nostr.query(
-        [
-          {
-            kinds: [OPERATOR_KIND],
-            authors: [user.pubkey],
-            limit: 200,
-          },
-        ],
-        { signal: c.signal },
+      const events = await qc.fetchQuery(
+        operatorEncryptedAppDataQuery(nostr, user.pubkey),
       );
+      if (c.signal.aborted) return null;
       const signer = user.signer as unknown as Nip44Signer;
       return findOperatorEnvelope(events, user.pubkey, signer);
     },
@@ -173,6 +161,11 @@ export function useOperatorEnvelope() {
     },
     onSuccess: (state) => {
       qc.setQueryData(queryKeys.operator.envelope(user?.pubkey), state);
+      qc.setQueryData(
+        queryKeys.encryptedAppData.events(user?.pubkey),
+        (current: NostrEvent[] | undefined) =>
+          upsertEncryptedAppDataEvent(current, state.event),
+      );
     },
   });
 
@@ -184,6 +177,11 @@ export function useOperatorEnvelope() {
     mutationFn: async (next) => publish(next),
     onSuccess: (state) => {
       qc.setQueryData(queryKeys.operator.envelope(user?.pubkey), state);
+      qc.setQueryData(
+        queryKeys.encryptedAppData.events(user?.pubkey),
+        (current: NostrEvent[] | undefined) =>
+          upsertEncryptedAppDataEvent(current, state.event),
+      );
     },
   });
 

@@ -12,7 +12,7 @@ const mocks = hoisted(() => ({
   clearSessionUnlocked: mockFn(),
   clearPersistedNostrLogin: mockFn(),
   clearUserNcryptsec: mockFn(),
-  clearPersonaDecryptCache: mockFn(),
+  clearEncryptedAppDataDecryptCache: mockFn(),
   clearLegacyPpqAccountStorage: mockFn(),
   clearAllVideoChains: mockFn(async () => undefined),
 }));
@@ -23,8 +23,8 @@ mockModule("@/lib/nip49Storage", () => ({
   clearUserNcryptsec: mocks.clearUserNcryptsec,
 }));
 
-mockModule("@/hooks/usePersona", () => ({
-  clearPersonaDecryptCache: mocks.clearPersonaDecryptCache,
+mockModule("@/hooks/useEncryptedAppData", () => ({
+  clearEncryptedAppDataDecryptCache: mocks.clearEncryptedAppDataDecryptCache,
 }));
 
 mockModule("@/lib/ppq/storage", () => ({
@@ -57,6 +57,7 @@ describe("operatorSessionState", () => {
     qc.setQueryData(queryKeys.persona.detail("npub1old", "operator-old"), {
       envelope: { persona: { pubkey: "persona-old" } },
     });
+    qc.setQueryData(queryKeys.encryptedAppData.events("operator-old"), []);
 
     await clearOperatorRuntimeState(qc, "operator-old");
 
@@ -66,8 +67,9 @@ describe("operatorSessionState", () => {
     expect(qc.getQueryData(queryKeys.operator.envelope("operator-old"))).toBeUndefined();
     expect(qc.getQueryData(queryKeys.persona.mine("operator-old"))).toBeUndefined();
     expect(qc.getQueryData(queryKeys.persona.detail("npub1old", "operator-old"))).toBeUndefined();
+    expect(qc.getQueryData(queryKeys.encryptedAppData.events("operator-old"))).toBeUndefined();
     expect(mocks.clearLegacyPpqAccountStorage).toHaveBeenCalledOnce();
-    expect(mocks.clearPersonaDecryptCache).toHaveBeenCalledOnce();
+    expect(mocks.clearEncryptedAppDataDecryptCache).toHaveBeenCalledOnce();
     expect(mocks.clearAllVideoChains).toHaveBeenCalledOnce();
   });
 
@@ -88,6 +90,6 @@ describe("operatorSessionState", () => {
     expect(mocks.clearUserNcryptsec).not.toHaveBeenCalled();
     expect(mocks.clearSessionUnlocked).toHaveBeenCalledOnce();
     expect(mocks.clearPersistedNostrLogin).toHaveBeenCalledOnce();
-    expect(mocks.clearPersonaDecryptCache).toHaveBeenCalledOnce();
+    expect(mocks.clearEncryptedAppDataDecryptCache).toHaveBeenCalledOnce();
   });
 });

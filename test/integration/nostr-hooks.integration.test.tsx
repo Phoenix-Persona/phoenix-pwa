@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "@/test/api";
 import { NostrSync } from "@/components/NostrSync";
 import { useAuthor } from "@/hooks/useAuthor";
 import { useLoginActions } from "@/hooks/useLoginActions";
+import { useOperatorEnvelope } from "@/hooks/useOperatorEnvelope";
 import {
   clearPersonaDecryptCache,
   useMyPersonas,
@@ -12,6 +13,7 @@ import { usePersonaPublish } from "@/hooks/usePersonaPublish";
 
 import {
   loginFor,
+  operatorEnvelopeEvent,
   personaEnvelopeEvent,
   profileEvent,
   testKeys,
@@ -66,6 +68,49 @@ describe("Nostr hook integration", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toHaveLength(1);
     expect(result.current.data?.[0].envelope.persona.pubkey).toBe(testKeys.persona.pubkey);
+  });
+
+  it("shares the operator-authored kind 30078 relay scan across operator and persona hooks", async () => {
+    const operator = await operatorEnvelopeEvent({
+      operator: testKeys.operator,
+      dTag: "operator-fixture",
+    });
+    const persona = await personaEnvelopeEvent({
+      operator: testKeys.operator,
+      persona: testKeys.persona,
+      dTag: "persona-fixture",
+      name: "Amina Test",
+    });
+    const harness = await createRelayHarness({
+      events: [operator.event, persona.event],
+      logins: [loginFor(testKeys.operator)],
+    });
+    harnesses.push(harness);
+
+    const { result } = renderHook(
+      () => ({
+        operator: useOperatorEnvelope(),
+        personas: useMyPersonas(),
+      }),
+      { wrapper: harness.wrapper },
+    );
+
+    await waitFor(() => expect(result.current.operator.isLoading).toBe(false));
+    await waitFor(() => expect(result.current.personas.isSuccess).toBe(true));
+
+    const personaReqs = harness.relay.messages
+      .map((message) => JSON.parse(message) as unknown)
+      .filter((message): message is ["REQ", string, ...Array<{ kinds?: number[] }>] =>
+        Array.isArray(message) &&
+        message[0] === "REQ" &&
+        message.slice(2).some((filter) =>
+          typeof filter === "object" &&
+          filter !== null &&
+          Array.isArray(filter.kinds) &&
+          filter.kinds.includes(30078),
+        ),
+      );
+    expect(personaReqs).toHaveLength(1);
   });
 
   it("publishes persona posts with the persona key and without operator identity tags", async () => {
