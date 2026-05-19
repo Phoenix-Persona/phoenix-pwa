@@ -322,15 +322,39 @@ describe("WalletPanel", () => {
     expect(screen.queryByText("Operator backup status")).not.toBeInTheDocument();
   });
 
-  it("requires confirmation before rotating operator PPQ credentials", async () => {
+  it("creates missing persona PPQ credentials without a warning dialog", async () => {
+    const wallet = makeWallet({ ppqAccount: null });
+    renderWallet(wallet);
+
+    activateTab(/ai credits/i);
+    fireEvent.click(screen.getByRole("button", { name: /create ppq credentials/i }));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(wallet.rotatePpqAccount).toHaveBeenCalledOnce());
+  });
+
+  it("requires confirmation before resetting persona PPQ credentials", async () => {
+    const wallet = makeWallet();
+    renderWallet(wallet);
+
+    activateTab(/ai credits/i);
+    fireEvent.click(screen.getByRole("button", { name: /reset ppq credentials/i }));
+
+    expect(wallet.rotatePpqAccount).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /reset credentials/i }));
+
+    await waitFor(() => expect(wallet.rotatePpqAccount).toHaveBeenCalledOnce());
+  });
+
+  it("requires confirmation before resetting operator PPQ credentials", async () => {
     const wallet = makeWallet();
     renderWallet(wallet, { walletScope: "operator" });
 
     activateTab(/ai credits/i);
-    fireEvent.click(screen.getByRole("button", { name: /rotate ppq credentials/i }));
+    fireEvent.click(screen.getByRole("button", { name: /reset ppq credentials/i }));
 
     expect(wallet.rotatePpqAccount).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /rotate credentials/i }));
+    fireEvent.click(screen.getByRole("button", { name: /reset credentials/i }));
 
     await waitFor(() => expect(wallet.rotatePpqAccount).toHaveBeenCalledOnce());
   });

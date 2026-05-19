@@ -55,8 +55,16 @@ export function PpqFundingSection({
   const [autoSettingsOpen, setAutoSettingsOpen] = useState(false);
   const [autoTopupError, setAutoTopupError] = useState<string | null>(null);
   const [manualTopupError, setManualTopupError] = useState<string | null>(null);
-  const [rotatePpqError, setRotatePpqError] = useState<string | null>(null);
+  const [ppqCredentialError, setPpqCredentialError] = useState<string | null>(
+    null,
+  );
   const [isSavingAutoTopup, setIsSavingAutoTopup] = useState(false);
+  const hasPpqCredentials = Boolean(
+    wallet.ppqAccount?.api_key || wallet.ppqAccount?.credit_id,
+  );
+  const ppqCredentialAction = hasPpqCredentials ? "reset" : "create";
+  const walletLabel =
+    walletScope === "operator" ? "operator wallet" : "persona wallet";
 
   async function saveAutoTopup() {
     const thresholdUsd = Number(thresholdInput);
@@ -120,19 +128,24 @@ export function PpqFundingSection({
     }
   }
 
-  async function rotatePpqCredentials() {
-    setRotatePpqError(null);
+  async function updatePpqCredentials() {
+    setPpqCredentialError(null);
     try {
       await wallet.rotatePpqAccount();
       setShowPpqApiKey(false);
       setShowPpqChargeId(false);
-      toast({ title: "PPQ credentials rotated" });
+      toast({
+        title:
+          ppqCredentialAction === "create"
+            ? "PPQ credentials created"
+            : "PPQ credentials reset",
+      });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Could not rotate PPQ credentials.";
-      setRotatePpqError(message);
+        error instanceof Error ? error.message : "Could not update PPQ credentials.";
+      setPpqCredentialError(message);
       toast({
-        title: "PPQ rotation failed",
+        title: "PPQ credential update failed",
         description: message,
         variant: "destructive",
       });
@@ -335,7 +348,7 @@ export function PpqFundingSection({
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
             Active PPQ credentials
           </p>
-          {walletScope === "operator" ? (
+          {hasPpqCredentials ? (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -343,38 +356,54 @@ export function PpqFundingSection({
                   variant="outline"
                   size="sm"
                   disabled={wallet.isPpqRotating}
-                  aria-label="Rotate PPQ credentials"
+                  aria-label="Reset PPQ credentials"
                   className="h-8"
                 >
                   <RotateCw
                     className={`mr-2 size-3.5 ${wallet.isPpqRotating ? "animate-spin" : ""}`}
                     aria-hidden="true"
                   />
-                  {wallet.isPpqRotating ? "Rotating..." : "Rotate"}
+                  {wallet.isPpqRotating ? "Resetting..." : "Reset"}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Rotate PPQ credentials?</AlertDialogTitle>
+                  <AlertDialogTitle>Reset PPQ credentials?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This replaces the operator wallet's active PPQ API key. New
-                    AI requests will use the rotated credentials after the
+                    This replaces the {walletLabel}'s active PPQ API key. New
+                    AI requests will use the new credentials after the encrypted
                     backup is updated.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={rotatePpqCredentials}>
-                    Rotate credentials
+                  <AlertDialogAction onClick={updatePpqCredentials}>
+                    Reset credentials
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          ) : null}
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={wallet.isPpqRotating}
+              aria-label="Create PPQ credentials"
+              className="h-8"
+              onClick={updatePpqCredentials}
+            >
+              <RotateCw
+                className={`mr-2 size-3.5 ${wallet.isPpqRotating ? "animate-spin" : ""}`}
+                aria-hidden="true"
+              />
+              {wallet.isPpqRotating ? "Creating..." : "Create"}
+            </Button>
+          )}
         </div>
-        {walletScope === "operator" && (rotatePpqError || wallet.ppqRotateError) ? (
+        {ppqCredentialError || wallet.ppqRotateError ? (
           <p className="text-xs text-destructive">
-            {rotatePpqError ?? wallet.ppqRotateError?.message}
+            {ppqCredentialError ?? wallet.ppqRotateError?.message}
           </p>
         ) : null}
         <SecretRow
