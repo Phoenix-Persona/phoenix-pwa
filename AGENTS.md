@@ -50,7 +50,7 @@ per-persona Lightning wallets).
 
 - `/src/components/` — UI components.
   - `ui/` — copied Radix/Tailwind UI primitives.
-  - `auth/` — login components (`LoginArea`, `AuthDialog`, `AccountSwitcher`).
+  - `auth/` — login components (`LoginArea`, `AuthDialog`, `AccountMenu`).
   - `wallet/` — wallet UI (`WalletPanel`, `WalletDialog`, `WalletBadge`, `SendDialog`, `ReceiveDialog`).
   - `howItWorks/` — landing-page explainer sections.
 - `/src/hooks/` — custom hooks. Discover the full set with `ls src/hooks/`. Key ones: `useNostr`, `useAuthor`, `useCurrentUser`, `useNostrPublish`, `useUploadFile`, `useAppContext`, `useTheme`, `useToast`, `useLoggedInAccounts`, `useLoginActions`, `useIsMobile`. Zuka-specific: `usePersona`, `usePersonaPublish`, `useOperatorEnvelope`, `useOperatorWallet`, `useDeletePersona`, `useWallet`, `usePpqAccount`, `usePpqInference`, `usePpqImage`, `usePpqVideo`, `usePpqTopup`, `useGenerateVideoPipeline`, `useCrossPost`, `useInstallPrompt`, `useUsernameAvailability`.

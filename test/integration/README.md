@@ -44,7 +44,7 @@ or external-only services:
 ## Coverage Map
 
 - `auth-flow.integration.test.tsx` and
-  `operator-account-switch.integration.test.tsx`: login replacement and
+  `operator-login-replacement.integration.test.tsx`: login replacement and
   operator isolation.
 - `persona-lifecycle.integration.test.tsx` and
   `persona-onboard.integration.test.tsx`: persona create/edit/delete and

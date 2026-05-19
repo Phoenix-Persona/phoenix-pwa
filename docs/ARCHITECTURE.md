@@ -131,7 +131,7 @@ Pure logic and HTTP clients. No React imports.
 | ----------------------- | -------------------------------------------------------------------- |
 | `useNostr.ts`           | **Re-export only** of `useNostr` from `@nostrify/react`. The file's comment (lines 1-5) says don't edit — it exists because LLMs invent it. |
 | `useNostrPublish`       | Operator publish (kind 0, kind 22242, etc). Auto-tags `client` on https. |
-| `useCurrentUser`        | Returns `{ user, users, ...metadata }`. Product code treats `user` as the single active login. |
+| `useCurrentUser`        | Returns `{ user, ...metadata }` for the single active login. |
 | `useLoggedInAccounts`   | Single account metadata helper for the active login.                 |
 | `useLoginActions`       | Single-slot `nsec` / `bunker` / `extension` / `nostrconnect` login replacement methods + `logout`. |
 | `useUploadFile`         | Uploads to Blossom with the active Blossom server list from `useAppContext`. |
@@ -183,7 +183,7 @@ Pure logic and HTTP clients. No React imports.
 | File                  | What it does                                                          |
 | --------------------- | --------------------------------------------------------------------- |
 | `LoginArea.tsx`       | Either the "Join" button (logged out) or the account menu (logged in). |
-| `AccountSwitcher.tsx` | Single-account profile dropdown with navigation links and log out. |
+| `AccountMenu.tsx` | Single-account profile dropdown with navigation links and log out. |
 | `AuthDialog.tsx`      | Modal for account creation, saved local account login, pasted nsec import, extension, nostrconnect, and bunker login. **The nostrconnect listening effect is subtle** — its dep array is intentionally limited to avoid tearing down in-flight subscriptions on re-render. |
 
 ### `components/ui/`

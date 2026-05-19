@@ -13,7 +13,7 @@ import { useLoginActions } from '@/hooks/useLoginActions';
 import { genUserName } from '@/lib/genUserName';
 import { sanitizeHttpsUrl } from '@/lib/url';
 
-export function AccountSwitcher() {
+export function AccountMenu() {
   const { currentUser } = useLoggedInAccounts();
   const { logout } = useLoginActions();
   const navigate = useNavigate();

@@ -10,7 +10,7 @@ import {
   mockModule,
 } from "@/test/api";
 
-import { AccountSwitcher } from "./AccountSwitcher";
+import { AccountMenu } from "./AccountMenu";
 
 const mocks = hoisted(() => ({
   logout: mockFn(),
@@ -34,7 +34,7 @@ mockModule("@/hooks/useLoginActions", () => ({
   useLoginActions: () => ({ logout: mocks.logout }),
 }));
 
-describe("AccountSwitcher", () => {
+describe("AccountMenu", () => {
   beforeEach(() => {
     mocks.logout.mockReset();
     Object.assign(globalThis, { Element: window.Element });
@@ -43,7 +43,7 @@ describe("AccountSwitcher", () => {
   it("consolidates primary navigation links into the profile menu", () => {
     render(
       <MemoryRouter>
-        <AccountSwitcher />
+        <AccountMenu />
       </MemoryRouter>,
     );
 
@@ -60,7 +60,7 @@ describe("AccountSwitcher", () => {
   it("removes add and switch account actions and logs out through the session action", async () => {
     render(
       <MemoryRouter>
-        <AccountSwitcher />
+        <AccountMenu />
       </MemoryRouter>,
     );
 

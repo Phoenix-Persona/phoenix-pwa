@@ -7,8 +7,9 @@ import { useAuthor } from './useAuthor.ts';
 export function useCurrentUser() {
   const { nostr } = useNostr();
   const { logins } = useNostrLogin();
+  const currentLogin = logins[0];
 
-  const loginToUser = useCallback((login: NLoginType): NUser  => {
+  const loginToUser = useCallback((login: NLoginType): NUser => {
     switch (login.type) {
       case 'nsec': // Nostr login with secret key
         return NUser.fromNsecLogin(login);
@@ -22,27 +23,23 @@ export function useCurrentUser() {
     }
   }, [nostr]);
 
-  const users = useMemo(() => {
-    const users: NUser[] = [];
-
-    for (const login of logins) {
-      try {
-        const user = loginToUser(login);
-        users.push(user);
-      } catch (error) {
-        console.warn('Skipped invalid login', login.id, error);
-      }
+  const user = useMemo(() => {
+    if (!currentLogin) {
+      return undefined;
     }
 
-    return users;
-  }, [logins, loginToUser]);
+    try {
+      return loginToUser(currentLogin);
+    } catch (error) {
+      console.warn('Skipped invalid login', currentLogin.id, error);
+      return undefined;
+    }
+  }, [currentLogin, loginToUser]);
 
-  const user = users[0] as NUser | undefined;
   const author = useAuthor(user?.pubkey);
 
   return {
     user,
-    users,
     ...author.data,
   };
 }
