@@ -14,17 +14,19 @@ export interface Account {
 
 export function useLoggedInAccounts() {
   const { nostr } = useNostr();
-  const { logins, setLogin, removeLogin } = useNostrLogin();
+  const { logins } = useNostrLogin();
+  const currentLogin = logins[0];
 
   const { data: authors = [] } = useQuery({
-    queryKey: queryKeys.nostr.logins(logins.map((l) => l.id).join(';')),
+    queryKey: queryKeys.nostr.logins(currentLogin?.id ?? ''),
     queryFn: async () => {
+      if (!currentLogin) return [];
       const events = await nostr.query(
-        [{ kinds: [0], authors: logins.map((l) => l.pubkey) }],
+        [{ kinds: [0], authors: [currentLogin.pubkey] }],
         { signal: AbortSignal.timeout(1500) },
       );
 
-      return logins.map(({ id, pubkey }): Account => {
+      return [currentLogin].map(({ id, pubkey }): Account => {
         const event = events.find((e) => e.pubkey === pubkey);
         const metadata = parseNostrMetadata(event?.content);
         if (metadata) {
@@ -37,22 +39,14 @@ export function useLoggedInAccounts() {
     retry: 3,
   });
 
-  // Current user is the first login
   const currentUser: Account | undefined = (() => {
-    const login = logins[0];
-    if (!login) return undefined;
-    const author = authors.find((a) => a.id === login.id);
-    return { metadata: {}, ...author, id: login.id, pubkey: login.pubkey };
+    if (!currentLogin) return undefined;
+    const author = authors.find((a) => a.id === currentLogin.id);
+    return { metadata: {}, ...author, id: currentLogin.id, pubkey: currentLogin.pubkey };
   })();
-
-  // Other users are all logins except the current one
-  const otherUsers = (authors || []).slice(1) as Account[];
 
   return {
     authors,
     currentUser,
-    otherUsers,
-    setLogin,
-    removeLogin,
   };
 }

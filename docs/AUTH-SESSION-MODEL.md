@@ -9,9 +9,9 @@ deployment-wide environment pins.
 
 | Data | Production location | Notes |
 | --- | --- | --- |
-| Active Nostr login | Memory only | `NostrLoginProvider` uses in-memory storage. Refresh/new tab must not restore an active plaintext `nsec`. |
-| Fresh Zuka operator `nsec` | NIP-49 `ncryptsec` | Stored through `secureStorage`; web falls back to localStorage, native uses Keychain/KeyStore. |
-| BYO operator `nsec` | External signer or encrypted import flow | Zuka does not change NIP-07/NIP-46 custody. Pasted `nsec` login requires NIP-49 encryption before session start. |
+| Active Nostr login | Memory only | `NostrLoginProvider` uses in-memory storage as a single active login slot. Refresh/new tab must not restore an active plaintext `nsec`. |
+| Local account backup | NIP-49 `ncryptsec` | At most one encrypted local account backup is stored through `secureStorage`; web falls back to localStorage, native uses Keychain/KeyStore. |
+| External operator login | External signer | Zuka does not change NIP-07/NIP-46 custody. |
 | Operator wallet seed | Operator envelope | Encrypted kind 30078, self-encrypted to the operator. |
 | Operator PPQ credentials | Operator envelope | Encrypted kind 30078. No production global PPQ localStorage cache. |
 | Persona `nsec` and wallet seed | Persona envelope | Encrypted kind 30078 authored by the operator. Runtime plaintext is memory-only. |
@@ -22,15 +22,15 @@ deployment-wide environment pins.
 `src/lib/operatorSessionState.ts` is the central cleanup API for
 sensitive operator state.
 
-- Operator switch clears PPQ queries, wallet queries, operator envelope
+- Login replacement and logout clear PPQ queries, wallet queries, operator envelope
   cache, persona list/detail queries, persona decrypt cache, legacy PPQ
   localStorage, and resumable video-chain state.
-- Lock clears active session state and runtime caches, but keeps the
-  encrypted NIP-49 device backup.
-- Forget device clears the encrypted NIP-49 device backup plus active
+- Log out clears active session state and runtime caches, but keeps the
+  encrypted local account backup.
+- Wipe device data clears the encrypted local account backup plus active
   session and runtime state, then hard reloads.
 
-New logout, lock, account-switch, or forget-device paths should call
+New logout, login-replacement, or device-wipe paths should call
 this module instead of clearing storage or caches directly.
 
 ## Dev Pins

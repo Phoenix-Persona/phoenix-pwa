@@ -16,7 +16,7 @@ export function LoginArea({ className }: LoginAreaProps) {
   return (
     <div className={cn('inline-flex items-center justify-center', className)}>
       {currentUser ? (
-        <AccountSwitcher onAddAccountClick={() => setAuthDialogOpen(true)} />
+        <AccountSwitcher />
       ) : (
         <Button
           onClick={() => setAuthDialogOpen(true)}

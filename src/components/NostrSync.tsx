@@ -29,7 +29,7 @@ function invalidateUserDependentCaches(queryClient: QueryClient) {
  *   - On the very first mount: trust whatever's persisted (the user
  *     is whoever Nostrify just restored from localStorage). Run the
  *     usual NIP-65 / NIP-94 sync against them.
- *   - When the active user changes (login, logout, account switch):
+ *   - When the active user changes (login replacement or logout):
  *     reset both lists to the app defaults FIRST, so the previous
  *     user's relays / Blossom servers don't bleed into the next
  *     user's session. Then re-run the sync against the new user (or

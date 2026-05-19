@@ -66,7 +66,7 @@ per-persona Lightning wallets).
 - `/test/scripts/` — validation scripts for node:test, source policy, build verification, bundle budgets/analysis, and PWA smoke checks.
 - `/test/manual/` — manual and E2E Node scripts for wallet, PPQ, and media workflows.
 - `/public/` — static assets.
-- `App.tsx` — **already configured** with `AppProvider`, `QueryClientProvider`, `NostrLoginProvider`, `NostrProvider`, operator cleanup/init, `NostrSync`, `TooltipProvider`, `AppToaster`, `UnlockGate`, and `AppRouter`. **Read before editing**; changes are rarely needed.
+- `App.tsx` — **already configured** with `AppProvider`, `QueryClientProvider`, `NostrLoginProvider`, `NostrProvider`, operator cleanup/init, `NostrSync`, `TooltipProvider`, `AppToaster`, and `AppRouter`. **Read before editing**; changes are rarely needed.
 - `AppRouter.tsx` — React Router configuration. The catch-all `/:nip19` route handles all NIP-19 identifiers (see the `nip19-routing` skill).
 
 **Always read an existing file before modifying it.** Never write over `App.tsx`, `AppRouter.tsx`, or `NostrProvider` without first reading their contents.
@@ -241,7 +241,7 @@ export function MyComponent() {
 
 ### Nostr Login
 
-Use the `LoginArea` component (already in the project). It renders a single "Join" button when logged out (opens an `AuthDialog` supporting signup, extension, nsec, and remote signer) and becomes an account switcher when logged in. **Do not wrap it in conditional logic.**
+Use the `LoginArea` component (already in the project). It renders a single "Join" button when logged out (opens an `AuthDialog` supporting signup, saved-account login, extension, nsec, and remote signer) and becomes an account menu when logged in. **Do not wrap it in conditional logic.**
 
 ```tsx
 import { LoginArea } from '@/components/auth/LoginArea';
@@ -249,7 +249,7 @@ import { LoginArea } from '@/components/auth/LoginArea';
 <LoginArea className="max-w-60" />
 ```
 
-`LoginArea` is inline-flex by default. Pass `flex` or `w-full` to expand it; otherwise set a sensible `max-w-*`.
+`LoginArea` is inline-flex by default. Pass `flex` or `w-full` to expand it; otherwise set a sensible `max-w-*`. Zuka intentionally supports one active operator login at a time; use `useLoginActions` for login replacement and logout instead of exposing add/switch account UI.
 
 **Social apps should include a profile/account menu in the main navigation** for access to settings, profile editing, and logout — don't only show `LoginArea` in logged-out states.
 

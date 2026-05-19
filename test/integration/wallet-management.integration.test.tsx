@@ -1,6 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
 import { act, cleanup, render, renderHook, screen, waitFor } from "@testing-library/react";
-import { useNostrLogin } from "@nostrify/react/login";
 import {
   afterEach,
   beforeEach,
@@ -14,6 +13,7 @@ import {
 } from "@/test/api";
 
 import { OperatorWalletInit } from "@/components/OperatorWalletInit";
+import { useLoginActions } from "@/hooks/useLoginActions";
 import { useOperatorEnvelope } from "@/hooks/useOperatorEnvelope";
 import { useOperatorWallet } from "@/hooks/useOperatorWallet";
 import type { WalletHandle } from "@/lib/wallet/types";
@@ -187,7 +187,7 @@ describe("wallet management integration", () => {
     expect(walletMocks.sendBolt11).toHaveBeenCalledOnce();
   });
 
-  it("switches operator wallet state without exposing the previous operator seed or handle", async () => {
+  it("replaces operator wallet state without exposing the previous operator seed or handle", async () => {
     const first = await operatorEnvelopeEvent({
       operator: testKeys.operator,
       wallet: { kind: "spark", seed: MNEMONIC },
@@ -198,7 +198,7 @@ describe("wallet management integration", () => {
     });
     harness = await createRelayHarness({
       events: [first.event, second.event],
-      logins: [loginFor(testKeys.operator), loginFor(testKeys.operatorAlt)],
+      logins: [loginFor(testKeys.operator)],
       queryClient: testQueryClient(),
     });
 
@@ -214,7 +214,7 @@ describe("wallet management integration", () => {
     );
 
     act(() => {
-      screen.getByRole("button", { name: "Switch operator" }).click();
+      screen.getByRole("button", { name: "Log in second operator" }).click();
     });
 
     await waitFor(() =>
@@ -297,16 +297,16 @@ function OperatorEnvelopeProbe() {
 }
 
 function OperatorWalletSwitchProbe() {
-  const { setLogin } = useNostrLogin();
+  const login = useLoginActions();
   const operatorWallet = useOperatorWallet();
   const handle = operatorWallet.wallet.handle as { id?: string } | undefined;
   return (
     <>
       <button
         type="button"
-        onClick={() => setLogin(loginFor(testKeys.operatorAlt).id)}
+        onClick={() => void login.nsec(testKeys.operatorAlt.nsec)}
       >
-        Switch operator
+        Log in second operator
       </button>
       <output data-testid="operator-seed">{operatorWallet.seed ?? "none"}</output>
       <output data-testid="wallet-handle">{handle?.id ?? "none"}</output>

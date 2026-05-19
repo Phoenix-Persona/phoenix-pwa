@@ -14,7 +14,6 @@
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  Lock,
   LogOut,
   TriangleAlert,
   User as UserIcon,
@@ -43,6 +42,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useLoginActions } from "@/hooks/useLoginActions";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import { useLoggedInAccounts } from "@/hooks/useLoggedInAccounts";
 import { impactHeavy, notificationWarning } from "@/lib/haptics";
@@ -50,15 +50,15 @@ import { useToast } from "@/hooks/useToast";
 import { hasUserNcryptsec } from "@/lib/nip49Storage";
 import {
   clearOperatorDeviceSecrets,
-  clearOperatorSessionState,
 } from "@/lib/operatorSessionState";
 
 const Settings = () => {
   usePageMeta({ title: "Settings — Zuka" });
   const navigate = useNavigate();
   const { user } = useCurrentUser();
-  const { logins, removeLogin } = useNostrLogin();
+  const { logins } = useNostrLogin();
   const { currentUser } = useLoggedInAccounts();
+  const login = useLoginActions();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -74,27 +74,19 @@ const Settings = () => {
       ? currentLogin.data.nsec
       : null;
 
-  function handleLockNow() {
+  async function handleLogout() {
     notificationWarning();
-    // Clear the Nostrify session AND the per-tab session flag. The
-    // <UnlockGate> reactively computes its `needsUnlock` state from
-    // `logins.length` so removing the login here causes the modal
-    // to render IMMEDIATELY over whatever route the user is on —
-    // no route change, no remount, no lost scroll/form state. They
-    // re-enter the passphrase and the modal hides without disturbing
-    // the page underneath.
-    const current = logins[0];
-    if (current) removeLogin(current.id);
-    void clearOperatorSessionState(queryClient, user?.pubkey);
+    await login.logout();
+    navigate("/");
     toast({
-      title: "Locked",
-      description: "Enter your passphrase to unlock.",
+      title: "Logged out",
+      description: "Your local account backup is still saved on this device.",
     });
   }
 
-  async function handleForgetDevice() {
+  async function handleWipeDeviceData() {
     const ok = window.confirm(
-      "Forget this device? You'll need your encrypted key backup to sign in again on this browser. Personas survive — they're stored on relays."
+      "Wipe device data? You'll need your encrypted key backup or an external signer to use Zuka on this browser again. Personas survive — they're stored on relays."
     );
     if (!ok) return;
     impactHeavy();
@@ -178,17 +170,17 @@ const Settings = () => {
                     {exportableNsec && (
                       <DownloadBackupDialog nsec={exportableNsec} />
                     )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleLogout()}
+                    >
+                      <LogOut className="mr-2 size-4" />
+                      Log out
+                    </Button>
                     {phoenixManaged && (
                       <>
                         <ChangePassphraseDialog />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleLockNow}
-                        >
-                          <Lock className="mr-2 size-4" />
-                          Lock now
-                        </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
@@ -197,45 +189,32 @@ const Settings = () => {
                               className="text-destructive border-destructive/30 hover:bg-destructive/5"
                             >
                               <TriangleAlert className="mr-2 size-4" />
-                              Forget this device
+                              Wipe device data
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Forget this device?</AlertDialogTitle>
+                              <AlertDialogTitle>Wipe device data?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                The encrypted key parked on this browser will be
-                                cleared. You'll need your encrypted key backup
-                                to sign in again here. Personas you've already
+                                The encrypted key and runtime state on this
+                                browser will be cleared. You'll need your
+                                encrypted key backup or an external signer to
+                                sign in again here. Personas you've already
                                 published survive on relays.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={handleForgetDevice}
+                                onClick={handleWipeDeviceData}
                                 className="bg-destructive hover:bg-destructive/90"
                               >
-                                Forget device
+                                Wipe device data
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
                       </>
-                    )}
-                    {!phoenixManaged && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const current = logins[0];
-                          if (current) removeLogin(current.id);
-                          navigate("/");
-                        }}
-                      >
-                        <LogOut className="mr-2 size-4" />
-                        Sign out
-                      </Button>
                     )}
                   </div>
                 </CardContent>

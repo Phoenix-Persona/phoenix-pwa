@@ -11,7 +11,6 @@ import { NostrLoginProvider } from "@nostrify/react/login";
 import { AppProvider } from "@/components/AppProvider";
 import type { AppConfig } from "@/contexts/AppContext";
 import { APP_RELAYS } from "@/lib/appRelays";
-import { UnlockGate } from "@/components/UnlockGate";
 import { InstallBanner } from "@/components/InstallBanner";
 import { DevAutoLogin } from "@/components/DevAutoLogin";
 import { OperatorWalletInit } from "@/components/OperatorWalletInit";
@@ -59,9 +58,7 @@ export function App() {
             <TooltipProvider>
               <AppToaster />
               <Suspense fallback={<div className="min-h-dvh bg-background" />}>
-                <UnlockGate>
-                  <AppRouter />
-                </UnlockGate>
+                <AppRouter />
               </Suspense>
               <InstallBanner />
             </TooltipProvider>

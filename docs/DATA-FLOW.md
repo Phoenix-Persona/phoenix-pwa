@@ -26,16 +26,17 @@ need to grep across pages, hooks, and lib helpers.
 
 ## Login
 
-`AuthDialog` supports generated nsec, pasted nsec, browser extension,
-NIP-46 bunker, and nostrconnect login paths. All paths call `useLoginActions`,
-which writes the active login into Nostrify's login store using
-`appNostrLoginStorage`.
+`AuthDialog` supports generated nsec, a saved local account backup, pasted
+nsec, browser extension, NIP-46 bunker, and nostrconnect login paths. All paths
+call `useLoginActions`, which enforces a single active login slot in Nostrify's
+login store using `appNostrLoginStorage`.
 
 After login, `NostrProvider` derives the active `NUser` and stores the signer
 in refs used by the long-lived `NPool` callbacks. `useCurrentUser` re-derives
 the same active user for pages and hooks. Operator-scoped cleanup components
-run at the app root so prior-account persona, PPQ, wallet, and transient
-runtime state does not bleed into the next login.
+run at the app root and during login replacement/logout so prior-account
+persona, PPQ, wallet, and transient runtime state does not bleed into the next
+login.
 
 ## Operator Wallet And PPQ Account
 

@@ -1,9 +1,9 @@
-import { useNostrLogin } from "@nostrify/react/login";
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "@/test/api";
 
 import { NostrSync } from "@/components/NostrSync";
 import { useAuthor } from "@/hooks/useAuthor";
+import { useLoginActions } from "@/hooks/useLoginActions";
 import {
   clearPersonaDecryptCache,
   useMyPersonas,
@@ -95,7 +95,7 @@ describe("Nostr hook integration", () => {
     expect(harness.relay.getEvents({ authors: [testKeys.persona.pubkey], kinds: [1] })).toHaveLength(1);
   });
 
-  it("does not show prior-operator personas after switching login", async () => {
+  it("does not show prior-operator personas after logging into another operator", async () => {
     const persona = await personaEnvelopeEvent({
       operator: testKeys.operator,
       persona: testKeys.persona,
@@ -103,18 +103,18 @@ describe("Nostr hook integration", () => {
     });
     const harness = await createRelayHarness({
       events: [persona.event],
-      logins: [loginFor(testKeys.operator), loginFor(testKeys.operatorAlt)],
+      logins: [loginFor(testKeys.operator)],
     });
     harnesses.push(harness);
 
     function PersonaCountProbe() {
       const personas = useMyPersonas();
-      const { setLogin } = useNostrLogin();
+      const login = useLoginActions();
       return (
         <>
           <NostrSync />
-          <button type="button" onClick={() => setLogin(loginFor(testKeys.operatorAlt).id)}>
-            Switch
+          <button type="button" onClick={() => void login.nsec(testKeys.operatorAlt.nsec)}>
+            Log in alt
           </button>
           <output data-testid="persona-count">{personas.data?.length ?? 0}</output>
         </>
@@ -125,7 +125,7 @@ describe("Nostr hook integration", () => {
 
     await waitFor(() => expect(screen.getByTestId("persona-count").textContent).toBe("1"));
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Switch" }));
+      fireEvent.click(screen.getByRole("button", { name: "Log in alt" }));
     });
     await waitFor(() => expect(screen.getByTestId("persona-count").textContent).toBe("0"));
   });

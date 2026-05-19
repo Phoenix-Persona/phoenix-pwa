@@ -54,13 +54,11 @@ export function DevAutoLogin() {
     if (!candidate || !isValidNsec(candidate)) return;
 
     ran.current = true;
-    try {
-      actions.nsec(candidate);
-    } catch (err) {
+    void actions.nsec(candidate).catch((err) => {
       // Don't crash the app if auto-login fails for any reason — fall
       // back to the manual AuthDialog flow.
       console.warn("[DevAutoLogin] auto-login failed:", err);
-    }
+    });
   }, [currentUser, actions]);
 
   return null;

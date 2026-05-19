@@ -1,8 +1,8 @@
-import { useNostrLogin } from "@nostrify/react/login";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "@/test/api";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useLoginActions } from "@/hooks/useLoginActions";
 import { usePpqAccount } from "@/hooks/usePpqAccount";
 
 import {
@@ -22,8 +22,8 @@ afterEach(async () => {
   await Promise.all(harnesses.splice(0).map((harness) => harness.cleanup()));
 });
 
-describe("operator PPQ account switching", () => {
-  it("does not render the previous operator PPQ credentials after login switch", async () => {
+describe("operator PPQ login replacement", () => {
+  it("does not render the previous operator PPQ credentials after login replacement", async () => {
     const consoleErrors: string[] = [];
     const consoleError = spyOn(console, "error").mockImplementation((...args) => {
       consoleErrors.push(args.map(String).join(" "));
@@ -48,7 +48,7 @@ describe("operator PPQ account switching", () => {
         />,
         {
           events: [first.event, second.event],
-          logins: [loginFor(testKeys.operator), loginFor(testKeys.operatorAlt)],
+          logins: [loginFor(testKeys.operator)],
         },
       );
       if (!harness) throw new Error("renderWithRelay did not return a harness");
@@ -59,7 +59,9 @@ describe("operator PPQ account switching", () => {
       );
       consoleErrors.length = 0;
 
-      fireEvent.click(screen.getByRole("button", { name: "Switch operator" }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Log in second operator" }));
+      });
 
       await waitFor(() =>
         expect(screen.getByTestId("current-user").textContent).toBe(
@@ -92,10 +94,10 @@ function PpqSwitchProbe({
 }: {
   observations: Array<{ pubkey: string | null; apiKey: string | null }>;
 }) {
-  const { setLogin } = useNostrLogin();
+  const login = useLoginActions();
   const { user } = useCurrentUser();
   const { account } = usePpqAccount();
-  const switchToAlt = () => setLogin(loginFor(testKeys.operatorAlt).id);
+  const loginAsAlt = () => void login.nsec(testKeys.operatorAlt.nsec);
   observations.push({
     pubkey: user?.pubkey ?? null,
     apiKey: account?.api_key ?? null,
@@ -105,9 +107,9 @@ function PpqSwitchProbe({
     <>
       <button
         type="button"
-        onClick={switchToAlt}
+        onClick={loginAsAlt}
       >
-        Switch operator
+        Log in second operator
       </button>
       <output data-testid="current-user">{user?.pubkey ?? "none"}</output>
       <output data-testid="ppq-account">{account?.api_key ?? "none"}</output>

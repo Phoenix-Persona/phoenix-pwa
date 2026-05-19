@@ -10,7 +10,14 @@ import {
   Loader2,
   ExternalLink,
 } from 'lucide-react';
-import { decryptNcryptsec, encryptNsec, markSessionUnlocked, storeUserNcryptsec } from '@/lib/nip49Storage';
+import {
+  decryptNcryptsec,
+  encryptNsec,
+  hasUserNcryptsec,
+  loadUserNcryptsec,
+  markSessionUnlocked,
+  storeUserNcryptsec,
+} from '@/lib/nip49Storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -41,7 +48,7 @@ interface AuthDialogProps {
   onClose: () => void;
 }
 
-type Step = 'welcome' | 'generate' | 'passphrase' | 'profile' | 'login' | 'login-passphrase' | 'connect' | 'import-backup';
+type Step = 'welcome' | 'generate' | 'passphrase' | 'profile' | 'login' | 'login-passphrase' | 'saved-account' | 'connect' | 'import-backup';
 
 const validateNsec = (nsec: string) => /^nsec1[a-zA-Z0-9]{58}$/.test(nsec);
 const validateBunkerUri = (uri: string) => uri.startsWith('bunker://');
@@ -302,9 +309,9 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
       await downloadTextFile(signupBackupFilename(), ncryptsec);
       storeUserNcryptsec(ncryptsec);
       // Now safe to log in — the at-rest backup is in place.
-      login.nsec(nsec);
-      // Same in-memory tab session is unlocked. The persisted Nostrify
-      // nsec is cleared by UnlockGate so refresh/new tab re-prompts.
+      await login.nsec(nsec);
+      // Same in-memory tab session is unlocked. The persisted Nostrify nsec is
+      // still cleared at boot so refresh/new tab returns to the login flow.
       markSessionUnlocked();
       setPassphrase('');
       setPassphraseConfirm('');
@@ -356,7 +363,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
       if (decoded.type !== 'nsec') throw new Error('Invalid nsec');
       const ncryptsec = encryptNsec(decoded.data, passphrase);
       storeUserNcryptsec(ncryptsec);
-      login.nsec(loginNsec);
+      await login.nsec(loginNsec);
       markSessionUnlocked();
       setPassphrase('');
       setPassphraseConfirm('');
@@ -425,7 +432,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
       // log_n we use at-rest — install it directly so this device has
       // an at-rest backup without re-encrypting.
       storeUserNcryptsec(importedNcryptsec);
-      login.nsec(recoveredNsec);
+      await login.nsec(recoveredNsec);
       // Mark this tab as unlocked so we don't immediately re-prompt
       // on the next render — the user just typed the passphrase.
       markSessionUnlocked();
@@ -440,6 +447,32 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
       );
     } finally {
       setImporting(false);
+    }
+  };
+
+  const handleSavedAccountSubmit = async () => {
+    setPassphraseError('');
+    if (!passphrase) {
+      setPassphraseError('Enter your passphrase.');
+      return;
+    }
+    setIsLoggingIn(true);
+    await new Promise((r) => setTimeout(r, 0));
+    try {
+      const ncryptsec = loadUserNcryptsec();
+      if (!ncryptsec) {
+        setPassphraseError('No saved account found on this device.');
+        return;
+      }
+      const skBytes = decryptNcryptsec(ncryptsec, passphrase);
+      await login.nsec(nip19.nsecEncode(skBytes));
+      markSessionUnlocked();
+      setPassphrase('');
+      onClose();
+    } catch {
+      setPassphraseError('Incorrect passphrase. Try again.');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -512,6 +545,8 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
         return 'Log in';
       case 'login-passphrase':
         return 'Encrypt this key on this device?';
+      case 'saved-account':
+        return 'Log in';
       case 'connect':
         return 'Connect signer';
       case 'import-backup':
@@ -791,6 +826,20 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
           {/* Login step. */}
           {step === 'login' && (
             <div className="space-y-4">
+              {hasUserNcryptsec() ? (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setPassphrase('');
+                    setPassphraseError('');
+                    setStep('saved-account');
+                  }}
+                  className="w-full h-12"
+                >
+                  Log in with saved account
+                </Button>
+              ) : null}
+
               {hasExtension ? (
                 <>
                   <Button
@@ -857,6 +906,77 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ isOpen, onClose }) => {
               <button
                 type="button"
                 onClick={() => setStep('welcome')}
+                className="w-full text-sm text-muted-foreground hover:text-foreground"
+              >
+                Back
+              </button>
+            </div>
+          )}
+
+          {/* Saved local account step — decrypt the device backup and log in. */}
+          {step === 'saved-account' && (
+            <div className="space-y-4">
+              <div className="flex size-14 bg-primary/10 rounded-full items-center justify-center mx-auto">
+                <Lock className="w-7 h-7 text-primary" />
+              </div>
+
+              <p className="text-sm text-muted-foreground text-center leading-relaxed">
+                Enter the passphrase for the account saved on this device.
+              </p>
+
+              <div className="space-y-1.5">
+                <label htmlFor="saved-account-passphrase" className="text-sm font-medium">
+                  Passphrase
+                </label>
+                <Input
+                  id="saved-account-passphrase"
+                  type="password"
+                  value={passphrase}
+                  onChange={(e) => {
+                    setPassphrase(e.target.value);
+                    if (passphraseError) setPassphraseError('');
+                  }}
+                  autoComplete="current-password"
+                  disabled={isLoggingIn}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isLoggingIn) {
+                      e.preventDefault();
+                      handleSavedAccountSubmit();
+                    }
+                  }}
+                />
+              </div>
+
+              {passphraseError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{passphraseError}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button
+                onClick={handleSavedAccountSubmit}
+                disabled={isLoggingIn || !passphrase}
+                className="w-full h-12"
+              >
+                {isLoggingIn ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Logging in…
+                  </>
+                ) : (
+                  'Log in'
+                )}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('login');
+                  setPassphrase('');
+                  setPassphraseError('');
+                }}
+                disabled={isLoggingIn}
                 className="w-full text-sm text-muted-foreground hover:text-foreground"
               >
                 Back

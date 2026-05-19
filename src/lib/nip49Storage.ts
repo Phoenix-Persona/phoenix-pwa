@@ -10,7 +10,7 @@
  *   - scrypt log_n = 18 (≈400ms on desktop; balanced mobile vs security)
  *   - per-user (not per-persona) — persona nsecs already encrypted-at-rest
  *     inside the kind 30078 backup
- *   - once per session unlock — see UnlockGate
+ *   - one saved local account backup per device
  *   - separate passphrase for "download backup" export (also NIP-49)
  *
  * Threat model boundary:
@@ -31,13 +31,10 @@ import { secureStorage } from "./secureStorage";
 const STORAGE_KEY = "zuka:user:ncryptsec";
 
 /**
- * Per-tab session flag — set when the user has unlocked or completed
- * a fresh signup in this tab. The active signer may stay in memory for
- * this tab, but persisted Nostrify login state is still cleared so a
- * refresh/new tab triggers the unlock prompt.
- *
- * Used by `main.tsx` to decide whether to clear Nostrify's persisted
- * nsec login on page load — see the pre-render hook there.
+ * Per-tab session flag — set when the user logs in with the saved local
+ * account or completes a fresh signup in this tab. The active signer may stay
+ * in memory for this tab, but persisted Nostrify login state is still cleared
+ * so a refresh/new tab returns to the normal login flow.
  */
 const SESSION_UNLOCK_KEY = "zuka:session-unlocked";
 
@@ -100,7 +97,7 @@ export function decryptNcryptsec(
 // automatically on first read, so existing users transparently upgrade
 // the first time the native app reads the key.
 //
-// API consumers (UnlockGate, AuthDialog, Settings, main.tsx) want
+// API consumers (AuthDialog, Settings, main.tsx) want
 // synchronous reads. We back the sync read API with an in-memory cache
 // hydrated once at boot from the (async) secureStorage. Writes update
 // the cache synchronously and fire-and-forget the underlying write.
@@ -162,7 +159,7 @@ export function loadUserNcryptsec(): string | null {
   return cachedNcryptsec;
 }
 
-/** Clear the stored ncryptsec. Used on logout / "forget device". */
+/** Clear the stored ncryptsec. Used by the settings "wipe device data" flow. */
 export function clearUserNcryptsec(): void {
   cachedNcryptsec = null;
   void secureStorage.removeItem(STORAGE_KEY).catch((err) => {
@@ -187,8 +184,8 @@ function safeSessionStorage(): Storage | null {
 }
 
 /**
- * Mark this live tab as "unlocked" — the user has either entered the
- * passphrase via `<UnlockGate>` or just completed a fresh signup.
+ * Mark this live tab as "unlocked" — the user has either entered the saved
+ * account passphrase or just completed a fresh signup.
  */
 export function markSessionUnlocked(): void {
   const storage = safeSessionStorage();
@@ -204,9 +201,8 @@ export function isSessionUnlocked(): boolean {
 }
 
 /**
- * Clear the per-tab session flag. Called by Settings → "Lock now"
- * (which forces re-prompt on next signer use within this tab) and
- * by "Forget device" (which clears everything).
+ * Clear the per-tab session flag. Called by log out, login replacement, and
+ * device wipe.
  */
 export function clearSessionUnlocked(): void {
   const storage = safeSessionStorage();
@@ -227,8 +223,8 @@ export function clearPersistedNostrLogin(): void {
  *
  * If the user has an at-rest ncryptsec on this device, clear
  * Nostrify's persisted login from localStorage. Without this,
- * Nostrify hydrates the prior session's nsec on every page load and
- * the unlock gate never fires.
+ * Nostrify hydrates the prior session's nsec on every page load instead of
+ * returning to the normal logged-out login flow.
  *
  * The function is idempotent: if no ncryptsec is parked, it does
  * nothing; otherwise repeated clears are harmless.

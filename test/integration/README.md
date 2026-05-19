@@ -44,13 +44,13 @@ or external-only services:
 ## Coverage Map
 
 - `auth-flow.integration.test.tsx` and
-  `operator-account-switch.integration.test.tsx`: login, account switching,
-  and operator isolation.
+  `operator-account-switch.integration.test.tsx`: login replacement and
+  operator isolation.
 - `persona-lifecycle.integration.test.tsx` and
   `persona-onboard.integration.test.tsx`: persona create/edit/delete and
   route-level onboarding.
 - `wallet-management.integration.test.tsx`: operator/persona wallet init,
-  switching, and wallet failure handling.
+  login replacement, and wallet failure handling.
 - `ai-credits-management.integration.test.tsx`: PPQ account and credit
   management.
 - `ai-usage.integration.test.tsx`: text styling, PPQ top-up, and persona image
