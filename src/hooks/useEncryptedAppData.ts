@@ -20,6 +20,7 @@ import { queryKeys } from "@/lib/queryKeys";
 export const ENCRYPTED_APP_DATA_KIND = 30078;
 export const ENCRYPTED_APP_DATA_QUERY_LIMIT = 200;
 export const ENCRYPTED_APP_DATA_QUERY_TIMEOUT_MS = 5000;
+export const ENCRYPTED_APP_DATA_DECRYPT_CONCURRENCY = 4;
 
 export interface OperatorEncryptedAppDataQuery {
   queryKey: ReturnType<typeof queryKeys.encryptedAppData.events>;
@@ -96,6 +97,50 @@ export async function classifyEncryptedAppDataEvent(
   const promise = decryptAndClassify(event, userPubkey, signer);
   decryptCache.set(cacheKey, promise);
   return promise;
+}
+
+export async function classifyEncryptedAppDataEvents(
+  events: NostrEvent[],
+  userPubkey: string,
+  signer: Nip44Signer,
+  options: {
+    signal?: AbortSignal;
+    concurrency?: number;
+  } = {},
+): Promise<ClassifiedEncryptedAppData[]> {
+  const concurrency = Math.max(
+    1,
+    Math.min(
+      options.concurrency ?? ENCRYPTED_APP_DATA_DECRYPT_CONCURRENCY,
+      events.length,
+    ),
+  );
+  const results = new Array<ClassifiedEncryptedAppData | undefined>(
+    events.length,
+  );
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (!options.signal?.aborted) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const event = events[index];
+      if (!event) return;
+      results[index] = await classifyEncryptedAppDataEvent(
+        event,
+        userPubkey,
+        signer,
+      );
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: concurrency }, () => worker()),
+  );
+
+  return results.filter(
+    (result): result is ClassifiedEncryptedAppData => Boolean(result),
+  );
 }
 
 export function upsertEncryptedAppDataEvent(

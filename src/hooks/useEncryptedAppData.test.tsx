@@ -161,4 +161,60 @@ describe("encrypted app data hooks", () => {
     expect(mocks.query).toHaveBeenCalledTimes(1);
     expect(mocks.decryptCount).toBe(events.length);
   });
+
+  it("starts persona envelope classification concurrently instead of serially", async () => {
+    const plaintextByContent = new Map<string, string>();
+    const gates: Array<() => void> = [];
+    const started: string[] = [];
+
+    const events = ["persona-a", "persona-b", "persona-c"].map(
+      (dTag, index) => {
+        const personaContent = JSON.stringify({
+          app: "phoenix-persona",
+          version: 1,
+          persona: {
+            pubkey: PERSONA_PUBKEY,
+            nsec: PERSONA_NSEC,
+            dTag,
+            name: `Persona ${index}`,
+            system_prompt: "Speak clearly.",
+            created_at: 1_700_000_000 + index,
+          },
+        });
+        const content = `ciphertext-${dTag}`;
+        plaintextByContent.set(content, personaContent);
+        return signedEvent({
+          kind: 30078,
+          content,
+          tags: [["d", dTag]],
+          created_at: 1_700_000_000 + index,
+        });
+      },
+    );
+    mocks.query.mockResolvedValue(events);
+    mocks.currentUser.user = {
+      ...mocks.currentUser.user!,
+      signer: {
+        ...mocks.currentUser.user!.signer,
+        nip44: {
+          ...mocks.currentUser.user!.signer.nip44,
+          decrypt: async (_pubkey, ciphertext) => {
+            started.push(ciphertext);
+            await new Promise<void>((resolve) => gates.push(resolve));
+            const plaintext = plaintextByContent.get(ciphertext);
+            if (!plaintext) throw new Error("Unknown ciphertext");
+            return plaintext;
+          },
+        },
+      },
+    };
+
+    const { result } = renderHook(() => useMyPersonas(), { wrapper });
+
+    await waitFor(() => expect(started).toHaveLength(events.length));
+    for (const release of gates) release();
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data).toHaveLength(events.length);
+  });
 });

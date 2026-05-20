@@ -34,6 +34,7 @@ import { npubToHex } from "@/lib/nostrIds";
 import { withNostrQueryTimeout } from "@/lib/nostrQuery";
 import { queryKeys } from "@/lib/queryKeys";
 import {
+  classifyEncryptedAppDataEvents,
   classifyEncryptedAppDataEvent,
   clearEncryptedAppDataDecryptCache,
   operatorEncryptedAppDataQuery,
@@ -123,16 +124,17 @@ export function useMyPersonas() {
         npub: string;
       }> = [];
 
-      for (const ev of events) {
-        if (c.signal.aborted) return [];
-        const classified = await classifyEncryptedAppDataEvent(
-          ev,
-          user.pubkey,
-          signer,
-        );
+      const classifiedEvents = await classifyEncryptedAppDataEvents(
+        events,
+        user.pubkey,
+        signer,
+        { signal: c.signal },
+      );
+
+      for (const classified of classifiedEvents) {
         if (classified.type !== "persona") continue;
         decrypted.push({
-          event: ev,
+          event: classified.event,
           envelope: classified.envelope,
           npub: classified.npub,
         });
