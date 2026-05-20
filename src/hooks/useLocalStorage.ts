@@ -25,13 +25,16 @@ export function useLocalStorage<T>(
   });
 
   const setValue = (value: T | ((prev: T) => T)) => {
-    try {
-      const valueToStore = value instanceof Function ? value(state) : value;
-      setState(valueToStore);
-      localStorage.setItem(key, serialize(valueToStore));
-    } catch (error) {
-      console.warn(`Failed to save ${key} to localStorage:`, error);
-    }
+    setState((previous) => {
+      try {
+        const valueToStore = value instanceof Function ? value(previous) : value;
+        localStorage.setItem(key, serialize(valueToStore));
+        return valueToStore;
+      } catch (error) {
+        console.warn(`Failed to save ${key} to localStorage:`, error);
+        return previous;
+      }
+    });
   };
 
   // Sync with localStorage changes from other tabs

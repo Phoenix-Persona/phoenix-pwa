@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { useSeoMeta } from "@unhead/react";
 import { Copy, QrCode, Zap } from "lucide-react";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -20,12 +19,13 @@ import {
 import { QRCodeCanvas } from "@/components/ui/qrcode";
 import { useAppContext } from "@/hooks/useAppContext";
 import { useAuthor } from "@/hooks/useAuthor";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { usePersonaPosts } from "@/hooks/usePersona";
 import { useToast } from "@/hooks/useToast";
 import { genUserName } from "@/lib/genUserName";
 import { npubToHex } from "@/lib/nostrIds";
 import { encodePubkeyAsNprofile } from "@/lib/nostrViewer";
-import { sanitizeHttpUrl } from "@/lib/url";
+import { sanitizeHttpsUrl } from "@/lib/url";
 
 const NPROFILE_RELAY_HINT_LIMIT = 3;
 
@@ -44,7 +44,7 @@ const PersonaFeed = () => {
     author.data?.metadata?.name ??
     (personaHex ? genUserName(personaHex) : "Unknown persona");
   const bio = author.data?.metadata?.about ?? "";
-  const picture = sanitizeHttpUrl(author.data?.metadata?.picture);
+  const picture = sanitizeHttpsUrl(author.data?.metadata?.picture);
   const lud16 = author.data?.metadata?.lud16;
   const donateUri = lud16 ? `lightning:${lud16}` : null;
 
@@ -73,7 +73,7 @@ const PersonaFeed = () => {
     toast({ title: "nprofile copied" });
   }
 
-  useSeoMeta({
+  usePageMeta({
     title: `${displayName} — Zuka`,
     description: bio || undefined,
   });

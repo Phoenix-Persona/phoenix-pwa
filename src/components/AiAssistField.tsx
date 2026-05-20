@@ -14,6 +14,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { getInferenceText, usePpqInference } from "@/hooks/usePpqInference";
+import type { PpqAccountOptions } from "@/hooks/usePpqAccount";
 import { cn } from "@/lib/utils";
 
 export interface AiAssistFieldContext {
@@ -29,6 +30,7 @@ type AiAssistButtonProps = AiAssistFieldContext & {
   className?: string;
   disabled?: boolean;
   title?: string;
+  ppqAccountOptions?: PpqAccountOptions;
 };
 
 const SYSTEM_PROMPT =
@@ -39,15 +41,15 @@ export function AiAssistButton({
   fieldPurpose,
   currentValue,
   surroundingContext,
-  defaultInstruction,
   onReplace,
   className,
   disabled,
   title,
+  ppqAccountOptions,
 }: AiAssistButtonProps) {
-  const inference = usePpqInference();
+  const inference = usePpqInference(ppqAccountOptions);
   const [open, setOpen] = useState(false);
-  const [instruction, setInstruction] = useState(defaultInstruction ?? "");
+  const [instruction, setInstruction] = useState("");
   const [preview, setPreview] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -58,7 +60,7 @@ export function AiAssistButton({
   function closeDialog(nextOpen: boolean) {
     setOpen(nextOpen);
     if (!nextOpen) {
-      setInstruction(defaultInstruction ?? "");
+      setInstruction("");
       setPreview("");
       setError("");
     }
@@ -177,14 +179,6 @@ export function AiAssistButton({
           </div>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => closeDialog(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
             <Button
               type="button"
               variant="outline"

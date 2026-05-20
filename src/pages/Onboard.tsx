@@ -16,7 +16,6 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSeoMeta } from "@unhead/react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -45,6 +44,7 @@ import {
 import { useToast } from "@/hooks/useToast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useCreatePersona } from "@/hooks/useCreatePersona";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 
 import { generatePersonaKeypair } from "@/lib/personaKey";
@@ -59,7 +59,7 @@ import {
 type WizardStep = "details" | "picture";
 
 const Onboard = () => {
-  useSeoMeta({ title: "Create a persona — Zuka" });
+  usePageMeta({ title: "Create a persona — Zuka" });
   const navigate = useNavigate();
   const { user } = useCurrentUser();
   const { toast } = useToast();
@@ -68,14 +68,12 @@ const Onboard = () => {
   const [step, setStep] = useState<WizardStep>("details");
 
   // Details
-  const [name, setName] = useState("Voice of Rwanda");
+  const [name, setName] = useState("");
   // Persona handle auto-derives from `name` while untouched; once the
   // user edits it, we stop syncing (tracked by `usernameDirty`).
-  const [username, setUsername] = useState(slugifyForUsername("Voice of Rwanda"));
+  const [username, setUsername] = useState("");
   const [usernameDirty, setUsernameDirty] = useState(false);
-  const [lightningUsername, setLightningUsername] = useState(
-    slugifyForUsername("Voice of Rwanda"),
-  );
+  const [lightningUsername, setLightningUsername] = useState("");
   const [lightningUsernameDirty, setLightningUsernameDirty] = useState(false);
   const [bio, setBio] = useState(
     "An AI-assisted voice. Press freedom, civil society, the long memory."

@@ -3,6 +3,9 @@
 > **Status: SHIPPED** in PR #20 (`fix/ui-polish`, merged 2026-05-10). All six tasks completed: OperatorWalletInit hook warning fix, URL sanitization library, public persona profile hook, query key factories, centralised Nostr publish helper, and route-component decomposition (`DashboardComposerCard`, `PersonaHero`, `EditPersonaIdentityFields`, `EditPersonaPublicProfileFields`, `EditPersonaCrossPostFields`).
 >
 > The component-adoption follow-up (wiring those extracted components into their consumer pages) shipped separately in PR #21 — see `2026-05-10-adopt-extracted-persona-components.md`.
+>
+> **Historical toolchain note:** this plan predates the esbuild + `node:test`
+> + Biome hard cut. Vitest and Vite references below are archival.
 
 **Goal:** Clean up remaining code quality debt after PR #10 without blocking other pending PRs.
 

@@ -3,7 +3,7 @@
  * persona's configured cross-post webhook.
  *
  * Architecture context (derek-plan.md "Cross-post + video composer"):
- * Phoenix can't host its own backend (PROJECT.md §4), and the major
+ * Zuka does not host a user-data backend, and the major
  * social platforms' OAuth flows require a `client_secret` that
  * cannot live in a browser PWA. The default cross-post path is
  * therefore a webhook to a third-party aggregator (Buffer, Zapier,

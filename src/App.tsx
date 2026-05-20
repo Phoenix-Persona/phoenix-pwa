@@ -1,28 +1,22 @@
 // NOTE: This file should normally not be modified unless you are adding a new provider.
 // To add new routes, edit the AppRouter.tsx file.
 
+import { Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createHead, UnheadProvider } from '@unhead/react/client';
-import { InferSeoMetaPlugin } from 'unhead/plugins';
-import { Suspense } from 'react';
-import NostrProvider from '@/components/NostrProvider';
-import { NostrSync } from '@/components/NostrSync';
-import { Toaster } from "@/components/ui/toaster";
+import NostrProvider from "@/components/NostrProvider";
+import { NostrSync } from "@/components/NostrSync";
+import { AppToaster } from "@/components/AppToaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { NostrLoginProvider } from '@nostrify/react/login';
-import { AppProvider } from '@/components/AppProvider';
-import { AppConfig } from '@/contexts/AppContext';
-import { APP_RELAYS } from '@/lib/appRelays';
-import { UnlockGate } from '@/components/UnlockGate';
-import { InstallBanner } from '@/components/InstallBanner';
-import { DevAutoLogin } from '@/components/DevAutoLogin';
-import { OperatorWalletInit } from '@/components/OperatorWalletInit';
-import AppRouter from './AppRouter';
-const head = createHead({
-  plugins: [
-    InferSeoMetaPlugin(),
-  ],
-});
+import { NostrLoginProvider } from "@nostrify/react/login";
+import { AppProvider } from "@/components/AppProvider";
+import type { AppConfig } from "@/contexts/AppContext";
+import { APP_RELAYS } from "@/lib/appRelays";
+import { InstallBanner } from "@/components/InstallBanner";
+import { DevAutoLogin } from "@/components/DevAutoLogin";
+import { OperatorWalletInit } from "@/components/OperatorWalletInit";
+import { OperatorScopedStateCleanup } from "@/components/OperatorScopedStateCleanup";
+import { appNostrLoginStorage } from "@/lib/nostrLoginStorage";
+import AppRouter from "./AppRouter";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,28 +44,28 @@ const defaultConfig: AppConfig = {
 
 export function App() {
   return (
-    <UnheadProvider head={head}>
-      <AppProvider storageKey="nostr:app-config" defaultConfig={defaultConfig}>
-        <QueryClientProvider client={queryClient}>
-          <NostrLoginProvider storageKey='nostr:login'>
-            <NostrProvider>
-              <DevAutoLogin />
-              <OperatorWalletInit />
-              <NostrSync />
-              <TooltipProvider>
-                <Toaster />
-                <Suspense>
-                  <UnlockGate>
-                    <AppRouter />
-                  </UnlockGate>
-                </Suspense>
-                <InstallBanner />
-              </TooltipProvider>
-            </NostrProvider>
-          </NostrLoginProvider>
-        </QueryClientProvider>
-      </AppProvider>
-    </UnheadProvider>
+    <AppProvider storageKey="nostr:app-config" defaultConfig={defaultConfig}>
+      <QueryClientProvider client={queryClient}>
+        <NostrLoginProvider
+          storageKey='nostr:login'
+          storage={appNostrLoginStorage}
+        >
+          <NostrProvider>
+            <DevAutoLogin />
+            <OperatorScopedStateCleanup />
+            <OperatorWalletInit />
+            <NostrSync />
+            <TooltipProvider>
+              <AppToaster />
+              <Suspense fallback={<div className="min-h-dvh bg-background" />}>
+                <AppRouter />
+              </Suspense>
+              <InstallBanner />
+            </TooltipProvider>
+          </NostrProvider>
+        </NostrLoginProvider>
+      </QueryClientProvider>
+    </AppProvider>
   );
 }
 

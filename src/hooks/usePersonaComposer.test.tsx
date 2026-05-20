@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import type { NostrEvent } from "@nostrify/nostrify";
 import type { PropsWithChildren } from "react";
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import type { Persona } from "@/lib/persona";
 import {
@@ -10,31 +10,31 @@ import {
   usePersonaComposer,
 } from "./usePersonaComposer";
 
-const mocks = vi.hoisted(() => ({
-  publishMutateAsync: vi.fn(),
-  crossPostMutateAsync: vi.fn(),
-  inferenceMutateAsync: vi.fn(),
+const mocks = hoisted(() => ({
+  publishMutateAsync: mockFn(),
+  crossPostMutateAsync: mockFn(),
+  inferenceMutateAsync: mockFn(),
 }));
 
-vi.mock("./useCurrentUser", () => ({
+mockModule("./useCurrentUser", () => ({
   useCurrentUser: () => ({ user: { pubkey: "operator-pubkey" } }),
 }));
 
-vi.mock("./usePersonaPublish", () => ({
+mockModule("./usePersonaPublish", () => ({
   usePersonaPublish: () => ({
     mutateAsync: mocks.publishMutateAsync,
     isPending: false,
   }),
 }));
 
-vi.mock("./useCrossPost", () => ({
+mockModule("./useCrossPost", () => ({
   useCrossPost: () => ({
     mutateAsync: mocks.crossPostMutateAsync,
     isPending: false,
   }),
 }));
 
-vi.mock("./usePpqInference", async (importOriginal) => {
+mockModule("./usePpqInference", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("./usePpqInference")>();
   return {
@@ -89,8 +89,8 @@ describe("usePersonaComposer", () => {
 
   it("styles text with the persona system prompt and refreshes wallet state", async () => {
     const wallet = {
-      refreshInfo: vi.fn(),
-      refreshPpqBalance: vi.fn(),
+      refreshInfo: mockFn(),
+      refreshPpqBalance: mockFn(),
     };
     const { result } = renderHook(
       () =>
@@ -120,7 +120,7 @@ describe("usePersonaComposer", () => {
   });
 
   it("publishes text-only posts with source attribution tags", async () => {
-    const onPublished = vi.fn();
+    const onPublished = mockFn();
     const { result } = renderHook(
       () =>
         usePersonaComposer({

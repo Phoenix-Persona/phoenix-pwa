@@ -5,11 +5,12 @@
  * The operator wallet is the *funder* of AI inference: creation costs
  * (when those grow), default fallback when a persona's wallet is
  * empty, and the source of any auto-topup the operator initiates from
- * the header. Per-persona wallets exist separately (see PROJECT.md
- * §7) and receive donations on behalf of each persona; they are not
+ * the header. Per-persona wallets exist separately and receive donations on
+ * behalf of each persona; they are not
  * the operator's funder.
  *
- * Privacy posture matches the persona pattern (PROJECT.md §5.2):
+ * Privacy posture matches the persona pattern documented in
+ * `docs/PERSONA-SCHEMA.md`:
  *   - kind 30078 event with a fresh random UUID d-tag (no Phoenix
  *     fingerprint in tags)
  *   - NIP-44 self-encryption to the operator's own pubkey
@@ -23,31 +24,28 @@
  * `app` field inside the ciphertext.
  */
 
-import { z } from "zod";
 import type { NostrEvent } from "@nostrify/nostrify";
 
-import { walletSchema, type PersonaWallet } from "@/lib/persona";
+import { parsePersonaWallet, type PersonaWallet } from "@/lib/persona";
 import type { Nip44Signer } from "@/lib/personaCrypto";
 
 export const OPERATOR_KIND = 30078;
 export const PHOENIX_OPERATOR_APP = "phoenix-operator";
 export const PHOENIX_OPERATOR_VERSION = 1 as const;
 
-const ppqAccountSchema = z.object({
-  api_key: z.string().min(1).max(2048),
-  credit_id: z.string().min(0).max(512),
-});
-export type OperatorPpqAccount = z.infer<typeof ppqAccountSchema>;
+export interface OperatorPpqAccount {
+  api_key: string;
+  credit_id: string;
+}
 
-const operatorEnvelopeSchema = z.object({
-  app: z.literal(PHOENIX_OPERATOR_APP),
-  version: z.literal(PHOENIX_OPERATOR_VERSION),
-  dTag: z.string().min(1).max(128).optional(),
-  wallet: walletSchema.optional(),
-  ppq: ppqAccountSchema.optional(),
-  created_at: z.number().int().nonnegative(),
-});
-export type OperatorEnvelope = z.infer<typeof operatorEnvelopeSchema>;
+export interface OperatorEnvelope {
+  app: typeof PHOENIX_OPERATOR_APP;
+  version: typeof PHOENIX_OPERATOR_VERSION;
+  dTag?: string;
+  wallet?: PersonaWallet;
+  ppq?: OperatorPpqAccount;
+  created_at: number;
+}
 
 export interface OperatorEnvelopeInput {
   dTag?: string;
@@ -95,11 +93,56 @@ export async function tryDecryptOperatorEnvelope(
 export function parseOperatorEnvelope(plaintext: string): OperatorEnvelope | null {
   try {
     const json = JSON.parse(plaintext) as unknown;
-    const result = operatorEnvelopeSchema.safeParse(json);
-    return result.success ? result.data : null;
+    return parseOperatorEnvelopeValue(json);
   } catch {
     return null;
   }
+}
+
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isStringLength(value: unknown, min: number, max: number): value is string {
+  return typeof value === "string" && value.length >= min && value.length <= max;
+}
+
+function parsePpqAccount(value: unknown): OperatorPpqAccount | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return null;
+  if (!isStringLength(value.api_key, 1, 2048)) return null;
+  if (!isStringLength(value.credit_id, 0, 512)) return null;
+  return {
+    api_key: value.api_key,
+    credit_id: value.credit_id,
+  };
+}
+
+function parseOperatorEnvelopeValue(value: unknown): OperatorEnvelope | null {
+  if (!isRecord(value)) return null;
+  if (value.app !== PHOENIX_OPERATOR_APP) return null;
+  if (value.version !== PHOENIX_OPERATOR_VERSION) return null;
+  if (
+    typeof value.created_at !== "number" ||
+    !Number.isInteger(value.created_at) ||
+    value.created_at < 0
+  ) {
+    return null;
+  }
+  if (value.dTag !== undefined && !isStringLength(value.dTag, 1, 128)) return null;
+  const wallet = value.wallet === undefined ? undefined : parsePersonaWallet(value.wallet);
+  const ppq = parsePpqAccount(value.ppq);
+  if (wallet === null || ppq === null) return null;
+  return {
+    app: PHOENIX_OPERATOR_APP,
+    version: PHOENIX_OPERATOR_VERSION,
+    created_at: value.created_at,
+    ...(value.dTag !== undefined ? { dTag: value.dTag } : {}),
+    ...(wallet !== undefined ? { wallet } : {}),
+    ...(ppq !== undefined ? { ppq } : {}),
+  };
 }
 
 export function generateOperatorDTag(): string {

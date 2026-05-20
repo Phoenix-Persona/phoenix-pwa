@@ -1,17 +1,17 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, mockFn, mockModule } from "@/test/api";
 
 import { WalletPanel } from "./WalletPanel";
 import { WalletDialog } from "./WalletDialog";
 import type { UseWalletResult } from "@/hooks/useWallet";
 
-vi.mock("@/hooks/useToast", () => ({
-  useToast: () => ({ toast: vi.fn() }),
+mockModule("@/hooks/useToast", () => ({
+  useToast: () => ({ toast: mockFn() }),
 }));
 
-vi.mock("@/components/ui/qrcode", () => ({
+mockModule("@/components/ui/qrcode", () => ({
   QRCodeCanvas: ({ value }: { value: string }) => (
     <div data-testid="qr-code">{value}</div>
   ),
@@ -48,32 +48,38 @@ function makeWallet(
     } as UseWalletResult["info"],
     isInfoLoading: false,
     infoError: undefined,
-    refreshInfo: vi.fn(),
+    refreshInfo: mockFn(),
     payments: [
       makePayment("receive", 4_000n, "receive-1"),
       makePayment("send", 1_500n, "send-1"),
     ],
-    refreshPayments: vi.fn(),
-    receive: vi.fn(),
+    refreshPayments: mockFn(),
+    receive: mockFn(),
     isReceiving: false,
     receiveError: undefined,
-    send: vi.fn(),
+    send: mockFn(),
     isSending: false,
     sendError: undefined,
     ppqAccount: {
       credit_id: "credit_active_123",
       api_key: "ppq_live_secret_key",
     },
+    rotatePpqAccount: mockFn().mockResolvedValue({
+      credit_id: "credit_rotated_456",
+      api_key: "ppq_live_rotated_key",
+    }),
+    isPpqRotating: false,
+    ppqRotateError: undefined,
     ppqBalanceUsd: 4.25,
     isPpqBalanceLoading: false,
-    refreshPpqBalance: vi.fn(),
+    refreshPpqBalance: mockFn(),
     autoTopup: {
       enabled: true,
       thresholdUsd: 5,
       topupAmountUsd: 10,
       fundingSource: "persona",
     },
-    setAutoTopup: vi.fn(),
+    setAutoTopup: mockFn(),
     autoTopupRun: {
       isRunning: false,
       lastResult: {
@@ -83,12 +89,12 @@ function makeWallet(
         status: "Settled",
       },
     },
-    triggerAutoTopup: vi.fn(),
+    triggerAutoTopup: mockFn(),
     fundingSources: [
       { source: "operator", label: "Operator", isAvailable: true },
       { source: "persona", label: "Persona", isAvailable: true },
     ],
-    manualTopup: vi.fn().mockResolvedValue({
+    manualTopup: mockFn().mockResolvedValue({
       toppedUpUsd: 15,
       invoiceId: "invoice_manual",
       paymentRequest: "lnbc1manual",
@@ -111,7 +117,7 @@ function makeWallet(
     ],
     isPpqQueryHistoryLoading: false,
     ppqQueryHistoryError: undefined,
-    refreshPpqQueryHistory: vi.fn(),
+    refreshPpqQueryHistory: mockFn(),
     ...overrides,
   };
 }
@@ -138,7 +144,7 @@ describe("WalletPanel", () => {
   beforeEach(() => {
     Object.assign(navigator, {
       clipboard: {
-        writeText: vi.fn(),
+        writeText: mockFn(),
       },
     });
   });
@@ -149,14 +155,14 @@ describe("WalletPanel", () => {
     expect(screen.getByRole("tab", { name: /lightning/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /ai credits/i })).toBeInTheDocument();
     expect(screen.getByText("12,345 sats")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /receive/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /deposit/i })).toBeInTheDocument();
     expect(screen.queryByText("AI credits (PPQ)")).not.toBeInTheDocument();
 
     activateTab(/ai credits/i);
 
     expect(screen.getByText("AI credits (PPQ)")).toBeInTheDocument();
     expect(screen.getByText("$4.25")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /receive/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /deposit/i })).not.toBeInTheDocument();
   });
 
   it("keeps the PPQ charge id and API key hidden until revealed", () => {
@@ -178,10 +184,11 @@ describe("WalletPanel", () => {
 
   it("saves edited auto top-up threshold and amount", async () => {
     const wallet = makeWallet();
-    const onAutoTopupSave = vi.fn().mockResolvedValue(undefined);
+    const onAutoTopupSave = mockFn().mockResolvedValue(undefined);
     renderWallet(wallet, { onAutoTopupSave });
 
     activateTab(/ai credits/i);
+    fireEvent.click(screen.getByRole("button", { name: /edit auto top-up/i }));
     fireEvent.change(screen.getByLabelText(/auto below/i), {
       target: { value: "7" },
     });
@@ -208,10 +215,11 @@ describe("WalletPanel", () => {
 
   it("saves the selected PPQ funding source", async () => {
     const wallet = makeWallet();
-    const onAutoTopupSave = vi.fn().mockResolvedValue(undefined);
+    const onAutoTopupSave = mockFn().mockResolvedValue(undefined);
     renderWallet(wallet, { onAutoTopupSave });
 
     activateTab(/ai credits/i);
+    fireEvent.click(screen.getByRole("button", { name: /edit auto top-up/i }));
     fireEvent.click(screen.getByRole("button", { name: /fund from operator/i }));
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -225,13 +233,15 @@ describe("WalletPanel", () => {
     );
   });
 
-  it("renders compact PPQ top-up controls", () => {
+  it("separates manual and auto top-up controls and hides auto settings", () => {
     renderWallet();
 
     activateTab(/ai credits/i);
 
-    expect(screen.getByLabelText(/auto below/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^buy$/i)).toBeInTheDocument();
+    expect(screen.getByText("Manual top-up")).toBeInTheDocument();
+    expect(screen.getByText("Auto top-up")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/auto below/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /edit auto top-up/i })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /fund from persona/i }),
     ).toBeInTheDocument();
@@ -281,16 +291,101 @@ describe("WalletPanel", () => {
     expect(screen.getByText("$0.0123")).toBeInTheDocument();
     expect(screen.queryByText(/1,500 sats/i)).not.toBeInTheDocument();
   });
+
+  it("hides Lightning Address details for the operator wallet", () => {
+    renderWallet(makeWallet(), { walletScope: "operator" });
+
+    expect(screen.getByText("12,345 sats")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /deposit/i })).toBeInTheDocument();
+    expect(screen.queryByText("Lightning Address")).not.toBeInTheDocument();
+    expect(screen.queryByText("voice@breez.tips")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("qr-code")).not.toBeInTheDocument();
+  });
+
+  it("does not render operator envelope diagnostics in the wallet", () => {
+    render(
+      <MemoryRouter>
+        <WalletPanel
+          wallet={makeWallet()}
+          walletScope="operator"
+          operatorDiagnostics={{
+            hasEnvelopeEvent: true,
+            hasWalletBackup: true,
+            hasPpqBackup: true,
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    activateTab(/ai credits/i);
+
+    expect(screen.queryByText("Operator backup status")).not.toBeInTheDocument();
+  });
+
+  it("creates missing persona PPQ credentials without a warning dialog", async () => {
+    const wallet = makeWallet({ ppqAccount: null });
+    renderWallet(wallet);
+
+    activateTab(/ai credits/i);
+    fireEvent.click(screen.getByRole("button", { name: /create ppq credentials/i }));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(wallet.rotatePpqAccount).toHaveBeenCalledOnce());
+  });
+
+  it("requires confirmation before resetting persona PPQ credentials", async () => {
+    const wallet = makeWallet();
+    renderWallet(wallet);
+
+    activateTab(/ai credits/i);
+    fireEvent.click(screen.getByRole("button", { name: /reset ppq credentials/i }));
+
+    expect(wallet.rotatePpqAccount).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /reset credentials/i }));
+
+    await waitFor(() => expect(wallet.rotatePpqAccount).toHaveBeenCalledOnce());
+  });
+
+  it("requires confirmation before resetting operator PPQ credentials", async () => {
+    const wallet = makeWallet();
+    renderWallet(wallet, { walletScope: "operator" });
+
+    activateTab(/ai credits/i);
+    fireEvent.click(screen.getByRole("button", { name: /reset ppq credentials/i }));
+
+    expect(wallet.rotatePpqAccount).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /reset credentials/i }));
+
+    await waitFor(() => expect(wallet.rotatePpqAccount).toHaveBeenCalledOnce());
+  });
 });
 
 describe("WalletDialog", () => {
+  it("uses operator-specific description copy for the operator wallet", () => {
+    render(
+      <MemoryRouter>
+        <WalletDialog
+          wallet={makeWallet()}
+          walletScope="operator"
+          open
+          onOpenChange={mockFn()}
+          personaName="Operator"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Operator's wallet")).toBeInTheDocument();
+    expect(screen.getByText(/operator Spark Lightning wallet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/donations land here/i)).not.toBeInTheDocument();
+  });
+
   it("bounds wallet content to a scrollable dialog body", () => {
     render(
       <MemoryRouter>
         <WalletDialog
           wallet={makeWallet()}
           open
-          onOpenChange={vi.fn()}
+          onOpenChange={mockFn()}
           personaName="Voice"
         />
       </MemoryRouter>,

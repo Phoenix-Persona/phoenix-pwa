@@ -19,9 +19,8 @@
  * re-mounts the form rather than re-using stale state.
  */
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useSeoMeta } from "@unhead/react";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import type { NostrEvent } from "@nostrify/nostrify";
 
@@ -30,19 +29,21 @@ import { FlagStripe } from "@/components/ImigongoBand";
 import { EditPersonaCrossPostFields } from "@/components/persona/EditPersonaCrossPostFields";
 import { EditPersonaIdentityFields } from "@/components/persona/EditPersonaIdentityFields";
 import { EditPersonaPublicProfileFields } from "@/components/persona/EditPersonaPublicProfileFields";
+import { EditPersonaSystemPromptField } from "@/components/persona/EditPersonaSystemPromptField";
 import { createPersonaSigner } from "@/lib/personaSigner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { usePersona } from "@/hooks/usePersona";
+import { usePersonaPpqAccountOptions } from "@/hooks/usePersonaPpqAccountOptions";
 import { usePersonaPublicProfile } from "@/hooks/usePersonaPublicProfile";
+import type { PpqAccountOptions } from "@/hooks/usePpqAccount";
 import { useToast } from "@/hooks/useToast";
 import { useUpdatePersona } from "@/hooks/useUpdatePersona";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 import { featureFlags } from "@/lib/features";
-import { type PhoenixEnvelope } from "@/lib/persona";
+import type { PhoenixEnvelope } from "@/lib/persona";
 import {
   isValidLightningUsername,
   slugifyForUsername,
@@ -51,9 +52,20 @@ import { parseCommaList } from "@/lib/text";
 
 const EditPersona = () => {
   const { npub = "" } = useParams();
-  useSeoMeta({ title: "Edit persona — Zuka" });
+  usePageMeta({ title: "Edit persona — Zuka" });
   const { user } = useCurrentUser();
   const personaQ = usePersona(npub);
+  const refetchPersonaEnvelope = useCallback(async () => {
+    const refreshed = await personaQ.refetch();
+    return refreshed.data?.envelope ?? null;
+  }, [personaQ.refetch]);
+  const ppqAccountOptions = usePersonaPpqAccountOptions({
+    npub,
+    backupEvent: personaQ.data?.event,
+    envelope: personaQ.data?.envelope,
+    isLoading: personaQ.isLoading,
+    refetchEnvelope: refetchPersonaEnvelope,
+  });
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -113,6 +125,7 @@ const EditPersona = () => {
               npub={npub}
               backupEvent={personaQ.data.event}
               envelope={personaQ.data.envelope}
+              ppqAccountOptions={ppqAccountOptions}
             />
           )}
         </div>
@@ -125,13 +138,19 @@ interface EditPersonaFormProps {
   npub: string;
   backupEvent: NostrEvent;
   envelope: PhoenixEnvelope;
+  ppqAccountOptions: PpqAccountOptions;
 }
 
 function lightningUsernameFromAddress(address: string | undefined): string | undefined {
   return address?.split("@")[0];
 }
 
-function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) {
+function EditPersonaForm({
+  npub,
+  backupEvent,
+  envelope,
+  ppqAccountOptions,
+}: EditPersonaFormProps) {
   const navigate = useNavigate();
   const { user } = useCurrentUser();
   const { toast } = useToast();
@@ -251,8 +270,8 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
   async function handleSave() {
     if (!user) return;
 
-    // Prefer the d-tag stored inside the encrypted payload (PROJECT.md
-    // §5.2). Fall back to the event's own tag for personas authored
+    // Prefer the d-tag stored inside the encrypted payload. Fall back to
+    // the event's own tag for personas authored
     // before persona.dTag landed.
     const dTag =
       original.dTag ?? backupEvent.tags.find(([n]) => n === "d")?.[1];
@@ -360,23 +379,25 @@ function EditPersonaForm({ npub, backupEvent, envelope }: EditPersonaFormProps) 
           bio={bio}
           pictureUrl={pictureUrl}
           name={name}
+          username={username}
+          lightningUsername={lightningUsername}
+          systemPrompt={systemPrompt}
           loadingBio={profileQuery.isLoading}
           onBioChange={setBio}
           onPictureUrlChange={setPictureUrl}
           pictureSigner={personaSigner}
+          ppqAccountOptions={ppqAccountOptions}
         />
 
-        <div className="space-y-2">
-          <Label htmlFor="edit-system-prompt">
-            System prompt (private)
-          </Label>
-          <Textarea
-            id="edit-system-prompt"
-            rows={6}
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
-          />
-        </div>
+        <EditPersonaSystemPromptField
+          name={name}
+          username={username}
+          lightningUsername={lightningUsername}
+          bio={bio}
+          systemPrompt={systemPrompt}
+          onSystemPromptChange={setSystemPrompt}
+          ppqAccountOptions={ppqAccountOptions}
+        />
 
         {crossPostEnabled ? (
           <EditPersonaCrossPostFields

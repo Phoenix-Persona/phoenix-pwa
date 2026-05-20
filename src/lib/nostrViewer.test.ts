@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@/test/api";
 import { nip19 } from "nostr-tools";
 
 import {
@@ -8,6 +8,7 @@ import {
   encodePubkeyAsNprofile,
   findPresetByUrl,
   NOSTR_VIEWER_PRESETS,
+  sanitizeNostrViewerUrlPrefix,
   truncateNevent,
 } from "./nostrViewer";
 
@@ -28,6 +29,26 @@ describe("buildEventUrl", () => {
     expect(buildEventUrl("https://primal.net/e///", "nevent1xyz")).toBe(
       "https://primal.net/e/nevent1xyz",
     );
+  });
+
+  it("falls back to the default viewer for unsafe prefixes", () => {
+    expect(buildEventUrl("javascript:alert(1)", "nevent1abc")).toBe(
+      `${DEFAULT_NOSTR_VIEWER_URL.replace(/\/+$/, "")}/nevent1abc`,
+    );
+  });
+});
+
+describe("sanitizeNostrViewerUrlPrefix", () => {
+  it("normalizes https prefixes", () => {
+    expect(sanitizeNostrViewerUrlPrefix("https://example.com/path///")).toBe(
+      "https://example.com/path/",
+    );
+  });
+
+  it("rejects non-https prefixes", () => {
+    expect(sanitizeNostrViewerUrlPrefix("http://example.com")).toBeNull();
+    expect(sanitizeNostrViewerUrlPrefix("javascript:alert(1)")).toBeNull();
+    expect(sanitizeNostrViewerUrlPrefix("not a url")).toBeNull();
   });
 });
 

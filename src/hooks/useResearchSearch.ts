@@ -15,8 +15,8 @@
  *       the `words` filter. Best for cross-handle X search like
  *       "Rwanda human rights".
  *
- * Pulls the operator's PPQ api_key from `usePpqAccount` (env →
- * envelope → cache → mint) so callers don't thread credentials.
+ * Pulls a scoped PPQ api_key from `usePpqAccount`. Dashboard callers pass
+ * persona scope so research spend belongs to the active persona.
  */
 
 import { useMutation, type UseMutationResult } from "@tanstack/react-query";
@@ -28,7 +28,7 @@ import {
   type SearchResult,
 } from "@/lib/ppq/search";
 
-import { usePpqAccount } from "./usePpqAccount";
+import { usePpqAccount, type PpqAccountOptions } from "./usePpqAccount";
 
 export type ResearchSearchInput =
   | {
@@ -51,12 +51,14 @@ export type ResearchSearchInput =
       signal?: AbortSignal;
     };
 
-export function useResearchSearch(): UseMutationResult<
+export function useResearchSearch(
+  accountOptions?: PpqAccountOptions,
+): UseMutationResult<
   SearchResult[],
   Error,
   ResearchSearchInput
 > {
-  const { account, ensureAccount } = usePpqAccount();
+  const { account, ensureAccount } = usePpqAccount(accountOptions);
 
   return useMutation({
     mutationFn: async (input) => {

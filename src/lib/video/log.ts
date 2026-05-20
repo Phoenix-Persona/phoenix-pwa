@@ -11,23 +11,31 @@
  *   stitch    — ffmpeg.wasm load + concat events
  *   upload    — Blossom upload sizes + returned URLs
  *
- * Logging is unconditional in DEV; we lean on console verbosity rather
- * than a feature flag because every entry into this pipeline is an
- * intentional, paid action (Seedance clips cost money) — surfacing
- * what's happening is worth the noise.
+ * Logging is disabled by default because prompts, source material, and
+ * generated media URLs can be sensitive. Set `VITE_VIDEO_DEBUG=1` for
+ * local diagnostic sessions.
  */
+
+import { readEnv } from "@/lib/env";
 
 const STYLE = "color:#a8431b;font-weight:bold";
 
+function isVideoDebugEnabled(): boolean {
+  return readEnv("VITE_VIDEO_DEBUG") === "1";
+}
+
 export function vlog(scope: string, ...args: unknown[]): void {
+  if (!isVideoDebugEnabled()) return;
   console.log(`%c[video:${scope}]%c`, STYLE, "", ...args);
 }
 
 export function vwarn(scope: string, ...args: unknown[]): void {
+  if (!isVideoDebugEnabled()) return;
   console.warn(`[video:${scope}]`, ...args);
 }
 
 export function verror(scope: string, ...args: unknown[]): void {
+  if (!isVideoDebugEnabled()) return;
   console.error(`[video:${scope}]`, ...args);
 }
 

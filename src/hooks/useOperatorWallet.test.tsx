@@ -1,11 +1,12 @@
 import { renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import { useOperatorWallet } from "./useOperatorWallet";
 
-const mocks = vi.hoisted(() => ({
-  useWallet: vi.fn(() => ({ handle: undefined })),
-  readEnv: vi.fn(),
+const mocks = hoisted(() => ({
+  useWallet: mockFn(() => ({ handle: undefined })),
+  readEnv: mockFn(),
+  readDevEnv: mockFn(),
   currentUser: {
     user: { pubkey: "operator-pubkey" } as { pubkey: string } | undefined,
   },
@@ -19,26 +20,28 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/hooks/useWallet", () => ({
+mockModule("@/hooks/useWallet", () => ({
   useWallet: mocks.useWallet,
 }));
 
-vi.mock("@/hooks/useCurrentUser", () => ({
+mockModule("@/hooks/useCurrentUser", () => ({
   useCurrentUser: () => mocks.currentUser,
 }));
 
-vi.mock("@/hooks/useOperatorEnvelope", () => ({
+mockModule("@/hooks/useOperatorEnvelope", () => ({
   useOperatorEnvelope: () => mocks.operator,
 }));
 
-vi.mock("@/lib/env", () => ({
+mockModule("@/lib/env", () => ({
   readEnv: mocks.readEnv,
+  readDevEnv: mocks.readDevEnv,
 }));
 
 describe("useOperatorWallet", () => {
   beforeEach(() => {
     mocks.useWallet.mockClear();
     mocks.readEnv.mockReset().mockReturnValue(undefined);
+    mocks.readDevEnv.mockReset().mockReturnValue(undefined);
     mocks.currentUser.user = { pubkey: "operator-pubkey" };
     mocks.operator.envelope = {
       wallet: { kind: "spark", seed: "operator seed words" },
@@ -61,8 +64,8 @@ describe("useOperatorWallet", () => {
     );
   });
 
-  it("prefers the VITE_WALLET_SEED env override over the envelope", () => {
-    mocks.readEnv.mockReturnValue("env override seed");
+  it("prefers the dev-only VITE_WALLET_SEED env override over the envelope", () => {
+    mocks.readDevEnv.mockReturnValue("env override seed");
 
     const { result } = renderHook(() => useOperatorWallet());
 
@@ -71,6 +74,21 @@ describe("useOperatorWallet", () => {
       expect.objectContaining({
         walletId: "operator:operator-pubkey",
         mnemonic: "env override seed",
+      }),
+    );
+  });
+
+  it("ignores production env wallet seed values and uses the operator envelope", () => {
+    mocks.readEnv.mockReturnValue("production env seed");
+    mocks.readDevEnv.mockReturnValue(undefined);
+
+    const { result } = renderHook(() => useOperatorWallet());
+
+    expect(result.current.seed).toBe("operator seed words");
+    expect(mocks.useWallet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        walletId: "operator:operator-pubkey",
+        mnemonic: "operator seed words",
       }),
     );
   });

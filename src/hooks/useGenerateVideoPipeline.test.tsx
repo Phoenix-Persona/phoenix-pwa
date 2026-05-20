@@ -1,51 +1,51 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import type { Persona } from "@/lib/persona";
 import { generatePersonaKeypair } from "@/lib/personaKey";
 import { useGenerateVideoPipeline } from "./useGenerateVideoPipeline";
 
-const mocks = vi.hoisted(() => ({
+const mocks = hoisted(() => ({
   uploadOptions: [] as unknown[],
 }));
 
-vi.mock("@/hooks/useUploadFile", () => ({
+mockModule("@/hooks/useUploadFile", () => ({
   useUploadFile: (options?: unknown) => {
     mocks.uploadOptions.push(options);
     return {
-      mutateAsync: vi.fn(),
+      mutateAsync: mockFn(),
       isPending: false,
     };
   },
 }));
 
-vi.mock("@/hooks/useCurrentUser", () => ({
+mockModule("@/hooks/useCurrentUser", () => ({
   useCurrentUser: () => ({
     user: {
       pubkey: "operator-pubkey",
-      signer: { signEvent: vi.fn() },
+      signer: { signEvent: mockFn() },
     },
   }),
 }));
 
-vi.mock("@/hooks/usePpqAccount", () => ({
+mockModule("@/hooks/usePpqAccount", () => ({
   usePpqAccount: () => ({
     account: { api_key: "ppq_test", credit_id: "credit" },
-    ensureAccount: vi.fn(),
+    ensureAccount: mockFn(),
   }),
 }));
 
-vi.mock("./usePersonaPublish", () => ({
+mockModule("./usePersonaPublish", () => ({
   usePersonaPublish: () => ({
-    mutateAsync: vi.fn(),
+    mutateAsync: mockFn(),
     isPending: false,
   }),
 }));
 
-vi.mock("@/hooks/useToast", () => ({
-  useToast: () => ({ toast: vi.fn() }),
+mockModule("@/hooks/useToast", () => ({
+  useToast: () => ({ toast: mockFn() }),
 }));
 
 let queryClient: QueryClient;

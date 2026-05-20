@@ -76,13 +76,11 @@ export function BlossomServerListManager() {
   // NostrSync writes a freshly-pulled kind 10063 into config or
   // when the user changes (we reset to defaults on user change).
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setServers(config.blossomServerMetadata.servers);
   }, [config.blossomServerMetadata.servers]);
 
   const persist = (next: string[]) => {
     // Event-handler context, not render — Date.now() is safe.
-    // eslint-disable-next-line react-hooks/purity
     const now = Math.floor(Date.now() / 1000);
     updateConfig((current) => ({
       ...current,

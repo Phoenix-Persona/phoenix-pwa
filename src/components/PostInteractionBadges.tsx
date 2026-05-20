@@ -16,7 +16,7 @@ import {
   extractZapperPubkey,
   formatSatsCompact,
 } from "@/lib/postInteractions";
-import { sanitizeHttpUrl } from "@/lib/url";
+import { sanitizeHttpsUrl } from "@/lib/url";
 import { cn } from "@/lib/utils";
 
 const LIST_LIMIT = 20;
@@ -182,7 +182,7 @@ function AuthorChip({ pubkey }: { pubkey: string }) {
   const author = useAuthor(pubkey);
   const meta = author.data?.metadata;
   const displayName = meta?.display_name ?? meta?.name ?? genUserName(pubkey);
-  const picture = sanitizeHttpUrl(meta?.picture);
+  const picture = sanitizeHttpsUrl(meta?.picture);
   return (
     <div className="flex items-center gap-2 min-w-0">
       <Avatar className="size-6 shrink-0">

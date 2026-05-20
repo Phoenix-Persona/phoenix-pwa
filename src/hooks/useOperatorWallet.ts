@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { readEnv } from "@/lib/env";
+import { readDevEnv } from "@/lib/env";
 import { DEFAULT_AUTO_TOPUP_CONFIG } from "@/lib/wallet/types";
 
 import { useCurrentUser } from "./useCurrentUser";
@@ -11,9 +11,9 @@ import { useWallet } from "./useWallet";
  * The operator's Spark wallet, ready to use.
  *
  * Connects eagerly the moment a seed is available — either from the
- * `VITE_WALLET_SEED` env override or the decrypted operator envelope —
- * so the header `<WalletBadge>` shows a live balance instead of a
- * placeholder. The SDK handle is keyed by user pubkey so two
+ * dev-only `VITE_WALLET_SEED` env override or the decrypted operator
+ * envelope — so the header `<WalletBadge>` shows a live balance instead
+ * of a placeholder. The SDK handle is keyed by user pubkey so two
  * operators on the same browser don't collide.
  *
  * **Eager connect is intentional.** AppHeader mounts once at the React
@@ -30,7 +30,8 @@ import { useWallet } from "./useWallet";
 export function useOperatorWallet() {
   const { user } = useCurrentUser();
   const operator = useOperatorEnvelope();
-  const seed = readEnv("VITE_WALLET_SEED") ?? operator.envelope?.wallet?.seed;
+  const seed =
+    readDevEnv("VITE_WALLET_SEED") ?? operator.envelope?.wallet?.seed;
   const autoTopup = useMemo(
     () => ({
       ...DEFAULT_AUTO_TOPUP_CONFIG,

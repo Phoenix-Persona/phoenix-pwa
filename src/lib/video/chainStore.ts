@@ -24,6 +24,7 @@ import type { ScriptSegment } from "./generateMonologueScript";
 const DB_NAME = "phoenix-video-chain";
 const DB_VERSION = 1;
 const STORE = "chains";
+export const VIDEO_CHAIN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface StoredClip {
   id: string;
@@ -171,13 +172,25 @@ export async function deleteChain(chainId: string): Promise<void> {
   }
 }
 
+export async function clearAllVideoChains(): Promise<void> {
+  try {
+    await withStore("readwrite", (s) => s.clear() as IDBRequest<void>);
+  } catch (err) {
+    vwarn("chainStore", "clearAllVideoChains failed (non-fatal):", err);
+  }
+}
+
 export async function listChains(): Promise<ChainSummary[]> {
   try {
     const all = await withStore<ChainRecord[]>(
       "readonly",
       (s) => s.getAll() as IDBRequest<ChainRecord[]>,
     );
-    return all
+    const cutoff = Date.now() - VIDEO_CHAIN_TTL_MS;
+    const active = all.filter((r) => r.updatedAt >= cutoff);
+    const expired = all.filter((r) => r.updatedAt < cutoff);
+    void Promise.all(expired.map((r) => deleteChain(r.chainId)));
+    return active
       .map<ChainSummary>((r) => ({
         chainId: r.chainId,
         updatedAt: r.updatedAt,

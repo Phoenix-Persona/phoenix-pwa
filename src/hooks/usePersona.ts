@@ -24,47 +24,31 @@
  * signer). Both outcomes are stable across the session.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNostr } from "@nostrify/react";
 import type { NostrEvent } from "@nostrify/nostrify";
-import { nip19 } from "nostr-tools";
 
-import {
-  PERSONA_KIND,
-  isCandidatePersonaEvent,
-  type PhoenixEnvelope,
-} from "@/lib/persona";
-import {
-  tryDecryptPhoenixEnvelope,
-  type Nip44Signer,
-} from "@/lib/personaCrypto";
+import type { PhoenixEnvelope } from "@/lib/persona";
+import type { Nip44Signer } from "@/lib/personaCrypto";
 import { npubToHex } from "@/lib/nostrIds";
+import { withNostrQueryTimeout } from "@/lib/nostrQuery";
 import { queryKeys } from "@/lib/queryKeys";
+import {
+  classifyEncryptedAppDataEvents,
+  classifyEncryptedAppDataEvent,
+  clearEncryptedAppDataDecryptCache,
+  operatorEncryptedAppDataQuery,
+} from "./useEncryptedAppData";
 import { useCurrentUser } from "./useCurrentUser";
 
-// Module-level cache. Lives for the duration of the page session.
-// Keyed by event.id (sha256 of the canonical event, immutable).
-type CacheEntry = PhoenixEnvelope | "not-phoenix";
-const decryptCache = new Map<string, CacheEntry>();
+const PERSONA_PUBLIC_QUERY_TIMEOUT_MS = 3000;
 
-/** Test-only: allow the cache to be cleared between tests. */
-export function __clearPersonaDecryptCache(): void {
-  decryptCache.clear();
+export function clearPersonaDecryptCache(): void {
+  clearEncryptedAppDataDecryptCache();
 }
 
-async function decryptWithCache(
-  ev: NostrEvent,
-  userPubkey: string,
-  signer: Nip44Signer
-): Promise<PhoenixEnvelope | null> {
-  const cached = decryptCache.get(ev.id);
-  if (cached !== undefined) {
-    return cached === "not-phoenix" ? null : cached;
-  }
-  const env = await tryDecryptPhoenixEnvelope(ev.content, userPubkey, signer);
-  decryptCache.set(ev.id, env ?? "not-phoenix");
-  return env;
-}
+/** Test-only backwards-compatible alias. */
+export const __clearPersonaDecryptCache = clearPersonaDecryptCache;
 
 /**
  * Look up a single persona by persona npub. Walks the user's kind
@@ -74,6 +58,7 @@ async function decryptWithCache(
 export function usePersona(npub: string | undefined) {
   const { nostr } = useNostr();
   const { user } = useCurrentUser();
+  const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: queryKeys.persona.detail(npub, user?.pubkey),
@@ -85,39 +70,25 @@ export function usePersona(npub: string | undefined) {
       const personaHex = npubToHex(npub);
       if (!personaHex) throw new Error("Invalid npub");
 
-      // Pull every kind 30078 the user has authored. We can't filter
-      // by anything Phoenix-specific because that would leak app usage.
-      const events = await nostr.query(
-        [
-          {
-            kinds: [PERSONA_KIND],
-            authors: [user.pubkey],
-            limit: 200,
-          },
-        ],
-        { signal: c.signal }
+      const events = await queryClient.fetchQuery(
+        operatorEncryptedAppDataQuery(nostr, user.pubkey),
       );
 
       const signer = user.signer as unknown as Nip44Signer;
 
-      // Newest first — addressable events de-duplicate by latest created_at.
-      const sorted = [...events].sort((a, b) => b.created_at - a.created_at);
-
-      // Track the latest encrypted-blob per d-tag so we don't waste
-      // decrypt cycles on stale revisions.
-      const latestPerD = new Map<string, NostrEvent>();
-      for (const ev of sorted) {
-        if (!isCandidatePersonaEvent(ev)) continue;
-        const d = ev.tags.find(([n]) => n === "d")?.[1];
-        if (!d) continue;
-        if (!latestPerD.has(d)) latestPerD.set(d, ev);
-      }
-
-      for (const ev of latestPerD.values()) {
-        const env = await decryptWithCache(ev, ev.pubkey, signer);
-        if (!env) continue;
-        if (env.persona.pubkey.toLowerCase() === personaHex.toLowerCase()) {
-          return { event: ev, envelope: env };
+      for (const ev of events) {
+        if (c.signal.aborted) return null;
+        const classified = await classifyEncryptedAppDataEvent(
+          ev,
+          user.pubkey,
+          signer,
+        );
+        if (classified.type !== "persona") continue;
+        if (
+          classified.envelope.persona.pubkey.toLowerCase() ===
+          personaHex.toLowerCase()
+        ) {
+          return { event: ev, envelope: classified.envelope };
         }
       }
 
@@ -134,6 +105,7 @@ export function usePersona(npub: string | undefined) {
 export function useMyPersonas() {
   const { nostr } = useNostr();
   const { user } = useCurrentUser();
+  const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: queryKeys.persona.mine(user?.pubkey),
@@ -141,28 +113,9 @@ export function useMyPersonas() {
     queryFn: async (c) => {
       if (!user) return [];
 
-      const events = await nostr.query(
-        [
-          {
-            kinds: [PERSONA_KIND],
-            authors: [user.pubkey],
-            limit: 200,
-          },
-        ],
-        { signal: c.signal }
+      const events = await queryClient.fetchQuery(
+        operatorEncryptedAppDataQuery(nostr, user.pubkey),
       );
-
-      // Latest revision per d-tag.
-      const latestPerD = new Map<string, NostrEvent>();
-      for (const ev of events) {
-        if (!isCandidatePersonaEvent(ev)) continue;
-        const d = ev.tags.find(([n]) => n === "d")?.[1];
-        if (!d) continue;
-        const existing = latestPerD.get(d);
-        if (!existing || existing.created_at < ev.created_at) {
-          latestPerD.set(d, ev);
-        }
-      }
 
       const signer = user.signer as unknown as Nip44Signer;
       const decrypted: Array<{
@@ -171,13 +124,19 @@ export function useMyPersonas() {
         npub: string;
       }> = [];
 
-      for (const ev of latestPerD.values()) {
-        const env = await decryptWithCache(ev, ev.pubkey, signer);
-        if (!env) continue;
+      const classifiedEvents = await classifyEncryptedAppDataEvents(
+        events,
+        user.pubkey,
+        signer,
+        { signal: c.signal },
+      );
+
+      for (const classified of classifiedEvents) {
+        if (classified.type !== "persona") continue;
         decrypted.push({
-          event: ev,
-          envelope: env,
-          npub: nip19.npubEncode(env.persona.pubkey),
+          event: classified.event,
+          envelope: classified.envelope,
+          npub: classified.npub,
         });
       }
 
@@ -224,7 +183,7 @@ export function usePersonaActivityStats(pubkeys: string[] | undefined) {
             limit: Math.min(500, sorted.length * 100),
           },
         ],
-        { signal: c.signal }
+        { signal: withNostrQueryTimeout(c.signal, PERSONA_PUBLIC_QUERY_TIMEOUT_MS) }
       );
 
       for (const ev of events) {
@@ -277,7 +236,7 @@ export function usePersonaPosts(npub: string | undefined, limit = 50) {
             limit,
           },
         ],
-        { signal: c.signal }
+        { signal: withNostrQueryTimeout(c.signal, PERSONA_PUBLIC_QUERY_TIMEOUT_MS) }
       );
 
       return events.sort((a, b) => b.created_at - a.created_at);

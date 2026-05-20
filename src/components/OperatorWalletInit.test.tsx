@@ -8,33 +8,38 @@
  */
 
 import { render } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, mockFn, hoisted, mockModule, clearAllMocks } from "@/test/api";
 
 import { OperatorWalletInit } from "./OperatorWalletInit";
 
-const mocks = vi.hoisted(() => ({
-  useCurrentUser: vi.fn(),
-  useOperatorEnvelope: vi.fn(),
-  readEnv: vi.fn(),
+const mocks = hoisted(() => ({
+  useCurrentUser: mockFn(),
+  useOperatorEnvelope: mockFn(),
+  readEnv: mockFn(),
+  readDevEnv: mockFn(),
 }));
 
-vi.mock("@/hooks/useCurrentUser", () => ({
+mockModule("@/hooks/useCurrentUser", () => ({
   useCurrentUser: mocks.useCurrentUser,
 }));
 
-vi.mock("@/hooks/useOperatorEnvelope", () => ({
+mockModule("@/hooks/useOperatorEnvelope", () => ({
   useOperatorEnvelope: mocks.useOperatorEnvelope,
 }));
 
-vi.mock("@/lib/env", () => ({
+mockModule("@/lib/env", () => ({
   readEnv: mocks.readEnv,
+  readDevEnv: mocks.readDevEnv,
 }));
 
 interface FakeEnvelopeState {
-  envelope?: unknown;
+  envelope?: {
+    wallet?: { kind: "spark"; seed: string };
+    ppq?: { api_key: string; credit_id: string };
+  };
   isLoading: boolean;
   isMinting: boolean;
-  mint: ReturnType<typeof vi.fn>;
+  mint: ReturnType<typeof mockFn>;
 }
 
 function setupEnvelope(overrides: Partial<FakeEnvelopeState> = {}): FakeEnvelopeState {
@@ -42,7 +47,7 @@ function setupEnvelope(overrides: Partial<FakeEnvelopeState> = {}): FakeEnvelope
     envelope: undefined,
     isLoading: false,
     isMinting: false,
-    mint: vi.fn().mockRejectedValue(new Error("signer rejected")),
+    mint: mockFn().mockRejectedValue(new Error("signer rejected")),
     ...overrides,
   };
   mocks.useOperatorEnvelope.mockReturnValue(state);
@@ -52,13 +57,14 @@ function setupEnvelope(overrides: Partial<FakeEnvelopeState> = {}): FakeEnvelope
 describe("OperatorWalletInit", () => {
   beforeEach(() => {
     mocks.readEnv.mockReturnValue(undefined);
+    mocks.readDevEnv.mockReturnValue(undefined);
     mocks.useCurrentUser.mockReturnValue({
       user: { pubkey: "operator-pubkey" },
     });
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    clearAllMocks();
   });
 
   it("calls mint exactly once when the user is logged in and no envelope exists", async () => {
@@ -94,15 +100,31 @@ describe("OperatorWalletInit", () => {
     expect(env.mint).toHaveBeenCalledTimes(1);
   });
 
-  it("does not mint when an existing envelope is already present", async () => {
+  it("does not mint when an existing envelope already has a wallet", async () => {
     const env = setupEnvelope({
-      envelope: { app: "phoenix-operator", version: 1 },
+      envelope: {
+        wallet: { kind: "spark", seed: "operator seed words" },
+      },
     });
 
     render(<OperatorWalletInit />);
     await Promise.resolve();
 
     expect(env.mint).not.toHaveBeenCalled();
+  });
+
+  it("mints a wallet when an existing envelope has no wallet seed", async () => {
+    const ppq = { api_key: "api-existing", credit_id: "credit-existing" };
+    const env = setupEnvelope({
+      envelope: { ppq },
+    });
+
+    render(<OperatorWalletInit />);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(env.mint).toHaveBeenCalledTimes(1);
+    expect(env.mint).toHaveBeenCalledWith({ ppq });
   });
 
   it("does not mint while the envelope query is still loading", async () => {
@@ -115,7 +137,7 @@ describe("OperatorWalletInit", () => {
   });
 
   it("does not mint when the env override is complete", async () => {
-    mocks.readEnv.mockImplementation((key: string) => {
+    mocks.readDevEnv.mockImplementation((key: string) => {
       if (key === "VITE_WALLET_SEED") return "env seed";
       if (key === "VITE_PPQ_API_KEY") return "env api key";
       return undefined;
@@ -126,6 +148,22 @@ describe("OperatorWalletInit", () => {
     await Promise.resolve();
 
     expect(env.mint).not.toHaveBeenCalled();
+  });
+
+  it("ignores production env pins and still mints a missing operator envelope", async () => {
+    mocks.readEnv.mockImplementation((key: string) => {
+      if (key === "VITE_WALLET_SEED") return "production env seed";
+      if (key === "VITE_PPQ_API_KEY") return "production env api key";
+      return undefined;
+    });
+    mocks.readDevEnv.mockReturnValue(undefined);
+    const env = setupEnvelope();
+
+    render(<OperatorWalletInit />);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(env.mint).toHaveBeenCalledTimes(1);
   });
 
   it("does not mint when no user is logged in", async () => {

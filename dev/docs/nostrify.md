@@ -59,8 +59,8 @@ const plaintext  = await signer.nip44!.decrypt(personaPubkey, ciphertext);
 For Zuka, the persona's backup is encrypted to its **own** pubkey:
 `signer.nip44.encrypt(await signer.getPublicKey(), backupJson)`.
 
-`NConnectSigner` (NIP-46 remote signer) is the V2 stretch goal in PROJECT.md
-§8.
+`NConnectSigner` (NIP-46 remote signer) is supported through login flows where
+available; review current source before changing signer handling.
 
 ## Relays
 
@@ -123,8 +123,9 @@ import { NostrLoginProvider } from '@nostrify/react/login';
 </NostrLoginProvider>
 ```
 
-`storageKey` is the `localStorage` key. Zuka uses this for the
-multi-persona switcher (`LoginArea` / `AccountSwitcher`).
+`storageKey` names the login storage record. Zuka passes an in-memory storage
+adapter, so active Nostr login state is not persisted to localStorage.
+`LoginArea` / `AccountSwitcher` switch operator accounts.
 
 ### Hooks already in the scaffold
 
@@ -136,9 +137,9 @@ Authoritative source is the file itself.
 | `useNostr`            | `src/hooks/useNostr.ts`             | Get pool/relay from context              |
 | `useNostrPublish`     | `src/hooks/useNostrPublish.ts`      | Publish kind 0/1/30078 (auto-tags `client`) |
 | `useAuthor`           | `src/hooks/useAuthor.ts`            | Resolve pubkey → kind 0 metadata         |
-| `useCurrentUser`      | `src/hooks/useCurrentUser.ts`       | Active persona                           |
-| `useLoggedInAccounts` | `src/hooks/useLoggedInAccounts.ts`  | List + switch personas                   |
-| `useLoginActions`     | `src/hooks/useLoginActions.ts`      | Add / remove personas                    |
+| `useCurrentUser`      | `src/hooks/useCurrentUser.ts`       | Active operator                          |
+| `useLoggedInAccounts` | `src/hooks/useLoggedInAccounts.ts`  | List + switch operator accounts          |
+| `useLoginActions`     | `src/hooks/useLoginActions.ts`      | Add / remove operator accounts           |
 | `useUploadFile`       | `src/hooks/useUploadFile.ts`        | Blossom upload                           |
 
 `useNostrLogin` from `@nostrify/react/login` is the lower-level primitive
@@ -146,18 +147,19 @@ those `useLoggedInAccounts` / `useLoginActions` build on.
 
 ## Zuka-specific notes
 
-- **Persona backups (kind 30078)**: NIP-44-encrypt to the **user's own
-  pubkey** (not the persona's) with `signer.nip44.encrypt`, set `d` tag
+- **Persona backups (kind 30078)**: NIP-44-encrypt to the **operator's own
+  pubkey** with `signer.nip44.encrypt`, set `d` tag
   to an opaque random UUID **stable per persona** (generated once at
   creation, stored as `persona.dTag`, reused on every update — no `t`,
   `alt`, or other tags) so a Zuka backup is externally indistinguishable
   from any other app's encrypted-app-data event. Discovery is
-  scan-and-decrypt over the user's own kind-30078 events. See
-  PROJECT.md §5.2.
+  scan-and-decrypt over the operator's own kind-30078 events. See
+  `docs/PERSONA-SCHEMA.md`.
 - **NIP-49 (ncryptsec)** for at-rest local nsec: `nostr-tools` provides
   this. Signer construction happens after the user unlocks.
-- **Auto-`client` tag**: `useNostrPublish` adds `["client", "phoenix"]`
-  per PROJECT.md §5.3.
+- **Auto-`client` tag**: `useNostrPublish` is for operator-authored events.
+  Persona-authored posts use `usePersonaPublish` and do not add app-identifying
+  tags.
 
 ## Source
 
@@ -167,4 +169,5 @@ those `useLoggedInAccounts` / `useLoginActions` build on.
   authoritative API reference
 - Existing scaffold: `src/components/{NostrProvider,NostrSync,auth/*}.tsx`,
   `src/hooks/*`
-- PROJECT.md §4 (architecture), §5 (event schema), §11 (file plan)
+- `docs/ARCHITECTURE.md`
+- `docs/PERSONA-SCHEMA.md`

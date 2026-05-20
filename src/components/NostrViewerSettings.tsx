@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import {
   buildEventUrl,
   findPresetByUrl,
   NOSTR_VIEWER_PRESETS,
+  sanitizeNostrViewerUrlPrefix,
 } from "@/lib/nostrViewer";
 
 const CUSTOM_OPTION_VALUE = "__custom__";
@@ -21,6 +22,8 @@ const SAMPLE_NEVENT = "nevent1qqsexample…";
 
 export function NostrViewerSettings() {
   const { viewerUrl, setViewerUrl } = useNostrViewer();
+  const [customDraft, setCustomDraft] = useState(viewerUrl);
+  const [customError, setCustomError] = useState<string | null>(null);
   const activePreset = findPresetByUrl(viewerUrl);
   const selectValue = activePreset?.id ?? CUSTOM_OPTION_VALUE;
   const isCustom = !activePreset;
@@ -32,11 +35,30 @@ export function NostrViewerSettings() {
 
   function handleSelect(value: string) {
     if (value === CUSTOM_OPTION_VALUE) {
-      if (!isCustom) setViewerUrl("");
+      if (!isCustom) {
+        setCustomDraft("");
+        setCustomError(null);
+        setViewerUrl("");
+      }
       return;
     }
     const preset = NOSTR_VIEWER_PRESETS.find((p) => p.id === value);
-    if (preset) setViewerUrl(preset.urlPrefix);
+    if (preset) {
+      setCustomDraft(preset.urlPrefix);
+      setCustomError(null);
+      setViewerUrl(preset.urlPrefix);
+    }
+  }
+
+  function handleCustomChange(value: string) {
+    setCustomDraft(value);
+    const safe = sanitizeNostrViewerUrlPrefix(value);
+    if (!safe) {
+      setCustomError("Use a valid https:// URL.");
+      return;
+    }
+    setCustomError(null);
+    setViewerUrl(safe);
   }
 
   return (
@@ -70,10 +92,15 @@ export function NostrViewerSettings() {
             type="url"
             inputMode="url"
             placeholder="https://your-viewer.example/"
-            value={viewerUrl}
-            onChange={(e) => setViewerUrl(e.target.value)}
+            value={customDraft}
+            onChange={(e) => handleCustomChange(e.target.value)}
             className="bg-background/60"
           />
+          {customError && (
+            <p className="sm:col-start-2 text-xs text-destructive">
+              {customError}
+            </p>
+          )}
         </div>
       )}
 

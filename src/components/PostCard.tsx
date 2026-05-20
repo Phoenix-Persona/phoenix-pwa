@@ -206,13 +206,13 @@ export function PostCard({ event, className }: PostCardProps) {
             >
               {copied ? (
                 <>
-                  <Check className="mr-1.5 size-3" aria-hidden="true" />
                   Copied
+                  <Check className="ml-1.5 size-3" aria-hidden="true" />
                 </>
               ) : (
                 <>
-                  <Copy className="mr-1.5 size-3" aria-hidden="true" />
                   Copy
+                  <Copy className="ml-1.5 size-3" aria-hidden="true" />
                 </>
               )}
             </Button>

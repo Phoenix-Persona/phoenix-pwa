@@ -1,14 +1,14 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import { DashboardComposerCard } from "./DashboardComposerCard";
 import type { Persona } from "@/lib/persona";
 
-const mocks = vi.hoisted(() => ({
-  inferenceMutateAsync: vi.fn(),
+const mocks = hoisted(() => ({
+  inferenceMutateAsync: mockFn(),
 }));
 
-vi.mock("@/hooks/usePpqInference", async (importOriginal) => {
+mockModule("@/hooks/usePpqInference", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/hooks/usePpqInference")>();
   return {
     ...actual,
@@ -19,7 +19,7 @@ vi.mock("@/hooks/usePpqInference", async (importOriginal) => {
   };
 });
 
-vi.mock("@/components/persona/ResearchPanel", () => ({
+mockModule("@/components/persona/ResearchPanel", () => ({
   ResearchPanel: () => null,
 }));
 
@@ -37,16 +37,16 @@ function renderComposer(overrides: Partial<Parameters<typeof DashboardComposerCa
     walletSeed: "seed words",
     isPublishing: false,
     isStyling: false,
-    onRawChange: vi.fn(),
-    onSourcesInputChange: vi.fn(),
-    onHintsInputChange: vi.fn(),
-    onDiscard: vi.fn(),
-    onStyle: vi.fn(),
-    onOpenPostWizard: vi.fn(),
-    onPost: vi.fn(),
-    onOpenVideo: vi.fn(),
-    onAppendSource: vi.fn(),
-    onAppendIdea: vi.fn(),
+    onRawChange: mockFn(),
+    onSourcesInputChange: mockFn(),
+    onHintsInputChange: mockFn(),
+    onDiscard: mockFn(),
+    onStyle: mockFn(),
+    onOpenPostWizard: mockFn(),
+    onPost: mockFn(),
+    onOpenVideo: mockFn(),
+    onAppendSource: mockFn(),
+    onAppendIdea: mockFn(),
     ...overrides,
   };
 
@@ -183,5 +183,37 @@ describe("DashboardComposerCard", () => {
     fireEvent.click(screen.getByRole("button", { name: /replace field/i }));
 
     expect(props.onRawChange).toHaveBeenCalledWith("Generated video brief");
+  });
+
+  it("disables discard when the composer has no draft fields to clear", () => {
+    renderComposer({ raw: "", sourcesInput: "", hintsInput: "" });
+
+    expect(screen.getByRole("button", { name: /^discard$/i })).toHaveAttribute(
+      "disabled",
+    );
+  });
+
+  it("highlights Publish instead of Style in voice on the post tab", () => {
+    renderComposer();
+
+    expect(screen.getByRole("button", { name: /style in voice/i })).toHaveClass(
+      "border",
+    );
+    expect(screen.getByRole("button", { name: /^publish$/i })).toHaveClass(
+      "shadow-primary/20",
+    );
+  });
+
+  it("highlights Generate video instead of Style in voice on the video tab", () => {
+    renderComposer();
+
+    openVideoTab();
+
+    expect(screen.getByRole("button", { name: /style in voice/i })).toHaveClass(
+      "border",
+    );
+    expect(screen.getByRole("button", { name: /generate video/i })).toHaveClass(
+      "shadow-primary/20",
+    );
   });
 });

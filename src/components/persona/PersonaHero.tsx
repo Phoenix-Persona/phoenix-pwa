@@ -4,7 +4,7 @@ import { FlagStripe, ImigongoSeal } from "@/components/ImigongoBand";
 import { cn } from "@/lib/utils";
 
 export interface PersonaHeroProps {
-  eyebrow: string;
+  eyebrow?: string;
   name: string;
   bio?: string;
   pictureUrl: string | null;
@@ -79,10 +79,12 @@ export function PersonaHero({
           </div>
 
           <div className="flex-1 min-w-0 space-y-3">
-            <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
-              <span className="h-px w-6 bg-rw-gold" />
-              {eyebrow}
-            </p>
+            {eyebrow ? (
+              <p className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-rw-gold font-semibold">
+                <span className="h-px w-6 bg-rw-gold" />
+                {eyebrow}
+              </p>
+            ) : null}
             <h1 className="font-display text-3xl md:text-5xl font-medium tracking-tight leading-tight">
               {name}
             </h1>

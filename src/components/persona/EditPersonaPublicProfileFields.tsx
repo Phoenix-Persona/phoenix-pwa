@@ -1,13 +1,19 @@
 import type { NostrSigner } from "@nostrify/types";
 
+import { AiAssistButton } from "@/components/AiAssistField";
 import { PersonaPictureField } from "@/components/PersonaPictureField";
+import type { PpqAccountOptions } from "@/hooks/usePpqAccount";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { SPARK_LN_DOMAIN } from "@/lib/wallet/lightningAddress";
 
 export interface EditPersonaPublicProfileFieldsProps {
   bio: string;
   pictureUrl: string;
   name: string;
+  username: string;
+  lightningUsername: string;
+  systemPrompt: string;
   loadingBio: boolean;
   onBioChange: (value: string) => void;
   onPictureUrlChange: (value: string) => void;
@@ -26,23 +32,47 @@ export interface EditPersonaPublicProfileFieldsProps {
   pictureSigner: NostrSigner;
   /** Optional persona-specific Blossom server override. */
   pictureBlossomServers?: string[];
+  ppqAccountOptions?: PpqAccountOptions;
 }
 
 export function EditPersonaPublicProfileFields({
   bio,
   pictureUrl,
   name,
+  username,
+  lightningUsername,
+  systemPrompt,
   loadingBio,
   onBioChange,
   onPictureUrlChange,
   allowFreeFallback = false,
   pictureSigner,
   pictureBlossomServers,
+  ppqAccountOptions,
 }: EditPersonaPublicProfileFieldsProps) {
   return (
     <>
       <div className="space-y-2">
-        <Label htmlFor="edit-bio">Bio (public profile)</Label>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Label htmlFor="edit-bio">Bio (public profile)</Label>
+          <AiAssistButton
+            fieldLabel="Bio"
+            fieldPurpose="A concise public Nostr profile bio for the persona."
+            currentValue={bio}
+            surroundingContext={[
+              `Display name: ${fieldContextValue(name)}`,
+              `Username: ${fieldContextValue(username)}`,
+              `Lightning address: ${
+                lightningUsername
+                  ? `${lightningUsername}@${SPARK_LN_DOMAIN}`
+                  : "(empty)"
+              }`,
+              `Current system prompt: ${fieldContextValue(systemPrompt)}`,
+            ]}
+            onReplace={onBioChange}
+            ppqAccountOptions={ppqAccountOptions}
+          />
+        </div>
         <Textarea
           id="edit-bio"
           rows={2}
@@ -65,8 +95,13 @@ export function EditPersonaPublicProfileFields({
           allowFreeFallback={allowFreeFallback}
           signer={pictureSigner}
           blossomServers={pictureBlossomServers}
+          ppqAccountOptions={ppqAccountOptions}
         />
       </div>
     </>
   );
+}
+
+function fieldContextValue(value: string): string {
+  return value.trim() || "(empty)";
 }

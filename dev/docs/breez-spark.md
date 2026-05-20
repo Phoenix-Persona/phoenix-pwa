@@ -1,13 +1,9 @@
 # Breez SDK (Spark)
 
 `@breeztech/breez-sdk-spark` — Breez's wrapping of Lightspark's Spark
-protocol. Zuka gives **each persona its own wallet**, with the
-BIP-39 seed living only inside the encrypted kind 30078 backup
-(PROJECT.md §5.2, §7.1).
-
-> Wallet SDK is **locked** to Breez Spark per `dev/PROJECT.md` §10.
-> The `jc/add-spark-wallet` branch already has a working headless
-> implementation under `src/lib/wallet/`.
+protocol. Zuka gives each persona its own wallet, with the BIP-39 seed living
+inside the encrypted persona kind 30078 backup. Zuka also uses an independent
+operator wallet stored in the encrypted operator envelope.
 
 ## Install
 
@@ -17,11 +13,11 @@ npm install @breeztech/breez-sdk-spark
 
 - **Web**: WASM bundle. Requires `await init()` once at app boot
   before any other SDK call. See `src/lib/wallet/init.ts:ensureWalletReady()`
-  on the spark branch — it's an idempotent helper.
+  for the idempotent helper.
 - **Node** (≥22): default export is a no-op; `ensureWalletReady()`
   treats that case correctly.
 - **API key**: required. Configure via `import.meta.env.VITE_BREEZ_API_KEY`
-  (Vite-loaded from `.env`); pass explicitly when calling from
+  (injected by the esbuild env helper from `.env`); pass explicitly when calling from
   Node integration tests.
 
 ## Connect with a mnemonic
@@ -37,9 +33,8 @@ const sdk = await connect({ mnemonic, config })
 await sdk.disconnect()
 ```
 
-In Zuka, the BIP-39 mnemonic is loaded from the decrypted kind
-30078 backup at persona-switch time and held only in memory while the
-persona is active.
+In Zuka, persona BIP-39 mnemonics are loaded from decrypted kind 30078 backups
+and held only in memory while active.
 
 ## Hosted Lightning Address (no Zuka-side server)
 
@@ -89,10 +84,9 @@ NWC. Zuka wires this once at persona creation by handing PPQ an
 NWC URL exposed by the Spark wallet — PPQ then pulls credit
 on-demand whenever the balance dips below a configured threshold. The
 end-to-end flow is exercised in
-`tests/wallet/test-auto-topup-and-inference.ts` on the
-`jc/add-spark-wallet` branch.
+`test/manual/wallet/test-auto-topup-and-inference.ts`.
 
-## Zuka integration points (per `jc/add-spark-wallet`)
+## Zuka integration points
 
 | Where                                    | What                                              |
 | ---------------------------------------- | ------------------------------------------------- |
@@ -101,7 +95,7 @@ end-to-end flow is exercised in
 | `src/lib/wallet/types.ts`                | Re-exports SDK types + Zuka `WalletInfo`       |
 | `src/lib/wallet/autoTopup.ts`            | NWC auto-topup wiring for PPQ credits             |
 | `src/hooks/useWallet.ts`                 | TanStack Query bindings: balance, send, receive   |
-| `src/components/Wallet*.tsx` (TBD)       | Wallet UI panel                                   |
+| `src/components/wallet/*.tsx`            | Wallet UI panel                                   |
 | Persona creation                         | Generate seed → `registerLightningAddress` → store seed + address in kind 30078 |
 | PPQ payment flow                         | NWC URL exposed; PPQ pulls credit on demand       |
 
@@ -123,5 +117,6 @@ interface WalletInfo {
 - `sdk-doc-spark.breez.technology` — full guide (lightning-address
   registration is at `/guide/receive_lnurl_pay.html`)
 - `github.com/breez/spark-sdk` — repo
-- `src/lib/wallet/*` on `jc/add-spark-wallet` — reference implementation
-- `dev/PROJECT.md` §7 (wallet & economics), §10 (resolved items)
+- `src/lib/wallet/*`
+- `docs/DATA-FLOW.md`
+- `docs/PERSONA-SCHEMA.md`

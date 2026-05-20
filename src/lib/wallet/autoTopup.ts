@@ -204,7 +204,7 @@ async function payPpqTopupInvoice({
       throw new WalletError(
         `Spark wallet rejected the payment: insufficient funds for the ` +
           `${requiredSats ?? "(unknown)"}-sat ${label} invoice. Fund the wallet ` +
-          `first via tests/wallet/bootstrap-spark-wallet-e2e.ts → Receive.`,
+          `first via test/manual/wallet/bootstrap-spark-wallet-e2e.ts → Receive.`,
         err,
       );
     }

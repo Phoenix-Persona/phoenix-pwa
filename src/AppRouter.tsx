@@ -1,18 +1,21 @@
+import { lazy } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { DeepLinkHandler } from "./components/DeepLinkHandler";
 
-import Index from "./pages/Index";
-import Onboard from "./pages/Onboard";
-import Dashboard from "./pages/Dashboard";
-import EditPersona from "./pages/EditPersona";
-import MyPersonas from "./pages/MyPersonas";
-import PersonaFeed from "./pages/PersonaFeed";
-import Settings from "./pages/Settings";
-import { NIP19Page } from "./pages/NIP19Page";
-import NotFound from "./pages/NotFound";
-import WalletHarness from "./dev/WalletHarness";
-import InferencePayHarness from "./dev/InferencePayHarness";
+const Index = lazy(() => import("./pages/Index"));
+const Onboard = lazy(() => import("./pages/Onboard"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const EditPersona = lazy(() => import("./pages/EditPersona"));
+const MyPersonas = lazy(() => import("./pages/MyPersonas"));
+const PersonaFeed = lazy(() => import("./pages/PersonaFeed"));
+const Settings = lazy(() => import("./pages/Settings"));
+const NIP19Page = lazy(() =>
+  import("./pages/NIP19Page").then((module) => ({ default: module.NIP19Page })),
+);
+const NotFound = lazy(() => import("./pages/NotFound"));
+const WalletHarness = lazy(() => import("./dev/WalletHarness"));
+const InferencePayHarness = lazy(() => import("./dev/InferencePayHarness"));
 
 export function AppRouter() {
   return (

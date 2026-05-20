@@ -1,65 +1,61 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import Onboard from "./Onboard";
 
-const mocks = vi.hoisted(() => ({
-  navigate: vi.fn(),
-  toast: vi.fn(),
-  mutateAsync: vi.fn(),
-  generatePersonaKeypair: vi.fn(),
-  createPersonaSigner: vi.fn(),
-  uploadFileToBlossom: vi.fn(),
-  inferenceMutateAsync: vi.fn(),
+const mocks = hoisted(() => ({
+  navigate: mockFn(),
+  toast: mockFn(),
+  mutateAsync: mockFn(),
+  generatePersonaKeypair: mockFn(),
+  createPersonaSigner: mockFn(),
+  uploadFileToBlossom: mockFn(),
+  inferenceMutateAsync: mockFn(),
   availability: { status: "idle" } as { status: "idle" } | { status: "taken"; username: string },
 }));
 
-vi.mock("@unhead/react", () => ({
-  useSeoMeta: vi.fn(),
-}));
-
-vi.mock("react-router-dom", () => ({
+mockModule("react-router-dom", () => ({
   useNavigate: () => mocks.navigate,
 }));
 
-vi.mock("@/components/AppHeader", () => ({
+mockModule("@/components/AppHeader", () => ({
   AppHeader: () => <header />,
 }));
 
-vi.mock("@/components/ImigongoBand", () => ({
+mockModule("@/components/ImigongoBand", () => ({
   FlagStripe: () => <div />,
   ImigongoSeal: () => <div />,
 }));
 
-vi.mock("@/components/PersonaPictureStager", () => ({
+mockModule("@/components/PersonaPictureStager", () => ({
   PersonaPictureStager: () => <div data-testid="picture-stager" />,
 }));
 
-vi.mock("@/hooks/useToast", () => ({
+mockModule("@/hooks/useToast", () => ({
   useToast: () => ({ toast: mocks.toast }),
 }));
 
-vi.mock("@/hooks/useCurrentUser", () => ({
+mockModule("@/hooks/useCurrentUser", () => ({
   useCurrentUser: () => ({
     user: {
       pubkey: "operator-pubkey",
-      signer: { signEvent: vi.fn() },
+      signer: { signEvent: mockFn() },
     },
   }),
 }));
 
-vi.mock("@/hooks/useCreatePersona", () => ({
+mockModule("@/hooks/useCreatePersona", () => ({
   useCreatePersona: () => ({
     isPending: false,
     mutateAsync: mocks.mutateAsync,
   }),
 }));
 
-vi.mock("@/hooks/useUsernameAvailability", () => ({
+mockModule("@/hooks/useUsernameAvailability", () => ({
   useUsernameAvailability: () => mocks.availability,
 }));
 
-vi.mock("@/hooks/usePpqInference", async (importOriginal) => {
+mockModule("@/hooks/usePpqInference", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/hooks/usePpqInference")>();
   return {
     ...actual,
@@ -70,17 +66,17 @@ vi.mock("@/hooks/usePpqInference", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/personaKey", () => ({
+mockModule("@/lib/personaKey", () => ({
   generatePersonaKeypair: mocks.generatePersonaKeypair,
 }));
 
-vi.mock("@/lib/personaSigner", () => ({
+mockModule("@/lib/personaSigner", () => ({
   createPersonaSigner: mocks.createPersonaSigner,
 }));
 
-vi.mock("@/lib/blossomUpload", () => ({
+mockModule("@/lib/blossomUpload", () => ({
   uploadFileToBlossom: mocks.uploadFileToBlossom,
-  urlFromUploadTags: vi.fn(),
+  urlFromUploadTags: mockFn(),
 }));
 
 function ppqResponse(content: string) {
@@ -125,11 +121,31 @@ describe("Onboard", () => {
     });
   });
 
+  it("starts identity fields blank and derives handles from the display name", () => {
+    render(<Onboard />);
+
+    const name = screen.getByLabelText(/display name/i) as HTMLInputElement;
+    const username = screen.getByLabelText(/^username$/i) as HTMLInputElement;
+    const lightning = screen.getByLabelText(/lightning address/i) as HTMLInputElement;
+
+    expect(name.value).toBe("");
+    expect(username.value).toBe("");
+    expect(lightning.value).toBe("");
+
+    fireEvent.change(name, { target: { value: "Voice of Rwanda" } });
+
+    expect(username.value).toBe("voice-of-rwanda");
+    expect(lightning.value).toBe("voice-of-rwanda");
+  });
+
   it("does not generate the persona keypair until Create is clicked", async () => {
     render(<Onboard />);
 
     expect(mocks.generatePersonaKeypair).not.toHaveBeenCalled();
 
+    fireEvent.change(screen.getByLabelText(/display name/i), {
+      target: { value: "Voice of Rwanda" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /next: profile picture/i }));
 
     expect(mocks.generatePersonaKeypair).not.toHaveBeenCalled();
@@ -167,6 +183,9 @@ describe("Onboard", () => {
   it("does not show a separate skip button on the picture step", () => {
     render(<Onboard />);
 
+    fireEvent.change(screen.getByLabelText(/display name/i), {
+      target: { value: "Voice of Rwanda" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /next: profile picture/i }));
 
     expect(screen.getByRole("button", { name: /create persona/i })).toBeInTheDocument();

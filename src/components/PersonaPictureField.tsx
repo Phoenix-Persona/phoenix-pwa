@@ -27,11 +27,12 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useUploadFile } from "@/hooks/useUploadFile";
 import { usePpqImage } from "@/hooks/usePpqImage";
+import type { PpqAccountOptions } from "@/hooks/usePpqAccount";
 import { useToast } from "@/hooks/useToast";
 import { generatePollinationsImage } from "@/lib/pollinations/client";
 import { PpqError } from "@/lib/ppq/types";
 import { withNoTextOverlay } from "@/lib/visualPromptGuards";
-import { sanitizeHttpUrl } from "@/lib/url";
+import { sanitizeHttpsUrl } from "@/lib/url";
 import { cn } from "@/lib/utils";
 
 interface PersonaPictureFieldProps {
@@ -66,6 +67,7 @@ interface PersonaPictureFieldProps {
    * server preferences.
    */
   blossomServers?: string[];
+  ppqAccountOptions?: PpqAccountOptions;
   className?: string;
 }
 
@@ -73,9 +75,8 @@ interface PersonaPictureFieldProps {
 const DEFAULT_IMAGE_MODEL = "gpt-image-1";
 
 /**
- * Pull the canonical URL out of a Blossom upload result. Nostrify's
- * BlossomUploader returns NIP-94 imeta tags; the first `url` tag is
- * the upload's canonical address.
+ * Pull the canonical URL out of Blossom NIP-94-style upload tags. The
+ * first `url` tag is the upload's canonical address.
  */
 function urlFromUploadTags(tags: string[][]): string | null {
   for (const tag of tags) {
@@ -99,11 +100,12 @@ export function PersonaPictureField({
   allowFreeFallback = false,
   signer,
   blossomServers,
+  ppqAccountOptions,
   className,
 }: PersonaPictureFieldProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const upload = useUploadFile({ signer, blossomServers });
-  const generate = usePpqImage();
+  const generate = usePpqImage(ppqAccountOptions);
   const { toast } = useToast();
 
   const [prompt, setPrompt] = useState(promptHint ?? "");
@@ -244,7 +246,7 @@ export function PersonaPictureField({
   }
 
   const busy = upload.isPending || generating;
-  const previewUrl = sanitizeHttpUrl(value);
+  const previewUrl = sanitizeHttpsUrl(value);
 
   // User-facing label for each stage of the generate pipeline.
   const stageLabel: { button: string; detail: string } = (() => {

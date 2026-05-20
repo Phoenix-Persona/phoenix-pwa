@@ -1,5 +1,5 @@
 /**
- * Send — paste a BOLT11 invoice and pay it from this persona's wallet.
+ * Withdraw — paste a BOLT11 invoice and pay it from this wallet.
  * Used for manual top-ups out (e.g., to fund another persona) or for
  * settling external invoices the persona owes.
  */
@@ -61,9 +61,9 @@ export function SendDialog({ wallet, open, onOpenChange }: SendDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Send sats</DialogTitle>
+          <DialogTitle>Withdraw sats</DialogTitle>
           <DialogDescription>
-            Paste a BOLT11 invoice. The persona's Spark wallet will pay it.
+            Paste a BOLT11 invoice. This Spark wallet will pay it.
           </DialogDescription>
         </DialogHeader>
 

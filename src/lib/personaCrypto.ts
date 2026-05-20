@@ -20,6 +20,7 @@ import {
   type PersonaWallet,
   type PhoenixEnvelope,
 } from "./persona";
+import type { PpqAccount } from "./ppq/types";
 
 export interface Nip44Signer {
   nip44: {
@@ -35,6 +36,7 @@ export async function encryptPhoenixEnvelope(
   args: {
     persona: Persona;
     wallet?: PersonaWallet;
+    ppq?: PpqAccount;
     model_prefs?: PersonaModelPrefs;
     settings?: PersonaSettings;
   },
@@ -49,6 +51,7 @@ export async function encryptPhoenixEnvelope(
       pubkey: args.persona.pubkey.toLowerCase(),
     },
     wallet: args.wallet,
+    ppq: args.ppq,
     model_prefs: args.model_prefs,
     settings: args.settings,
   };

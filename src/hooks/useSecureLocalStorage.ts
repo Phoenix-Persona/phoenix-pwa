@@ -63,6 +63,8 @@ export function useSecureLocalStorage<T>(
     currentKeyRef.current = key;
   }, [key]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies(defaultValue): only key changes should trigger a secure-storage read.
+  // biome-ignore lint/correctness/useExhaustiveDependencies(deserialize): serializer identity is not part of the storage record identity.
   useEffect(() => {
     let cancelled = false;
 
@@ -91,16 +93,12 @@ export function useSecureLocalStorage<T>(
 
     // Reset `ready` before kicking off the new async load — this is a
     // deliberate external-system sync pattern.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReady(false);
     load();
 
     return () => {
       cancelled = true;
     };
-    // defaultValue and deserialize are intentionally excluded — we only want to
-    // re-read when the key identity changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, isNative]);
 
   const setValue = (value: T | ((prev: T) => T)) => {

@@ -9,6 +9,7 @@ import { useCrossPost } from "./useCrossPost";
 import { useCurrentUser } from "./useCurrentUser";
 import { usePersonaPublish } from "./usePersonaPublish";
 import { getInferenceText, usePpqInference } from "./usePpqInference";
+import type { PpqAccountOptions } from "./usePpqAccount";
 
 export interface PersonaComposerWalletRefresh {
   refreshInfo: () => void;
@@ -20,6 +21,7 @@ export interface UsePersonaComposerOptions {
   stylingModel: string;
   crossPostEnabled?: boolean;
   wallet?: PersonaComposerWalletRefresh;
+  ppqAccountOptions?: PpqAccountOptions;
   onPublished?: () => void | Promise<void>;
 }
 
@@ -39,12 +41,13 @@ export function usePersonaComposer({
   stylingModel,
   crossPostEnabled = false,
   wallet,
+  ppqAccountOptions,
   onPublished,
 }: UsePersonaComposerOptions) {
   const { user } = useCurrentUser();
   const publish = usePersonaPublish();
   const crossPost = useCrossPost();
-  const styling = usePpqInference();
+  const styling = usePpqInference(ppqAccountOptions);
 
   const styleInVoice = useCallback(
     async (text: string): Promise<string | null> => {

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button.tsx';
 import AuthDialog from './AuthDialog';
 import { useLoggedInAccounts } from '@/hooks/useLoggedInAccounts';
-import { AccountSwitcher } from './AccountSwitcher';
+import { AccountMenu } from './AccountMenu';
 import { cn } from '@/lib/utils';
 
 export interface LoginAreaProps {
@@ -16,7 +16,7 @@ export function LoginArea({ className }: LoginAreaProps) {
   return (
     <div className={cn('inline-flex items-center justify-center', className)}>
       {currentUser ? (
-        <AccountSwitcher onAddAccountClick={() => setAuthDialogOpen(true)} />
+        <AccountMenu />
       ) : (
         <Button
           onClick={() => setAuthDialogOpen(true)}

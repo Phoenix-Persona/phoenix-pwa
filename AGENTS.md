@@ -1,32 +1,46 @@
-# Zuka Project Plan
+# Zuka Agent Guide
 
-**Read [`PROJECT.md`](./dev/PROJECT.md) first.** It is the authoritative design document for Zuka — the user-facing problem, the identity model, the persona Nostr schema, the wallet model, the AI capabilities, the V1 scope, and the demo arc. When this file and `PROJECT.md` disagree on *what* to build, **`PROJECT.md` wins**. This file describes *how* to build on the codebase (Nostr conventions, security, file layout, lint rules).
+**Start with [`docs/INDEX.md`](./docs/INDEX.md).** Product intent lives in
+[`docs/PRODUCT.md`](./docs/PRODUCT.md); implementation maps live in
+[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) and
+[`docs/DATA-FLOW.md`](./docs/DATA-FLOW.md). This file describes *how* to build
+on the codebase: Nostr conventions, security rules, file layout, validation,
+and agent workflow.
 
-V1 has shipped. Per-feature plans live under [`dev/plans/`](./dev/plans/); shipped plans stay there as historical context, with a status banner at the top.
+Per-feature plans live under [`dev/plans/`](./dev/plans/); shipped plans stay
+there as historical context.
 
 **Doc indexes:** [`docs/INDEX.md`](./docs/INDEX.md) (engineering & architecture) · [`dev/INDEX.md`](./dev/INDEX.md) (design plan, parallel build streams).
+Current build/test/lint/smoke tooling is summarized in [`docs/CURRENT-STACK.md`](./docs/CURRENT-STACK.md).
 
-**Zuka-specific stack additions** (beyond the MKStack base described below):
+**Zuka-specific stack additions**:
 
-- **`pi-mono`** ([github.com/earendil-works/pi](https://github.com/earendil-works/pi)) — agent runtime (`pi-agent-core`), unified LLM API (`pi-ai`), web chat components (`pi-web-ui`)
-- **PPQ** (`ppq.ai`) — OpenAI-compatible inference API, paid per-request in sats over Lightning
-- **Breez Spark SDK** — per-persona Bitcoin Lightning wallet; seed phrase recoverable from the encrypted kind 30078 backup
-- **NIP-49** for at-rest persona-nsec encryption; **NIP-44** for the encrypted backup event; **NIP-57** for donations
+- **PPQ** (`ppq.ai`) — OpenAI-compatible inference API used through app-owned PPQ clients.
+- **Breez Spark SDK** — per-persona and operator Bitcoin Lightning wallets; persona wallet seeds are recoverable from encrypted kind 30078 backups.
+- **NIP-49** for at-rest fresh operator-nsec encryption; **NIP-44** for encrypted backup events; **NIP-57** for donations.
 
-**Reuse with adaptation — don't blindly extend, don't blindly rewrite.** The early `src/lib/persona*` and `src/hooks/usePersona*` sketch matches the user/persona architecture in PROJECT.md §3 closely; adapt it to the §5 schema (stable per-persona d-tag stored as `persona.dTag` and reused on every update, no app-specific tags — discovery is scan-and-decrypt for stronger anti-fingerprinting; embedded Breez Spark wallet seed; `model_prefs`) rather than rewriting from scratch. The Vercel `/style` endpoint plan in `src/lib/styleClient.ts` is gone — replace with a `pi-ai` PPQ client (PROJECT.md §6). PROJECT.md §11 lists exactly what to reuse, rewrite, replace, add, and delete.
+The current app uses a form-based persona creator and direct PPQ clients.
+`pi-mono` / agent-driven interview work is deferred and documented only as
+future context under `dev/docs/`.
 
 ---
 
 # Project Overview
 
-Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, Vite, shadcn/ui, and Nostrify, extended with `pi-mono` (agent runtime), PPQ (Lightning-paid AI inference), and the Breez Spark SDK (per-persona Lightning wallet).
+Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, esbuild,
+Radix/Tailwind UI primitives, and Nostrify, extended with PPQ
+(Lightning-paid AI inference) and the Breez Spark SDK (operator and
+per-persona Lightning wallets).
 
 ## Technology Stack
 
 - **React 19.x**: hooks, concurrent rendering, ref-as-prop
 - **TailwindCSS 4.x**: utility-first styling
-- **Vite**: dev server and production bundler
-- **shadcn/ui**: unstyled accessible components on Radix UI + Tailwind (48+ components in `@/components/ui`)
+- **esbuild**: production JS bundling and watched dev builds through `scripts/build.mjs` and `scripts/dev.mjs`
+- **Tailwind CLI**: CSS build step, run explicitly from the build/dev scripts
+- **Biome**: linting
+- **node:test**: unit and integration test runner, with project helpers in `test/node`
+- **Radix/Tailwind UI primitives**: copied accessible component primitives in `@/components/ui`
 - **Nostrify** (`@nostrify/react`): Nostr protocol framework
 - **React Router**: client-side routing with `BrowserRouter` and automatic scroll-to-top
 - **TanStack Query**: data fetching, caching, state
@@ -35,12 +49,12 @@ Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, Vite, shadcn/
 ## Project Structure
 
 - `/src/components/` — UI components.
-  - `ui/` — shadcn/ui primitives.
-  - `auth/` — login components (`LoginArea`, `AuthDialog`, `AccountSwitcher`).
+  - `ui/` — copied Radix/Tailwind UI primitives.
+  - `auth/` — login components (`LoginArea`, `AuthDialog`, `AccountMenu`).
   - `wallet/` — wallet UI (`WalletPanel`, `WalletDialog`, `WalletBadge`, `SendDialog`, `ReceiveDialog`).
   - `howItWorks/` — landing-page explainer sections.
-- `/src/hooks/` — custom hooks. Discover the full set with `ls src/hooks/`. Key ones: `useNostr`, `useAuthor`, `useCurrentUser`, `useNostrPublish`, `useUploadFile`, `useAppContext`, `useTheme`, `useToast`, `useLoggedInAccounts`, `useLoginActions`, `useIsMobile`. Zuka-specific: `usePersona`, `usePersonaPublish`, `useOperatorEnvelope`, `useDeletePersona`, `useWallet`, `usePpqAccount`, `usePpqInference`, `usePpqImage`, `usePpqVideo`, `usePpqTopup`, `useCrossPost`, `useInstallPrompt`, `useRegisterPersonaLightningAddress`, `useUsernameAvailability`.
-- `/src/pages/` — page components wired into React Router. Current set: `Index`, `Onboard`, `Dashboard`, `EditPersona`, `MyPersonas`, `PersonaFeed`, `Verify`, `Settings`, `NIP19Page`, `NotFound`.
+- `/src/hooks/` — custom hooks. Discover the full set with `ls src/hooks/`. Key ones: `useNostr`, `useAuthor`, `useCurrentUser`, `useNostrPublish`, `useUploadFile`, `useAppContext`, `useTheme`, `useToast`, `useLoggedInAccounts`, `useLoginActions`, `useIsMobile`. Zuka-specific: `usePersona`, `usePersonaPublish`, `useOperatorEnvelope`, `useOperatorWallet`, `useDeletePersona`, `useWallet`, `usePpqAccount`, `usePpqInference`, `usePpqImage`, `usePpqVideo`, `usePpqTopup`, `useGenerateVideoPipeline`, `useCrossPost`, `useInstallPrompt`, `useUsernameAvailability`.
+- `/src/pages/` — page components wired into React Router. Current set: `Index`, `Onboard`, `Dashboard`, `EditPersona`, `MyPersonas`, `PersonaFeed`, `Settings`, `NIP19Page`, `NotFound`.
 - `/src/lib/` — utility functions and shared logic.
   - `wallet/` — Breez Spark wallet (init, NWC, lightning address).
   - `operator/` — operator-envelope crypto and storage.
@@ -48,16 +62,18 @@ Zuka is a Nostr-native PWA built with React 19.x, TailwindCSS 4.x, Vite, shadcn/
   - Top-level: `persona.ts`, `personaCrypto.ts`, `personaKey.ts`, `personaPost.ts`, `appRelays.ts`, `appBlossom.ts`, `nip49Storage.ts`, `genUserName.ts`, `polyfills.ts`, `utils.ts`, `env.ts`.
 - `/src/contexts/` — React context providers (`AppContext`).
 - `/src/dev/` — dev harnesses for slice-by-slice testing (`WalletHarness`, `InferencePayHarness`). Routed under `/dev/*` in `AppRouter.tsx`.
-- `/src/test/` — testing utilities including the `TestApp` wrapper.
+- `/test/node/` — node:test setup and testing utilities including the `TestApp` wrapper.
+- `/test/scripts/` — validation scripts for node:test, source policy, build verification, bundle budgets/analysis, and PWA smoke checks.
+- `/test/manual/` — manual and E2E Node scripts for wallet, PPQ, and media workflows.
 - `/public/` — static assets.
-- `App.tsx` — **already configured** with `QueryClientProvider`, `NostrProvider`, `UnheadProvider`, `AppProvider`, `NostrLoginProvider`. **Read before editing**; changes are rarely needed.
+- `App.tsx` — **already configured** with `AppProvider`, `QueryClientProvider`, `NostrLoginProvider`, `NostrProvider`, operator cleanup/init, `NostrSync`, `TooltipProvider`, `AppToaster`, and `AppRouter`. **Read before editing**; changes are rarely needed.
 - `AppRouter.tsx` — React Router configuration. The catch-all `/:nip19` route handles all NIP-19 identifiers (see the `nip19-routing` skill).
 
 **Always read an existing file before modifying it.** Never write over `App.tsx`, `AppRouter.tsx`, or `NostrProvider` without first reading their contents.
 
 ## UI Components
 
-Components in `@/components/ui` are unstyled, accessible primitives styled with Tailwind. They follow a consistent pattern using `React.forwardRef` and the `cn()` class-merge utility, and many are built on Radix UI primitives. When you need a specific component, list the directory (`ls src/components/ui/`) or import from `@/components/ui/<name>` — all common primitives are present (buttons, inputs, dialogs, dropdowns, forms, tables, etc.).
+Components in `@/components/ui` are unstyled, accessible primitives styled with Tailwind. They follow a consistent pattern using `React.forwardRef` and the `cn()` class-merge utility, and many are built on Radix UI primitives. When you need a specific component, list the directory (`ls src/components/ui/`) or import from `@/components/ui/<name>` — this repo intentionally keeps only the primitives it uses.
 
 ## System Prompt Management
 
@@ -69,7 +85,7 @@ The assistant's behavior is defined by this file (`AGENTS.md`). Edit it directly
 
 1. **Always review existing NIPs first.** Use the NIP index tool, then read candidate NIPs in detail. The goal is to find the closest existing solution.
 2. **Prefer extending existing NIPs** over creating custom kinds, even if it requires minor schema compromises. Custom kinds fragment the ecosystem.
-3. **When existing NIPs are close but not perfect**, use the existing kind as the base and add domain-specific tags. Document extensions in `NIP.md`.
+3. **When existing NIPs are close but not perfect**, use the existing kind as the base and add domain-specific tags. Document extensions in `docs/NIP.md`.
 4. **Only generate a new kind** when no existing NIP covers the core functionality, the data structure is fundamentally different, or the use case needs different storage characteristics (regular/replaceable/addressable).
 5. **If a tool to generate a new kind number is available, you MUST use it** — don't pick an arbitrary number.
 6. **Custom kinds MUST include a NIP-31 `alt` tag** with a human-readable description.
@@ -96,16 +112,20 @@ Kinds below 1000 are "legacy"; their storage behavior is per-kind (e.g. kind 1 i
 - **Empty content is fine.** `content: ""` is idiomatic for tag-only events.
 - If you need to filter by a field, it **must** be a tag — relays don't index content.
 
-### NIP.md
+### docs/NIP.md
 
-`NIP.md` documents any custom kinds/schemas this project defines. If the file doesn't exist, this project has no custom kinds. **Whenever you generate a new kind or change a custom schema, create or update `NIP.md`.**
+`docs/NIP.md` documents any custom kinds/schemas this project defines. If the file doesn't exist, this project has no custom kinds. **Whenever you generate a new kind or change a custom schema, create or update `docs/NIP.md`.**
 
 ### Nostr Security Model
 
-**CRITICAL:** Nostr private keys (`nsec`) are stored **in plaintext in `localStorage`**. Any JavaScript running on the origin can steal them. A single XSS = permanent, unrecoverable key theft across every Nostr client the user ever touches. **Treat XSS mitigation as the top-priority security concern.**
+**CRITICAL:** any plaintext `nsec` present in JavaScript memory can be stolen by
+XSS. Zuka keeps active Nostr login state in memory, stores fresh generated
+operator keys as NIP-49 `ncryptsec`, and stores persona nsecs inside encrypted
+kind 30078 backups plus runtime memory. A single XSS can still steal active
+session secrets. **Treat XSS mitigation as the top-priority security concern.**
 
 - **Never** use `dangerouslySetInnerHTML`, `innerHTML`, or `document.write` with event data, URL params, or other untrusted strings.
-- **CSP is defense-in-depth**, not primary defense. `index.html` ships a restrictive CSP (`script-src 'self'`, `default-src 'none'`). Never relax it with `'unsafe-eval'`, `'unsafe-inline'` on `script-src`, or wildcard sources.
+- **CSP is defense-in-depth**, not primary defense. `public/index.html` ships a restrictive CSP (`script-src 'self'`, `default-src 'none'`). Never relax it with `'unsafe-eval'`, `'unsafe-inline'` on `script-src`, or wildcard sources.
 - **Sanitize every event-sourced URL** (`sanitizeUrl()` — https-only allowlist) before using it as `href`, `src`, iframe `src`, or CSS `url()`.
 - **Sanitize every event-sourced string interpolated into CSS**. A malicious `font-family` or `url()` value can break out of the CSS context and inject rules.
 
@@ -221,7 +241,7 @@ export function MyComponent() {
 
 ### Nostr Login
 
-Use the `LoginArea` component (already in the project). It renders a single "Join" button when logged out (opens an `AuthDialog` supporting signup, extension, nsec, and remote signer) and becomes an account switcher when logged in. **Do not wrap it in conditional logic.**
+Use the `LoginArea` component (already in the project). It renders a single "Join" button when logged out (opens an `AuthDialog` supporting signup, saved-account login, extension, nsec, and remote signer) and becomes an account menu when logged in. **Do not wrap it in conditional logic.**
 
 ```tsx
 import { LoginArea } from '@/components/auth/LoginArea';
@@ -229,7 +249,7 @@ import { LoginArea } from '@/components/auth/LoginArea';
 <LoginArea className="max-w-60" />
 ```
 
-`LoginArea` is inline-flex by default. Pass `flex` or `w-full` to expand it; otherwise set a sensible `max-w-*`.
+`LoginArea` is inline-flex by default. Pass `flex` or `w-full` to expand it; otherwise set a sensible `max-w-*`. Zuka intentionally supports one active operator login at a time; use `useLoginActions` for login replacement and logout instead of exposing add/switch account UI.
 
 **Social apps should include a profile/account menu in the main navigation** for access to settings, profile editing, and logout — don't only show `LoginArea` in logged-out states.
 
@@ -284,7 +304,7 @@ Canonical defaults live in `src/lib/appRelays.ts` (`APP_RELAYS`) and `src/lib/ap
 
 - **`NostrSync`** auto-loads the user's NIP-65 relay list on login and writes it into `AppContext`.
 - **Automatic publishing** — updating the relay config publishes a new kind 10002 event when the user is logged in.
-- A drop-in settings UI (`RelayListManager`) is available as the **`relay-management`** skill.
+- The settings UI is implemented in `src/components/RelayListManager.tsx`.
 
 ## Routing
 
@@ -353,9 +373,9 @@ For font installation, color-scheme changes, light/dark theming, or the `isolate
 
 ## Writing Tests vs. Running Tests
 
-**Running the existing test script — always do it.** After any code change, run the project's test/validation script. **Your task is not complete until it passes.** The script typically covers TypeScript compilation, ESLint, and existing tests.
+**Running the existing test script — always do it.** After any code change, run the project's test/validation script. **Your task is not complete until it passes.** The script typically covers TypeScript compilation, Biome, node:test, the esbuild build, and PWA smoke checks.
 
-**Writing new test files — don't, unless the user asks.** If the user explicitly requests tests, describes a bug to diagnose with a test, or reports that a problem persists after a fix, load the **`testing`** skill for the project's Vitest + `TestApp` setup and policy.
+**Writing new test files — don't, unless the user asks.** If the user explicitly requests tests, describes a bug to diagnose with a test, or reports that a problem persists after a fix, use the current `node:test` helpers in `test/node`. For integration-test harness patterns, read `test/integration/README.md`.
 
 ## Validating Your Changes
 

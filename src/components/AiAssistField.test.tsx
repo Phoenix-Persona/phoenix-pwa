@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import { AiAssistButton } from "./AiAssistField";
 
-const mocks = vi.hoisted(() => ({
-  inferenceMutateAsync: vi.fn(),
+const mocks = hoisted(() => ({
+  inferenceMutateAsync: mockFn(),
 }));
 
-vi.mock("@/hooks/usePpqInference", async (importOriginal) => {
+mockModule("@/hooks/usePpqInference", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/hooks/usePpqInference")>();
   return {
     ...actual,
@@ -18,7 +18,7 @@ vi.mock("@/hooks/usePpqInference", async (importOriginal) => {
   };
 });
 
-function renderAiAssist(onReplace = vi.fn()) {
+function renderAiAssist(onReplace = mockFn()) {
   render(
     <AiAssistButton
       fieldLabel="Bio"
@@ -54,6 +54,23 @@ function ppqResponse(content: string) {
 describe("AiAssistButton", () => {
   beforeEach(() => {
     mocks.inferenceMutateAsync.mockReset();
+  });
+
+  it("opens with an empty instructions field", () => {
+    renderAiAssist();
+
+    fireEvent.click(screen.getByRole("button", { name: /ai assist/i }));
+
+    expect(screen.getByLabelText(/instructions/i)).toHaveValue("");
+  });
+
+  it("does not render a redundant cancel button", () => {
+    renderAiAssist();
+
+    fireEvent.click(screen.getByRole("button", { name: /ai assist/i }));
+
+    expect(screen.queryByRole("button", { name: /cancel/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /close/i })).toBeInTheDocument();
   });
 
   it("sends field context and previews the generated replacement before applying it", async () => {
@@ -118,11 +135,14 @@ describe("AiAssistButton", () => {
     const { onReplace } = renderAiAssist();
 
     fireEvent.click(screen.getByRole("button", { name: /ai assist/i }));
+    fireEvent.change(screen.getByLabelText(/instructions/i), {
+      target: { value: "Draft a concise public bio." },
+    });
     fireEvent.click(screen.getByRole("button", { name: /generate/i }));
 
     expect(await screen.findByText("Generated public bio")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    fireEvent.click(screen.getByRole("button", { name: /close/i }));
 
     expect(onReplace).not.toHaveBeenCalled();
 
@@ -136,6 +156,9 @@ describe("AiAssistButton", () => {
     renderAiAssist();
 
     fireEvent.click(screen.getByRole("button", { name: /ai assist/i }));
+    fireEvent.change(screen.getByLabelText(/instructions/i), {
+      target: { value: "Draft a concise public bio." },
+    });
     fireEvent.click(screen.getByRole("button", { name: /generate/i }));
 
     expect(

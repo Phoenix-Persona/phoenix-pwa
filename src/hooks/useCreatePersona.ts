@@ -22,7 +22,7 @@ import {
   type PersonaKeypair,
 } from "@/lib/personaKey";
 import { buildPersonaProfileMetadata } from "@/lib/personaProfile";
-import { publishWithTimeout } from "@/lib/nostrPublish";
+import { publishWithTimeout, tryPublishWithTimeout } from "@/lib/nostrPublish";
 import { queryKeys } from "@/lib/queryKeys";
 import {
   connectWallet,
@@ -66,6 +66,7 @@ export interface CreatePersonaResult {
   backupEvent: NostrEvent;
   profileEvent: NostrEvent;
   warning?: string;
+  profileWarning?: string;
 }
 
 type MyPersonaRecord = {
@@ -182,7 +183,15 @@ export function useCreatePersona() {
         },
         kp,
       );
-      await publishWithTimeout(nostr, profileEvent);
+      let profileWarning: string | undefined;
+      const profilePublish = await tryPublishWithTimeout(
+        nostr,
+        profileEvent,
+        "persona-profile-publish",
+      );
+      if (!profilePublish.ok) {
+        profileWarning = profilePublish.error.message;
+      }
 
       const envelope: PhoenixEnvelope = {
         app: PHOENIX_PAYLOAD_APP,
@@ -229,6 +238,7 @@ export function useCreatePersona() {
         backupEvent,
         profileEvent,
         warning,
+        profileWarning,
       };
     },
   });

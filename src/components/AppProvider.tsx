@@ -1,5 +1,4 @@
-import { ReactNode, useEffect } from 'react';
-import { z } from 'zod';
+import { type ReactNode, useEffect } from 'react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { AppContext, type AppConfig, type AppContextType, type Theme, type RelayMetadata, type BlossomServerMetadata } from '@/contexts/AppContext';
 
@@ -10,30 +9,6 @@ interface AppProviderProps {
   /** Default app configuration */
   defaultConfig: AppConfig;
 }
-
-// Zod schema for RelayMetadata validation
-const RelayMetadataSchema = z.object({
-  relays: z.array(z.object({
-    url: z.url(),
-    read: z.boolean(),
-    write: z.boolean(),
-  })),
-  updatedAt: z.number(),
-}) satisfies z.ZodType<RelayMetadata>;
-
-// Zod schema for BlossomServerMetadata validation
-const BlossomServerMetadataSchema = z.object({
-  servers: z.array(z.url()),
-  updatedAt: z.number(),
-}) satisfies z.ZodType<BlossomServerMetadata>;
-
-// Zod schema for AppConfig validation
-const AppConfigSchema = z.object({
-  theme: z.enum(['dark', 'light', 'system']),
-  relayMetadata: RelayMetadataSchema,
-  blossomServerMetadata: BlossomServerMetadataSchema,
-  useAppBlossomServers: z.boolean(),
-}) satisfies z.ZodType<AppConfig>;
 
 export function AppProvider(props: AppProviderProps) {
   const {
@@ -50,7 +25,7 @@ export function AppProvider(props: AppProviderProps) {
       serialize: JSON.stringify,
       deserialize: (value: string) => {
         const parsed = JSON.parse(value);
-        return AppConfigSchema.partial().parse(parsed);
+        return parsePartialAppConfig(parsed);
       }
     }
   );
@@ -75,6 +50,89 @@ export function AppProvider(props: AppProviderProps) {
       {children}
     </AppContext.Provider>
   );
+}
+
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function parseRelayMetadata(value: unknown): RelayMetadata | null {
+  if (!isRecord(value) || !Array.isArray(value.relays) || typeof value.updatedAt !== "number") {
+    return null;
+  }
+  const relays = value.relays.map((relay) => {
+    if (
+      !isRecord(relay) ||
+      !isUrl(relay.url) ||
+      typeof relay.read !== "boolean" ||
+      typeof relay.write !== "boolean"
+    ) {
+      return null;
+    }
+    return {
+      url: relay.url,
+      read: relay.read,
+      write: relay.write,
+    };
+  });
+  if (relays.some((relay) => relay === null)) return null;
+  return {
+    relays: relays as RelayMetadata["relays"],
+    updatedAt: value.updatedAt,
+  };
+}
+
+function parseBlossomServerMetadata(value: unknown): BlossomServerMetadata | null {
+  if (!isRecord(value) || !Array.isArray(value.servers) || typeof value.updatedAt !== "number") {
+    return null;
+  }
+  if (!value.servers.every(isUrl)) return null;
+  return {
+    servers: value.servers,
+    updatedAt: value.updatedAt,
+  };
+}
+
+function parsePartialAppConfig(value: unknown): Partial<AppConfig> {
+  if (!isRecord(value)) throw new Error("App config must be an object.");
+  const out: Partial<AppConfig> = {};
+
+  if (value.theme !== undefined) {
+    if (value.theme !== "dark" && value.theme !== "light" && value.theme !== "system") {
+      throw new Error("Invalid app config theme.");
+    }
+    out.theme = value.theme;
+  }
+  if (value.relayMetadata !== undefined) {
+    const relayMetadata = parseRelayMetadata(value.relayMetadata);
+    if (!relayMetadata) throw new Error("Invalid app config relay metadata.");
+    out.relayMetadata = relayMetadata;
+  }
+  if (value.blossomServerMetadata !== undefined) {
+    const blossomServerMetadata = parseBlossomServerMetadata(value.blossomServerMetadata);
+    if (!blossomServerMetadata) throw new Error("Invalid app config Blossom server metadata.");
+    out.blossomServerMetadata = blossomServerMetadata;
+  }
+  if (value.useAppBlossomServers !== undefined) {
+    if (typeof value.useAppBlossomServers !== "boolean") {
+      throw new Error("Invalid app config Blossom server toggle.");
+    }
+    out.useAppBlossomServers = value.useAppBlossomServers;
+  }
+
+  return out;
 }
 
 /**

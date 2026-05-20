@@ -1,4 +1,4 @@
-import { type Theme } from "@/contexts/AppContext";
+import type { Theme } from "@/contexts/AppContext";
 import { useAppContext } from "@/hooks/useAppContext";
 
 /**

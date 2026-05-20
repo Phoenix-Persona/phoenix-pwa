@@ -4,7 +4,7 @@ A map of `src/`. Read this first. Source of truth is the code — when this
 doc disagrees with what's on disk, the code wins; update this file.
 
 > **Identity model.** Zuka uses an **operator + persona split**
-> (`dev/PROJECT.md` §3). The operator signs in with a single Nostr
+> (see `docs/PRODUCT.md` and `docs/THREAT-MODEL.md`). The operator signs in with a single Nostr
 > identity that NIP-44-self-encrypts each persona's config as a kind
 > 30078 event. Each persona has its own separate keypair that publishes
 > its public kind 0 profile and kind 1 posts. The link from persona ↔
@@ -12,7 +12,7 @@ doc disagrees with what's on disk, the code wins; update this file.
 > keypair" appears in some passing prose as a synonym; prefer
 > "operator.")
 >
-> **kind-30078 tag scheme.** Per `dev/PROJECT.md` §5.2, the only tag is
+> **kind-30078 tag scheme.** The only tag is
 > `["d", "<opaque random uuid>"]`, **stable per persona** (generated
 > at creation, stored as `persona.dTag` inside the encrypted plaintext,
 > reused on every update). No `t`, no `alt`. Externally a Zuka
@@ -32,13 +32,13 @@ doc disagrees with what's on disk, the code wins; update this file.
 ## Provider stack (App.tsx)
 
 ```
-UnheadProvider                         (SEO meta, src/components/PhoenixHeader uses useSeoMeta)
-└─ AppProvider                          (config: theme, relays, Blossom)        ← src/components/AppProvider.tsx
-   └─ QueryClientProvider               (TanStack Query — every fetch flows through it)
-      └─ NostrLoginProvider             (multi-account login state)             ← @nostrify/react/login
-         └─ NostrProvider               (NPool + NIP-42 AUTH)                   ← src/components/NostrProvider.tsx
-            ├─ NostrSync                (kind 10002, kind 10063)                ← src/components/NostrSync.tsx
-            └─ TooltipProvider → Toaster → Suspense → AppRouter
+AppProvider                          (config: theme, relays, Blossom)        ← src/components/AppProvider.tsx
+└─ QueryClientProvider               (TanStack Query — every fetch flows through it)
+   └─ NostrLoginProvider             (single active login slot)              ← @nostrify/react/login
+      └─ NostrProvider               (NPool + NIP-42 AUTH)                   ← src/components/NostrProvider.tsx
+         ├─ DevAutoLogin / OperatorScopedStateCleanup / OperatorWalletInit
+         ├─ NostrSync                (kind 10002, kind 10063)                ← src/components/NostrSync.tsx
+         └─ TooltipProvider → AppToaster → Suspense → AppRouter
 ```
 
 **Key invariants:**
@@ -52,11 +52,15 @@ UnheadProvider                         (SEO meta, src/components/PhoenixHeader u
 | Path                | Component       | Auth req'd | Notes                                |
 | ------------------- | --------------- | ---------- | ------------------------------------ |
 | `/`                 | `Index`         | no         | Marketing landing page.              |
-| `/onboard`          | `Onboard`       | yes        | 5-step persona creation wizard.      |
+| `/onboard`          | `Onboard`       | yes        | Details + picture persona creation wizard. |
 | `/my-personas`      | `MyPersonas`    | yes        | Grid of operator's decrypted personas. |
 | `/dashboard/:npub`  | `Dashboard`     | yes        | Per-persona compose + recent posts.  |
+| `/dashboard/:npub/edit` | `EditPersona` | yes      | Edit persona profile, system prompt, cross-posting, and wallet identity fields. |
 | `/p/:npub`          | `PersonaFeed`   | no         | Public feed for any persona.         |
-| `/verify/:npub`     | `Verify`        | no         | Public attestation — operator deliberately not disclosed. |
+| `/settings`         | `Settings`      | yes        | Account, relays, Blossom servers, and Nostr viewer settings. |
+| `/dev/wallet`       | `WalletHarness` | dev        | Wallet development harness.          |
+| `/dev/inference-pay` | `InferencePayHarness` | dev  | PPQ payment development harness.     |
+| `/dev/ppq-pay`      | `InferencePayHarness` | dev     | Alias for PPQ payment harness.       |
 | `/:nip19`           | `NIP19Page`     | no         | Catch-all for raw npub/note/naddr.   |
 | `*`                 | `NotFound`      | no         |                                      |
 
@@ -82,17 +86,18 @@ Pure logic and HTTP clients. No React imports.
 
 | File              | What it does                                                                |
 | ----------------- | --------------------------------------------------------------------------- |
-| `persona.ts`      | Persona Zod schemas, kind 30078 event template builder, envelope parser. **Read the file header (lines 1-43)** — it documents the privacy posture (no Zuka-specific tags) and the four-layer envelope verification. |
+| `persona.ts`      | Persona runtime validators, kind 30078 event template builder, envelope parser. **Read the file header (lines 1-43)** — it documents the privacy posture (no Zuka-specific tags) and the four-layer envelope verification. |
 | `personaCrypto.ts`| `encryptPhoenixEnvelope` / `tryDecryptPhoenixEnvelope` — operator-self-encrypted NIP-44 ciphertext. |
 | `personaKey.ts`   | Persona keypair generation, nsec ↔ keypair, `signWithPersona()`.            |
 | `personaPost.ts`  | `buildPersonaPostTemplate` — kind 1 with **no Zuka-identifying tags** (no `client`, no operator pubkey, no persona name). Read lines 1-19 for what's deliberately omitted. |
+| `queryKeys.ts`    | Central TanStack Query keys, including the shared encrypted-app-data kind 30078 scan used by operator and persona hooks. |
 
-### PPQ layer (built; not wired into pages yet)
+### PPQ layer
 
 | File              | What it does                                                                |
 | ----------------- | --------------------------------------------------------------------------- |
 | `ppq/client.ts`   | Low-level HTTP client. `chatCompletion`, `generateImage`, `submitVideo`/`getVideoStatus`, `createTopupInvoice`/`getTopupStatus`, NWC auto-topup. Throws `PpqError` with HTTP status preserved. |
-| `ppq/storage.ts`  | Pluggable account-credential storage. v1 = `localStorage` at `phoenix:ppq:account`. Header notes a future NIP-44-to-self upgrade path. |
+| `ppq/storage.ts`  | Legacy local PPQ account cleanup helper. Current operator PPQ credentials live in the encrypted operator envelope. |
 | `ppq/types.ts`    | Wire types. The PPQ API is loose around shapes (balance, topup); types are deliberately wide and the client has defensive accessors (`extractBolt11`, `isTopupSettled`). |
 
 ### Other lib files
@@ -103,8 +108,9 @@ Pure logic and HTTP clients. No React imports.
 | `appBlossom.ts`   | App-default Blossom servers + `parseBlossomServerList(event)` for kind 10063 + `getEffectiveBlossomServers()` for the merge-with-user-list policy. |
 | `genUserName.ts`  | Deterministic display name from a pubkey for "Unknown persona" fallbacks. Has tests. |
 | `polyfills.ts`    | Loaded first in `main.tsx`. Browser polyfills.                              |
-| `utils.ts`        | shadcn `cn()` helper.                                                       |
-| `styleClient.ts`  | **Legacy — scheduled for deletion per `dev/PROJECT.md` §11.** POSTs to `/api/style` (Vercel function) for persona text styling. Both `Onboard.tsx` and `Dashboard.tsx` still call this. The PPQ hooks exist but are not yet wired in — see `DATA-FLOW.md` "Unwired seams". Migration: replace with `usePpqInference`. |
+| `utils.ts`        | `cn()` class-merge helper used by UI primitives.                            |
+| `nostrViewer.ts`  | NIP-19 viewer URL helpers and safe viewer-prefix handling.              |
+| `url.ts`          | Shared HTTPS URL sanitizer for event/profile/media URLs.                |
 
 ## `src/hooks/`
 
@@ -112,10 +118,14 @@ Pure logic and HTTP clients. No React imports.
 
 | Hook                  | Signature                                  | Notes                                                         |
 | --------------------- | ------------------------------------------ | ------------------------------------------------------------- |
-| `usePersona(npub)`    | `useQuery → { event, config } \| null`    | Scans operator's kind 30078s, decrypts each, matches `personaPubkey`. Slow by design (privacy). |
-| `useMyPersonas()`     | `useQuery → { event, config, npub }[]`    | Scan-and-decrypt across all of the operator's kind 30078s; returns Zuka-shaped envelopes. |
+| `useEncryptedAppData` | internal helpers                           | Shared operator-authored kind 30078 query, latest-per-d dedupe, 5s absolute timeout, and memory-only decrypt classification cache. |
+| `usePersona(npub)`    | `useQuery → { event, config } \| null`    | Consumes the shared kind 30078 scan, decrypts/classifies candidates, matches `personaPubkey`. Slow by design (privacy). |
+| `useMyPersonas()`     | `useQuery → { event, config, npub }[]`    | Consumes the shared kind 30078 scan and returns Zuka-shaped persona envelopes. |
 | `usePersonaPosts(npub, limit)` | `useQuery → NostrEvent[]`         | Public kind 1 query by author pubkey. Anyone can call.        |
+| `useCreatePersona()`  | `useMutation`                              | Creates persona envelope, mints wallet seed, optionally registers persona Lightning Address, and publishes kind 30078 + persona kind 0. |
+| `useUpdatePersona()`  | `useMutation`                              | Reuses the stable persona d-tag, updates encrypted backup, and publishes kind 0 when public profile fields change. |
 | `usePersonaPublish()` | `useMutation({ personaNsec, template })`  | Decodes nsec, finalizes/signs the event with `signWithPersona`, publishes via `nostr.event(...)`. |
+| `usePersonaComposer()`| hook                                       | Styles drafts with PPQ chat, publishes kind 1 posts, refreshes wallet/PPQ state, and optionally cross-posts. |
 
 ### Nostr / auth (mostly Nostrify wrappers)
 
@@ -123,21 +133,22 @@ Pure logic and HTTP clients. No React imports.
 | ----------------------- | -------------------------------------------------------------------- |
 | `useNostr.ts`           | **Re-export only** of `useNostr` from `@nostrify/react`. The file's comment (lines 1-5) says don't edit — it exists because LLMs invent it. |
 | `useNostrPublish`       | Operator publish (kind 0, kind 22242, etc). Auto-tags `client` on https. |
-| `useCurrentUser`        | Returns `{ user, users, ...metadata }`. The current login is `users[0]`. Builds `NUser` from the active login. |
-| `useLoggedInAccounts`   | Multi-account list with kind-0 metadata pre-fetched.                 |
-| `useLoginActions`       | `nsec` / `bunker` / `extension` / `nostrconnect` login methods + `logout`. **Don't edit except to add new login methods** (file comment, line 10). |
-| `useUploadFile`         | Wraps `BlossomUploader` from `@nostrify/nostrify/uploaders`. Reads server list from `useAppContext`. |
+| `useCurrentUser`        | Returns `{ user, ...metadata }` for the single active login. |
+| `useLoggedInAccounts`   | Single account metadata helper for the active login.                 |
+| `useLoginActions`       | Single-slot `nsec` / `bunker` / `extension` / `nostrconnect` login replacement methods + `logout`. |
+| `useUploadFile`         | Uploads to Blossom with the active Blossom server list from `useAppContext`. |
 | `useAuthor(pubkey)`     | Resolve pubkey → kind 0 metadata. 5-min staleTime.                   |
 
-### PPQ (built, not yet wired into pages)
+### PPQ
 
 | Hook                 | What it does                                                              |
 | -------------------- | ------------------------------------------------------------------------- |
-| `usePpqAccount`      | Reads/refreshes ppq account + balance. `ensureAccount` is the only mutation that creates one. Cross-tab `storage` listener re-hydrates. |
-| `usePpqInference`    | Mutation: chat completion. Auto-creates ppq account on first call.        |
-| `usePpqImage`        | Mutation: image generation.                                               |
-| `usePpqVideo`        | `usePpqVideoSubmit` + `usePpqVideoJob(id)` polling pair. Default model `veo3-fast`. |
-| `usePpqTopup`        | `usePpqLightningTopup`, `usePpqTopupStatus(id)` polling, `usePpqNwcAutoTopup` (NIP-47 auto-topup). |
+| `usePpqAccount`      | Resolves scoped PPQ accounts. Operator scope reads dev env/operator envelope; persona scope reads and mints inside the active persona backup. Refreshes balance and rotates operator credentials. |
+| `usePersonaPpqAccountOptions` | Builds persona-scoped PPQ options and republishes the encrypted persona backup after minting persona credentials. |
+| `usePpqInference`    | Mutation: chat completion. Used by AI Assist, post wizard, and persona voice styling with optional persona scope. |
+| `usePpqImage`        | Mutation: image generation. Used by persona picture staging and profile image generation with optional persona scope. |
+| `usePpqVideo`        | Standalone `usePpqVideoSubmit` + `usePpqVideoJob(id)` polling pair. The dashboard video composer uses `useGenerateVideoPipeline` instead. |
+| `usePpqTopup`        | Standalone Lightning topup and status polling helpers. Wallet UI topup orchestration lives in `useWallet` and `lib/wallet/autoTopup.ts`. |
 
 ### Misc
 
@@ -145,7 +156,7 @@ Pure logic and HTTP clients. No React imports.
 | ----------------- | -------------------------------------------------- |
 | `useAppContext`   | Sugar for `AppContext` consumer.                   |
 | `useTheme`        | Reads/writes `config.theme`.                       |
-| `useToast`        | shadcn toast.                                      |
+| `useToast`        | App toast helper.                                  |
 | `useLocalStorage` | Generic key/value with serialize/deserialize hooks. |
 | `useIsMobile`     | Media-query based.                                 |
 | `useInView`       | Intersection observer wrapper.                     |
@@ -156,43 +167,45 @@ Pure logic and HTTP clients. No React imports.
 
 | File                  | What it does                                                          |
 | --------------------- | --------------------------------------------------------------------- |
-| `AppProvider.tsx`     | App config (theme, relays, Blossom). Persists to `localStorage` via Zod-validated deserializer. |
+| `AppProvider.tsx`     | App config (theme, relays, Blossom). Persists to `localStorage` via local runtime validation. |
 | `NostrProvider.tsx`   | NPool + NIP-42 AUTH. **Read it before changing the pool.** The signer/relay refs pattern (lines 22-115) is load-bearing. |
 | `NostrSync.tsx`       | Global syncer for kind 10002 + 10063 → app config.                    |
+| `AppHeader.tsx`       | App-wide header (logo, navigation, operator wallet status, LoginArea). |
+| `AppToaster.tsx`      | Lazy-loads toast UI only when toasts exist.                            |
 | `ErrorBoundary.tsx`   | React error boundary at the root.                                     |
 | `ScrollToTop.tsx`     | Reset window scroll on route change.                                  |
-| `PhoenixHeader.tsx`   | App-wide header (logo + nav + LoginArea).                             |
 | `PostCard.tsx`        | Renders a kind 1 from a persona, with attribution UI.                 |
 | `PostBody.tsx`        | Body renderer with link/mention parsing.                              |
 | `Skeletons.tsx`       | `PersonaHeaderSkeleton`, `PersonaGridSkeleton`, `PostListSkeleton`.   |
 | `ImigongoBand.tsx`    | Decorative band + seal (Rwandan geometric pattern).                   |
-| `HowItWorks.tsx` + `howItWorks/{Build,Speak,Outlive}Visual.tsx` | Marketing section + supporting illustrations. |
+| `HowItWorks.tsx` + `howItWorks/{Build,Speak,Outlive,Sustain}Visual.tsx` | Marketing section + supporting illustrations. |
 
 ### `components/auth/`
 
 | File                  | What it does                                                          |
 | --------------------- | --------------------------------------------------------------------- |
-| `LoginArea.tsx`       | Either the "Join" button (logged out) or the `AccountSwitcher` (logged in). |
-| `AccountSwitcher.tsx` | Multi-persona dropdown with switch / log out / add. Drives `useLoggedInAccounts.setLogin/removeLogin`. |
-| `AuthDialog.tsx`      | Six-step modal: welcome → generate → secure → profile → login → connect. Handles nsec / extension / nostrconnect / bunker login. **The nostrconnect listening effect (lines 197-232) is subtle** — its dep array is intentionally limited to avoid tearing down in-flight subscriptions on re-render. |
+| `LoginArea.tsx`       | Either the "Join" button (logged out) or the account menu (logged in). |
+| `AccountMenu.tsx` | Single-account profile dropdown with navigation links and log out. |
+| `AuthDialog.tsx`      | Modal for account creation, saved local account login, pasted nsec import, extension, nostrconnect, and bunker login. **The nostrconnect listening effect is subtle** — its dep array is intentionally limited to avoid tearing down in-flight subscriptions on re-render. |
 
 ### `components/ui/`
 
-56 files. **shadcn primitives — do not hand-edit.** Regenerate via the
-shadcn CLI when upstream changes. App-specific UI lives one level up.
+Copied UI primitives. **This directory intentionally keeps only primitives the
+app uses; check the directory before importing.**
+App-specific UI lives one level up.
 
 ## `src/pages/`
 
 | File              | What it does                                                              |
 | ----------------- | ------------------------------------------------------------------------- |
 | `Index.tsx`       | Marketing landing — hero, how-it-works, mission.                          |
-| `Onboard.tsx`     | 5-step persona creation wizard (form-based, not agent-based). Encrypts envelope, signs as operator, publishes kind 30078 + persona kind 0. |
+| `Onboard.tsx`     | Details + picture persona creation wizard. Uses AI Assist/PPQ image generation, creates the encrypted backup, and publishes kind 30078 + persona kind 0. |
 | `MyPersonas.tsx`  | Grid of operator's personas via `useMyPersonas`.                          |
-| `Dashboard.tsx`   | Per-persona: header, raw → styled composer, publish, recent posts.        |
+| `Dashboard.tsx`   | Per-persona: header, wallet, PPQ-backed composer, post wizard, video composer, recent posts. |
 | `PersonaFeed.tsx` | Public read-only feed. Anyone can view.                                   |
-| `Verify.tsx`      | Public attestation page. Explicitly states the operator is **not** disclosed. |
 | `NIP19Page.tsx`   | Resolves raw npub/nprofile/note/nevent/naddr URLs.                        |
 | `NotFound.tsx`    | 404.                                                                      |
+| `Settings.tsx`    | Account, relay, Blossom, and external Nostr viewer settings.              |
 
 ## `src/contexts/`
 
@@ -200,25 +213,36 @@ shadcn CLI when upstream changes. App-specific UI lives one level up.
 | ----------------- | --------------------------------------------------------- |
 | `AppContext.ts`   | `AppConfig` shape + context. `RelayMetadata`, `BlossomServerMetadata`. |
 
-## `src/test/`
+## `test/node/`
 
 | File                    | What it does                                              |
 | ----------------------- | --------------------------------------------------------- |
-| `setup.ts`              | Vitest setup (jest-dom, jsdom).                           |
+| `setup.ts`              | node:test setup (jest-dom, jsdom).                        |
 | `TestApp.tsx`           | Wrapped provider tree for render tests.                   |
-| `ErrorBoundary.test.tsx`| Smoke test.                                               |
+| `api.ts`                | Project-local test API and mock helpers.                  |
 
-Production tests are colocated next to source: `App.test.tsx`,
-`lib/genUserName.test.ts`, `lib/persona.test.ts`. New tests should follow
-that convention.
+## `test/manual/`
+
+Manual and E2E Node scripts for wallet, PPQ, and media workflows. These are
+run explicitly with `tsx`; they are not part of the automated node:test suite.
+
+## `test/scripts/`
+
+Validation scripts for node:test, source policy, build verification, bundle
+analysis/budgets, and PWA smoke checks. Root `scripts/` is reserved for app
+build/dev/shared-env scripts.
+
+Production unit and focused component tests are colocated next to source, for
+example `src/lib/genUserName.test.ts` and `src/lib/persona.test.ts`.
+Integration tests live under `test/integration/`.
 
 ## Storage keys
 
 | Key                   | Owner                | Contents                                       |
 | --------------------- | -------------------- | ---------------------------------------------- |
-| `nostr:app-config`    | `AppProvider`        | Theme, relay metadata, Blossom server metadata. Zod-validated on read. |
-| `nostr:login`         | `NostrLoginProvider` | All saved logins (nsec / bunker / extension).  |
-| `phoenix:ppq:account` | `lib/ppq/storage.ts` | `{ api_key, credit_id }` — the operator's PPQ account. |
+| `nostr:app-config`    | `AppProvider`        | Theme, relay metadata, Blossom server metadata. Runtime-validated on read. |
+| `nostr:login`         | `NostrLoginProvider` | In-memory active login store. The storage key is retained for Nostrify compatibility, but `appNostrLoginStorage` is not persistent. |
+| `phoenix:ppq:account` | `lib/ppq/storage.ts` | Legacy local PPQ cache key cleared during operator session cleanup. |
 
 **No persona keys live in `localStorage`.** Persona nsecs live inside the
 encrypted kind 30078 event content, recoverable from any device with the
@@ -229,7 +253,7 @@ operator's signer. See `lib/personaKey.ts:1-9`.
 - **`App.tsx` — providers only**, routes go in `AppRouter.tsx` (file comment line 1-2).
 - **`useNostr.ts` — re-export only**, do not add logic (file comment lines 1-5).
 - **`useLoginActions.ts` — only edit to add new login methods** (file comment line 10).
-- **`components/ui/` — shadcn-generated**, regenerate, don't hand-edit.
+- **`components/ui/` — copied primitives**, keep edits small and match the local pattern.
 - **No Zuka-specific tags on persona-published events.** Read `lib/persona.ts:1-43` and `lib/personaPost.ts:1-19` before touching tag arrays.
 - **No NIP-04 anywhere.** Use NIP-44 via `signer.nip44.{encrypt,decrypt}`.
 - **The current-user signer is at `useCurrentUser().user.signer`.** It satisfies the `Nip44Signer` interface — cast to that when calling `lib/personaCrypto.ts` helpers.
@@ -238,8 +262,4 @@ operator's signer. See `lib/personaKey.ts:1-9`.
 
 - Code in `src/` (canonical).
 - `docs/DATA-FLOW.md` — the seams traced through real call paths.
-- `dev/PROJECT.md` — design doc / master plan. Aligned on the identity
-  model (§3), dependencies (§4 — Breez Spark SDK + PPQ credits), and
-  tag-omission stance. Diverges on the d-tag *value* scheme (spec:
-  stable opaque per persona; code: random per publish) — see warning
-  at the top.
+- `docs/PRODUCT.md` — product model, release scope, and non-goals.

@@ -5,8 +5,8 @@
  * AND the persona's ppq.ai credit balance behind one hook so the dashboard
  * can render both numbers from a single subscription.
  *
- * Default-on auto-topup orchestrator lives here too: when ppq balance dips
- * below `autoTopup.thresholdUsd`, the hook fires a single in-flight
+ * Optional auto-topup orchestrator lives here too: when enabled and ppq
+ * balance dips below `autoTopup.thresholdUsd`, the hook fires a single in-flight
  * `runAutoTopupOnce` that pays a ppq Lightning invoice from the persona's
  * Spark wallet, polls until it settles, and refreshes the balance.
  *
@@ -47,7 +47,7 @@ import {
 } from "@/lib/wallet/types";
 import type { PpqAccount, PpqQueryHistoryItem } from "@/lib/ppq/types";
 
-import { usePpqAccount } from "./usePpqAccount";
+import { usePpqAccount, type PpqAccountOptions } from "./usePpqAccount";
 
 const WALLET_INFO_REFETCH_MS = 15_000;
 const DEFAULT_SELF_FUNDED_AUTO_TOPUP_CONFIG: AutoTopupConfig = {
@@ -77,13 +77,14 @@ export interface UseWalletOptions {
   mnemonic: string | undefined;
   /**
    * Initial auto-topup config. Defaults to `DEFAULT_AUTO_TOPUP_CONFIG`
-   * (enabled, threshold $5, top-up amount $5). The hook holds this in state and
+   * (disabled, threshold $5, top-up amount $5). The hook holds this in state and
    * exposes `setAutoTopup` for callers to mutate. Persistence (e.g. into
    * the persona's encrypted backup) is the caller's responsibility — wire
    * a `useEffect` on `autoTopup` to write changes back.
    */
   autoTopup?: AutoTopupConfig;
   operatorFundingWallet?: OperatorFundingWallet;
+  ppqAccountOptions?: PpqAccountOptions;
 }
 
 export interface AutoTopupRunState {
@@ -114,6 +115,9 @@ export interface UseWalletResult {
   /* ----- ppq.ai credit ----- */
   ppqBalanceUsd: number | undefined;
   ppqAccount: PpqAccount | null;
+  rotatePpqAccount: () => Promise<PpqAccount>;
+  isPpqRotating: boolean;
+  ppqRotateError: Error | undefined;
   isPpqBalanceLoading: boolean;
   refreshPpqBalance: () => void;
   ppqQueryHistory: PpqQueryHistoryItem[] | undefined;
@@ -145,7 +149,7 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
     opts.operatorFundingWallet?.refreshPayments;
   const qc = useQueryClient();
 
-  const ppq = usePpqAccount();
+  const ppq = usePpqAccount(opts.ppqAccountOptions);
 
   /* ---------- Auto-topup config (controlled-ish, no sync effect) ---------- */
 
@@ -452,9 +456,6 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
     if (lastAutoTopupKeyRef.current === runKey) return;
     lastAutoTopupKeyRef.current = runKey;
     autoTopupMutation.mutate();
-    // We intentionally leave `autoTopupMutation` out of deps — TanStack
-    // Query mutation objects are referentially stable per query client.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     balanceUsd,
     canAutoTopup,
@@ -463,6 +464,9 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
     autoTopup.fundingSource,
     ppq.account?.credit_id,
     resolveFundingWallet,
+    autoTopupMutation.isPending,
+    autoTopupMutation.mutate,
+    autoTopupRun.isRunning,
   ]);
 
   const triggerAutoTopup = useCallback(async () => {
@@ -512,6 +516,9 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
       sendError: sendMutation.error ?? undefined,
       ppqBalanceUsd: ppq.balance?.balance_usd,
       ppqAccount: ppq.account,
+      rotatePpqAccount: ppq.rotateAccount,
+      isPpqRotating: ppq.isRotating,
+      ppqRotateError: ppq.rotateError ?? undefined,
       isPpqBalanceLoading: ppq.isBalanceLoading,
       refreshPpqBalance: ppq.refreshBalance,
       ppqQueryHistory: ppqQueryHistoryQuery.data?.data,
@@ -543,6 +550,9 @@ export function useWallet(opts: UseWalletOptions): UseWalletResult {
       sendMutation,
       ppq.balance?.balance_usd,
       ppq.account,
+      ppq.rotateAccount,
+      ppq.isRotating,
+      ppq.rotateError,
       ppq.isBalanceLoading,
       ppq.refreshBalance,
       ppqQueryHistoryQuery.data,

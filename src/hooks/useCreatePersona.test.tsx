@@ -2,15 +2,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import type { NostrEvent } from "@nostrify/nostrify";
 import type { PropsWithChildren } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import { queryKeys } from "@/lib/queryKeys";
 import { LightningUsernameTakenError } from "@/lib/wallet/lightningAddress";
 import { useCreatePersona } from "./useCreatePersona";
 
-const mocks = vi.hoisted(() => {
-  const nostrEvent = vi.fn();
-  const signEvent = vi.fn(async (template: {
+const mocks = hoisted(() => {
+  const nostrEvent = mockFn();
+  const signEvent = mockFn(async (template: {
     kind: number;
     created_at: number;
     tags: string[][];
@@ -25,51 +25,51 @@ const mocks = vi.hoisted(() => {
   return {
     nostrEvent,
     signEvent,
-    generatePersonaKeypair: vi.fn(),
-    signWithPersona: vi.fn(),
-    generateMnemonic: vi.fn(),
-    connectWallet: vi.fn(),
-    disconnectWallet: vi.fn(),
-    registerLightningAddressWithRetry: vi.fn(),
-    encryptPhoenixEnvelope: vi.fn(),
+    generatePersonaKeypair: mockFn(),
+    signWithPersona: mockFn(),
+    generateMnemonic: mockFn(),
+    connectWallet: mockFn(),
+    disconnectWallet: mockFn(),
+    registerLightningAddressWithRetry: mockFn(),
+    encryptPhoenixEnvelope: mockFn(),
   };
 });
 
-vi.mock("@nostrify/react", () => ({
+mockModule("@nostrify/react", () => ({
   useNostr: () => ({ nostr: { event: mocks.nostrEvent } }),
 }));
 
-vi.mock("./useCurrentUser", () => ({
+mockModule("./useCurrentUser", () => ({
   useCurrentUser: () => ({
     user: {
       pubkey: "operator-pubkey",
       signer: {
         signEvent: mocks.signEvent,
         nip44: {
-          encrypt: vi.fn(),
-          decrypt: vi.fn(),
+          encrypt: mockFn(),
+          decrypt: mockFn(),
         },
       },
     },
   }),
 }));
 
-vi.mock("@/lib/personaKey", () => ({
+mockModule("@/lib/personaKey", () => ({
   generatePersonaKeypair: mocks.generatePersonaKeypair,
   signWithPersona: mocks.signWithPersona,
 }));
 
-vi.mock("@/lib/personaCrypto", () => ({
+mockModule("@/lib/personaCrypto", () => ({
   encryptPhoenixEnvelope: mocks.encryptPhoenixEnvelope,
 }));
 
-vi.mock("@/lib/wallet/client", () => ({
+mockModule("@/lib/wallet/client", () => ({
   connectWallet: mocks.connectWallet,
   disconnectWallet: mocks.disconnectWallet,
   generateMnemonic: mocks.generateMnemonic,
 }));
 
-vi.mock("@/lib/wallet/lightningAddress", async (importOriginal) => {
+mockModule("@/lib/wallet/lightningAddress", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@/lib/wallet/lightningAddress")>();
   return {
@@ -199,6 +199,35 @@ describe("useCreatePersona", () => {
     });
 
     expect(mocks.nostrEvent).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns a profile warning when the public profile publish fails after backup success", async () => {
+    mocks.nostrEvent
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("profile relay timeout"));
+    const { result } = renderHook(() => useCreatePersona(), { wrapper });
+
+    await act(async () => {
+      const created = await result.current.mutateAsync({
+        name: "Voice",
+        username: "public-voice",
+        lightningUsername: "donate-voice",
+        bio: "Bio",
+        systemPrompt: "System",
+      });
+
+      expect(created.npub).toBe("npub1persona");
+      expect(created.profileWarning).toContain("profile relay timeout");
+    });
+
+    expect(mocks.nostrEvent).toHaveBeenCalledTimes(2);
+    expect(
+      queryClient.getQueryData(queryKeys.persona.detail("npub1persona", "operator-pubkey")),
+    ).toEqual(
+      expect.objectContaining({
+        event: expect.objectContaining({ id: "backup-event-id" }),
+      }),
+    );
   });
 
   it("fails persona creation when the requested Lightning Address is taken", async () => {

@@ -24,24 +24,40 @@ export const queryKeys = {
       ["persona-public-profile", pubkey ?? ""] as const,
     allPublicProfiles: () => ["persona-public-profile"] as const,
   },
+  encryptedAppData: {
+    all: () => ["encrypted-app-data"] as const,
+    events: (userPubkey: string | undefined) =>
+      ["encrypted-app-data", "events", userPubkey ?? ""] as const,
+  },
   wallet: {
+    allDetails: () => ["wallet"] as const,
     detail: (walletId: string | undefined) => ["wallet", walletId ?? ""] as const,
+    allPayments: () => ["wallet-payments"] as const,
     payments: (walletId: string | undefined) =>
       ["wallet-payments", walletId ?? ""] as const,
   },
   operator: {
+    all: () => ["phoenix-operator"] as const,
     envelope: (pubkey: string | undefined) =>
-      ["phoenix-operator-envelope", pubkey] as const,
+      ["phoenix-operator", pubkey ?? ""] as const,
   },
   ppq: {
-    account: () => ["ppq", "account"] as const,
+    all: () => ["ppq"] as const,
+    account: (operatorPubkey: string | undefined) =>
+      ["ppq", "account", operatorPubkey ?? ""] as const,
+    allAccounts: () => ["ppq", "account"] as const,
     balance: (creditId: string | undefined) => ["ppq", "balance", creditId] as const,
     allBalances: () => ["ppq", "balance"] as const,
     queryHistory: (creditId: string | undefined) =>
       ["ppq", "query-history", creditId ?? ""] as const,
-    topup: (invoiceId: string | null | undefined) =>
-      ["ppq", "topup", invoiceId] as const,
-    nwcAutoTopup: () => ["ppq", "nwc-auto-topup"] as const,
-    video: (id: string | undefined) => ["ppq", "video", id] as const,
+    allQueryHistory: () => ["ppq", "query-history"] as const,
+    topup: (
+      creditId: string | undefined,
+      invoiceId: string | null | undefined,
+    ) => ["ppq", "topup", creditId ?? "", invoiceId] as const,
+    nwcAutoTopup: (creditId: string | undefined) =>
+      ["ppq", "nwc-auto-topup", creditId ?? ""] as const,
+    video: (creditId: string | undefined, id: string | undefined) =>
+      ["ppq", "video", creditId ?? "", id] as const,
   },
 } as const;

@@ -1,38 +1,50 @@
 import { useNostr } from '@nostrify/react';
 import {
   NLogin,
+  type NLoginType,
   type NostrConnectParams,
   type NostrConnectStatus,
   useNostrLogin,
 } from '@nostrify/react/login';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '@/hooks/useAppContext';
 import { APP_RELAYS } from '@/lib/appRelays';
+import { clearOperatorSessionState } from '@/lib/operatorSessionState';
 
-// NOTE: This file should not be edited except for adding new login methods.
+// Central auth boundary. Keep Zuka to one active login slot and route all
+// login/logout changes through operator session cleanup.
 
 export type { NostrConnectParams, NostrConnectStatus };
 export { generateNostrConnectParams, generateNostrConnectURI } from '@nostrify/react/login';
 
 export function useLoginActions() {
   const { nostr } = useNostr();
-  const { logins, addLogin, removeLogin } = useNostrLogin();
+  const { logins, addLogin, clearLogins } = useNostrLogin();
   const { config } = useAppContext();
+  const queryClient = useQueryClient();
+  const currentLogin = logins[0];
+
+  async function replaceLogin(login: NLoginType): Promise<void> {
+    await clearOperatorSessionState(queryClient, currentLogin?.pubkey);
+    clearLogins();
+    addLogin(login);
+  }
 
   return {
     // Login with a Nostr secret key
-    nsec(nsec: string): void {
+    async nsec(nsec: string): Promise<void> {
       const login = NLogin.fromNsec(nsec);
-      addLogin(login);
+      await replaceLogin(login);
     },
     // Login with a NIP-46 "bunker://" URI
     async bunker(uri: string): Promise<void> {
       const login = await NLogin.fromBunker(uri, nostr);
-      addLogin(login);
+      await replaceLogin(login);
     },
     // Login with a NIP-07 browser extension
     async extension(): Promise<void> {
       const login = await NLogin.fromExtension();
-      addLogin(login);
+      await replaceLogin(login);
     },
     // Login via nostrconnect:// (client-initiated NIP-46)
     // The client displays a QR code and waits for the remote signer to connect.
@@ -45,7 +57,7 @@ export function useLoginActions() {
       onStatus?: (status: NostrConnectStatus) => void,
     ): Promise<void> {
       const login = await NLogin.fromNostrConnect(params, nostr, { signal, onStatus });
-      addLogin(login);
+      await replaceLogin(login);
     },
     // Get the relay URLs for NIP-46 nostrconnect communication
     getRelayUrls(): string[] {
@@ -60,10 +72,8 @@ export function useLoginActions() {
     },
     // Log out the current user
     async logout(): Promise<void> {
-      const login = logins[0];
-      if (login) {
-        removeLogin(login.id);
-      }
+      await clearOperatorSessionState(queryClient, currentLogin?.pubkey);
+      clearLogins();
     }
   };
 }

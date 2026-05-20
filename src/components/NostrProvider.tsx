@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { type NostrSigner, NostrEvent, NostrFilter, NPool, NRelay1 } from '@nostrify/nostrify';
+import type React from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { type NostrSigner, type NostrEvent, type NostrFilter, NPool, NRelay1 } from '@nostrify/nostrify';
 import { NostrContext } from '@nostrify/react';
 import { NUser, useNostrLogin } from '@nostrify/react/login';
 import { useQueryClient } from '@tanstack/react-query';
@@ -31,7 +32,6 @@ const NostrProvider: React.FC<NostrProviderProps> = (props) => {
   // the render body pure (no ref writes) while guaranteeing a single
   // NPool instance per provider. The initializer runs exactly once at
   // mount, so reading refs inside its closures is safe.
-  // eslint-disable-next-line react-hooks/refs
   const [pool] = useState<NPool>(() => new NPool({
     open(url: string) {
       return new NRelay1(url, {

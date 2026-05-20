@@ -14,7 +14,7 @@
  *   - "phoenix" / "client" tag  (would fingerprint the app)
  *   - persona name in alt tag   (would identify the persona)
  *
- * See tasks/derek-plan.md "Locked decisions" §2 (kind 1 posts).
+ * See `docs/THREAT-MODEL.md` for the operator/persona privacy model.
  */
 
 export interface PersonaPostInput {
@@ -145,12 +145,12 @@ function parseImetaFields(tag: string[]): Record<string, string> {
   return fields;
 }
 
-/** Sanitise to http(s)-only URLs. Rejects data:/javascript:/etc. */
+/** Sanitise to HTTPS-only URLs. Rejects http:/data:/javascript:/etc. */
 function sanitizeMediaUrl(raw: string | undefined): string | null {
   if (!raw) return null;
   try {
     const u = new URL(raw);
-    if (u.protocol === "http:" || u.protocol === "https:") {
+    if (u.protocol === "https:") {
       return u.toString();
     }
   } catch {

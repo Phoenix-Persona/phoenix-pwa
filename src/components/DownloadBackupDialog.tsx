@@ -7,9 +7,9 @@
  * primitive behind the demo's "kill-and-resurrect" arc — the user can
  * walk to a different device, drop the file in, and continue.
  *
- * The export passphrase is independent of the at-rest passphrase used
- * by `<UnlockGate>`. Users can pick the same one or a different one;
- * we recommend distinct so a leak of one doesn't compromise the other.
+ * The export passphrase is independent of the at-rest passphrase used for
+ * the saved local account login. Users can pick the same one or a different
+ * one; we recommend distinct so a leak of one doesn't compromise the other.
  *
  * Only available for nsec-type logins (Phoenix-managed or pasted
  * nsec). NIP-07 / NIP-46 users hold their key in an external signer

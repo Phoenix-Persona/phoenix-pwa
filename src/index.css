@@ -53,28 +53,10 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-xl: calc(var(--radius) + 4px);
-
-  --animate-accordion-down: accordion-down 0.2s ease-out;
-  --animate-accordion-up: accordion-up 0.2s ease-out;
 
   /* Typography tokens for Tailwind utilities */
   --font-display: "Fraunces Variable", "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
@@ -96,24 +78,6 @@
   --color-rw-gold: var(--rw-gold);
   --color-rw-gold-soft: var(--rw-gold-soft);
   --color-rw-sky: var(--rw-sky);
-
-  @keyframes accordion-down {
-    from {
-      height: 0;
-    }
-    to {
-      height: var(--radix-accordion-content-height);
-    }
-  }
-
-  @keyframes accordion-up {
-    from {
-      height: var(--radix-accordion-content-height);
-    }
-    to {
-      height: 0;
-    }
-  }
 }
 
 /* Container utility replacement for v4 (previously configured in tailwind.config) */
@@ -178,20 +142,6 @@
   --input: hsl(38 20% 86%);
   --ring: hsl(28 70% 42%);
 
-  --chart-1: hsl(28 70% 48%);   /* ochre */
-  --chart-2: hsl(8 65% 38%);    /* clay */
-  --chart-3: hsl(150 50% 32%);  /* hills green */
-  --chart-4: hsl(46 92% 52%);   /* sun gold */
-  --chart-5: hsl(20 15% 10%);   /* charcoal */
-
-  --sidebar: hsl(38 35% 94%);
-  --sidebar-foreground: hsl(20 15% 10%);
-  --sidebar-primary: hsl(28 70% 42%);
-  --sidebar-primary-foreground: hsl(38 35% 96%);
-  --sidebar-accent: hsl(38 25% 86%);
-  --sidebar-accent-foreground: hsl(20 15% 10%);
-  --sidebar-border: hsl(38 20% 82%);
-  --sidebar-ring: hsl(28 70% 42%);
 }
 
 .dark {
@@ -235,20 +185,6 @@
   --input: hsl(20 12% 19%);
   --ring: hsl(28 75% 58%);
 
-  --chart-1: hsl(28 75% 58%);
-  --chart-2: hsl(8 70% 52%);
-  --chart-3: hsl(150 50% 50%);
-  --chart-4: hsl(46 92% 60%);
-  --chart-5: hsl(38 35% 80%);
-
-  --sidebar: hsl(20 15% 9%);
-  --sidebar-foreground: hsl(38 35% 92%);
-  --sidebar-primary: hsl(28 75% 58%);
-  --sidebar-primary-foreground: hsl(20 15% 7%);
-  --sidebar-accent: hsl(20 12% 14%);
-  --sidebar-accent-foreground: hsl(38 35% 92%);
-  --sidebar-border: hsl(20 12% 19%);
-  --sidebar-ring: hsl(28 75% 58%);
 }
 
 /* Imigongo background pattern — apply to hero sections, dividers */

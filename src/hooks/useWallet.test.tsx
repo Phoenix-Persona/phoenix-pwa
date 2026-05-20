@@ -1,23 +1,23 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, mockFn, hoisted, mockModule } from "@/test/api";
 
 import { useWallet } from "./useWallet";
 
-const mocks = vi.hoisted(() => ({
-  connectWallet: vi.fn(),
-  disconnectWallet: vi.fn(),
-  listRecentPayments: vi.fn(),
-  loadWalletInfo: vi.fn(),
-  receiveBolt11: vi.fn(),
-  sendBolt11: vi.fn(),
-  getQueryHistory: vi.fn(),
-  runAutoTopupOnce: vi.fn(),
-  runManualTopupOnce: vi.fn(),
-  refreshOperatorInfo: vi.fn(),
-  refreshOperatorPayments: vi.fn(),
-  refreshBalance: vi.fn(),
+const mocks = hoisted(() => ({
+  connectWallet: mockFn(),
+  disconnectWallet: mockFn(),
+  listRecentPayments: mockFn(),
+  loadWalletInfo: mockFn(),
+  receiveBolt11: mockFn(),
+  sendBolt11: mockFn(),
+  getQueryHistory: mockFn(),
+  runAutoTopupOnce: mockFn(),
+  runManualTopupOnce: mockFn(),
+  refreshOperatorInfo: mockFn(),
+  refreshOperatorPayments: mockFn(),
+  refreshBalance: mockFn(),
   ppq: {
     account: null as { api_key: string; credit_id: string } | null,
     balance: undefined as { balance_usd: number } | undefined,
@@ -25,11 +25,11 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/lib/ppq/client", () => ({
+mockModule("@/lib/ppq/client", () => ({
   getQueryHistory: mocks.getQueryHistory,
 }));
 
-vi.mock("@/lib/wallet/client", () => ({
+mockModule("@/lib/wallet/client", () => ({
   connectWallet: mocks.connectWallet,
   disconnectWallet: mocks.disconnectWallet,
   listRecentPayments: mocks.listRecentPayments,
@@ -38,12 +38,12 @@ vi.mock("@/lib/wallet/client", () => ({
   sendBolt11: mocks.sendBolt11,
 }));
 
-vi.mock("@/lib/wallet/autoTopup", () => ({
+mockModule("@/lib/wallet/autoTopup", () => ({
   runAutoTopupOnce: mocks.runAutoTopupOnce,
   runManualTopupOnce: mocks.runManualTopupOnce,
 }));
 
-vi.mock("./usePpqAccount", () => ({
+mockModule("./usePpqAccount", () => ({
   usePpqAccount: () => ({
     account: mocks.ppq.account,
     balance: mocks.ppq.balance,
@@ -98,6 +98,12 @@ describe("useWallet", () => {
           walletId: "persona:abc",
           mnemonic:
             "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+          autoTopup: {
+            enabled: true,
+            thresholdUsd: 5,
+            topupAmountUsd: 5,
+            fundingSource: "persona",
+          },
         }),
       { wrapper },
     );
@@ -119,6 +125,12 @@ describe("useWallet", () => {
           walletId: "persona:abc",
           mnemonic:
             "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+          autoTopup: {
+            enabled: true,
+            thresholdUsd: 5,
+            topupAmountUsd: 5,
+            fundingSource: "persona",
+          },
         }),
       { wrapper },
     );

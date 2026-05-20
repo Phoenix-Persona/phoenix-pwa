@@ -1,5 +1,5 @@
 /**
- * Settings — account, relays, media servers, and persona management.
+ * Settings — account, relays, media servers, and Nostr viewer preferences.
  *
  * Logged-in only. Four sections on a single scrollable page:
  *   - Account: Zuka-managed user nsec, lock / forget device,
@@ -8,24 +8,18 @@
  *   - Media: BUD-03 Blossom server list via BlossomServerListManager
  *     (where persona pictures, post images, and generated videos are
  *     uploaded)
- *   - Personas: thin list with edit/delete affordances on top of the
- *     same useMyPersonas query that powers /my-personas
+ *   - Nostr viewer: external client used for event links
  */
 
-import { Link, useNavigate } from "react-router-dom";
-import { useSeoMeta } from "@unhead/react";
+import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
-  Lock,
   LogOut,
-  Pencil,
-  Plus,
-  Trash2,
   TriangleAlert,
   User as UserIcon,
 } from "lucide-react";
 import { useNostrLogin } from "@nostrify/react/login";
 import { nip19 } from "nostr-tools";
-import type { NostrEvent } from "@nostrify/nostrify";
 
 import { AppHeader } from "@/components/AppHeader";
 import { BlossomServerListManager } from "@/components/BlossomServerListManager";
@@ -33,7 +27,6 @@ import { ChangePassphraseDialog } from "@/components/ChangePassphraseDialog";
 import { DownloadBackupDialog } from "@/components/DownloadBackupDialog";
 import { FlagStripe } from "@/components/ImigongoBand";
 import { NostrViewerSettings } from "@/components/NostrViewerSettings";
-import { PersonaStatsBadge } from "@/components/PersonaStatsBadge";
 import { RelayListManager } from "@/components/RelayListManager";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,30 +42,25 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useLoginActions } from "@/hooks/useLoginActions";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { useLoggedInAccounts } from "@/hooks/useLoggedInAccounts";
-import { useMyPersonas, usePersonaActivityStats } from "@/hooks/usePersona";
-import { useDeletePersona } from "@/hooks/useDeletePersona";
 import { impactHeavy, notificationWarning } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
+import { hasUserNcryptsec } from "@/lib/nip49Storage";
 import {
-  clearSessionUnlocked,
-  clearUserNcryptsec,
-  hasUserNcryptsec,
-  NOSTR_LOGIN_STORAGE_KEY,
-} from "@/lib/nip49Storage";
-import { formatDeletePersonaWarnings } from "@/lib/personaDeleteWarnings";
+  clearOperatorDeviceSecrets,
+} from "@/lib/operatorSessionState";
 
 const Settings = () => {
-  useSeoMeta({ title: "Settings — Zuka" });
+  usePageMeta({ title: "Settings — Zuka" });
   const navigate = useNavigate();
   const { user } = useCurrentUser();
-  const { logins, removeLogin } = useNostrLogin();
+  const { logins } = useNostrLogin();
   const { currentUser } = useLoggedInAccounts();
-  const personas = useMyPersonas();
-  const personaPubkeys = personas.data?.map((p) => p.envelope.persona.pubkey);
-  const personaStats = usePersonaActivityStats(personaPubkeys);
-  const deletePersona = useDeletePersona();
+  const login = useLoginActions();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const userNpub = user ? nip19.npubEncode(user.pubkey) : "";
   const phoenixManaged = hasUserNcryptsec();
@@ -86,82 +74,35 @@ const Settings = () => {
       ? currentLogin.data.nsec
       : null;
 
-  function handleLockNow() {
+  async function handleLogout() {
     notificationWarning();
-    // Clear the Nostrify session AND the per-tab session flag. The
-    // <UnlockGate> reactively computes its `needsUnlock` state from
-    // `logins.length` so removing the login here causes the modal
-    // to render IMMEDIATELY over whatever route the user is on —
-    // no route change, no remount, no lost scroll/form state. They
-    // re-enter the passphrase and the modal hides without disturbing
-    // the page underneath.
-    const current = logins[0];
-    if (current) removeLogin(current.id);
-    clearSessionUnlocked();
+    await login.logout();
+    navigate("/");
     toast({
-      title: "Locked",
-      description: "Enter your passphrase to unlock.",
+      title: "Logged out",
+      description: "Your local account backup is still saved on this device.",
     });
   }
 
-  function handleForgetDevice() {
+  async function handleWipeDeviceData() {
     const ok = window.confirm(
-      "Forget this device? You'll need your nsec backup to sign in again on this browser. Personas survive — they're stored on relays."
+      "Wipe device data? You'll need your encrypted key backup or an external signer to use Zuka on this browser again. Personas survive — they're stored on relays."
     );
     if (!ok) return;
     impactHeavy();
 
-    // Clear synchronously, then hard-reload to root. Hard reload is
+    // Clear local state, then hard-reload to root. Hard reload is
     // intentional — it drops Nostrify's in-memory login state, the
     // React Query cache (keyed on the prior user pubkey), the Spark
     // SDK handle, and all React state, leaving a clean slate for
     // the next sign-in. Soft navigate would leak prior-user data
     // through caches.
     //
-    // We bypass Nostrify's removeLogin and write to nostr:login
-    // directly — removeLogin's localStorage flush is async via a
-    // useEffect, which races the page reload.
-    clearUserNcryptsec();
-    clearSessionUnlocked();
-    try {
-      window.localStorage.removeItem(NOSTR_LOGIN_STORAGE_KEY);
-    } catch {
-      /* best effort */
-    }
+    // We bypass Nostrify's removeLogin and clear nostr:login directly
+    // because removeLogin's localStorage flush is async via a useEffect,
+    // which races the page reload.
+    await clearOperatorDeviceSecrets(queryClient, user?.pubkey);
     window.location.assign("/");
-  }
-
-  function deletePersonaFromSettings({
-    backupEvent,
-    personaPubkey,
-    npub,
-    personaName,
-  }: {
-    backupEvent: NostrEvent;
-    personaPubkey: string;
-    npub: string;
-    personaName: string;
-  }) {
-    deletePersona.mutate(
-      { backupEvent, personaPubkey, npub },
-      {
-        onSuccess: (result) => {
-          toast({
-            title: "Persona deleted",
-            description:
-              formatDeletePersonaWarnings(result.warnings) ??
-              `${personaName} was removed from your personas.`,
-          });
-        },
-        onError: (error) => {
-          toast({
-            title: "Delete failed",
-            description: error.message,
-            variant: "destructive",
-          });
-        },
-      },
-    );
   }
 
   return (
@@ -181,7 +122,7 @@ const Settings = () => {
               Settings
             </p>
             <h1 className="font-display text-4xl md:text-5xl font-medium tracking-tight">
-              Account, relays, personas
+              Account, relays, media
             </h1>
           </div>
           <FlagStripe height={4} />
@@ -229,17 +170,17 @@ const Settings = () => {
                     {exportableNsec && (
                       <DownloadBackupDialog nsec={exportableNsec} />
                     )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleLogout()}
+                    >
+                      <LogOut className="mr-2 size-4" />
+                      Log out
+                    </Button>
                     {phoenixManaged && (
                       <>
                         <ChangePassphraseDialog />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleLockNow}
-                        >
-                          <Lock className="mr-2 size-4" />
-                          Lock now
-                        </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
@@ -248,45 +189,32 @@ const Settings = () => {
                               className="text-destructive border-destructive/30 hover:bg-destructive/5"
                             >
                               <TriangleAlert className="mr-2 size-4" />
-                              Forget this device
+                              Wipe device data
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Forget this device?</AlertDialogTitle>
+                              <AlertDialogTitle>Wipe device data?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                The encrypted key parked on this browser will be
-                                cleared. You'll need your nsec backup to sign in
-                                again here. Personas you've already published
-                                survive on relays.
+                                The encrypted key and runtime state on this
+                                browser will be cleared. You'll need your
+                                encrypted key backup or an external signer to
+                                sign in again here. Personas you've already
+                                published survive on relays.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={handleForgetDevice}
+                                onClick={handleWipeDeviceData}
                                 className="bg-destructive hover:bg-destructive/90"
                               >
-                                Forget device
+                                Wipe device data
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
                       </>
-                    )}
-                    {!phoenixManaged && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const current = logins[0];
-                          if (current) removeLogin(current.id);
-                          navigate("/");
-                        }}
-                      >
-                        <LogOut className="mr-2 size-4" />
-                        Sign out
-                      </Button>
                     )}
                   </div>
                 </CardContent>
@@ -335,122 +263,6 @@ const Settings = () => {
               </Card>
             </section>
 
-            {/* Personas */}
-            <section className="space-y-4">
-              <SectionHeader
-                eyebrow="Personas"
-                title="Voices you operate"
-                description="Edit a persona's prompt, voice, or tags. Delete one to unlink it from your account."
-                action={
-                  <Button asChild size="sm" variant="outline">
-                    <Link to="/onboard">
-                      <Plus className="mr-2 size-4" />
-                      New persona
-                    </Link>
-                  </Button>
-                }
-              />
-
-              {personas.isLoading ? (
-                <div className="space-y-2">
-                  {[0, 1, 2].map((i) => (
-                    <Card
-                      key={i}
-                      className="border-imigongo-clay/20 animate-pulse"
-                    >
-                      <CardContent className="h-20" />
-                    </Card>
-                  ))}
-                </div>
-              ) : personas.data && personas.data.length > 0 ? (
-                <ul className="space-y-2">
-                  {personas.data.map(({ event, envelope, npub }) => {
-                    const persona = envelope.persona;
-                    return (
-                      <li key={event.id}>
-                        <Card className="border-imigongo-clay/20 overflow-hidden">
-                          <CardContent className="p-5 flex items-center gap-4 flex-wrap">
-                            <div className="flex-1 min-w-0 space-y-1.5">
-                              <p className="font-display text-lg font-medium tracking-tight">
-                                {persona.name}
-                              </p>
-                              <PersonaStatsBadge
-                                stats={personaStats.data?.get(persona.pubkey)}
-                                loading={personaStats.isLoading}
-                              />
-                            </div>
-                            <div className="flex gap-1.5">
-                              <Button asChild size="sm" variant="outline">
-                                <Link to={`/dashboard/${npub}/edit`}>
-                                  <Pencil className="mr-1.5 size-3.5" />
-                                  Edit
-                                </Link>
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-destructive border-destructive/30 hover:bg-destructive/5"
-                                    disabled={deletePersona.isPending}
-                                  >
-                                    <Trash2 className="mr-1.5 size-3.5" />
-                                    Delete
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Delete {persona.name}?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Zuka will publish a deletion request
-                                      for this persona's encrypted backup. The
-                                      persona keypair becomes inaccessible to
-                                      you afterwards. Posts already published
-                                      to relays will remain public — Nostr
-                                      cannot retract them.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() =>
-                                        deletePersonaFromSettings({
-                                          backupEvent: event,
-                                          personaPubkey: persona.pubkey,
-                                          npub,
-                                          personaName: persona.name,
-                                        })
-                                      }
-                                      className="bg-destructive hover:bg-destructive/90"
-                                    >
-                                      Delete persona
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <Card className="border-dashed border-imigongo-clay/30">
-                  <CardContent className="py-10 text-center text-muted-foreground space-y-3">
-                    <p className="text-sm">No personas yet.</p>
-                    <Button asChild size="sm">
-                      <Link to="/onboard">
-                        <Plus className="mr-2 size-4" />
-                        Create your first persona
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-            </section>
           </div>
         )}
       </main>

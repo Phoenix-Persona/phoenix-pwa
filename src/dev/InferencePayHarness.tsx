@@ -14,7 +14,6 @@
 
 import { useState } from "react";
 import { Image as ImageIcon, Loader2, MessageSquare, Wand2 } from "lucide-react";
-import { useSeoMeta } from "@unhead/react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/useToast";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { useWallet } from "@/hooks/useWallet";
 import { usePpqInference } from "@/hooks/usePpqInference";
 import { usePpqImage } from "@/hooks/usePpqImage";
@@ -40,7 +40,7 @@ function fmtMoney(n: number | undefined): string {
 }
 
 export default function InferencePayHarness() {
-  useSeoMeta({ title: "/dev/inference-pay — Phoenix" });
+  usePageMeta({ title: "/dev/inference-pay — Phoenix" });
   const { toast } = useToast();
 
   const [mnemonicInput, setMnemonicInput] = useState(PINNED_MNEMONIC ?? "");

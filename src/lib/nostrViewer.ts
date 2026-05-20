@@ -17,8 +17,21 @@ export const NOSTR_VIEWER_PRESETS: readonly NostrViewerPreset[] = [
 
 export const DEFAULT_NOSTR_VIEWER_URL = NOSTR_VIEWER_PRESETS[0].urlPrefix;
 
+export function sanitizeNostrViewerUrlPrefix(value: string): string | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return null;
+    const href = url.toString().replace(/\/+$/, "");
+    return `${href}/`;
+  } catch {
+    return null;
+  }
+}
+
 export function buildEventUrl(viewerPrefix: string, nevent: string): string {
-  const trimmed = viewerPrefix.replace(/\/+$/, "");
+  const safePrefix =
+    sanitizeNostrViewerUrlPrefix(viewerPrefix) ?? DEFAULT_NOSTR_VIEWER_URL;
+  const trimmed = safePrefix.replace(/\/+$/, "");
   return `${trimmed}/${nevent}`;
 }
 

@@ -1,15 +1,15 @@
-import { useSeoMeta } from "@unhead/react";
 import { Link, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { ImigongoSeal } from "@/components/ImigongoBand";
 import { Button } from "@/components/ui/button";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const NotFound = () => {
   const location = useLocation();
 
-  useSeoMeta({
+  usePageMeta({
     title: "Not found — Zuka",
     description:
       "The page you are looking for could not be found. Return to Zuka to continue.",

@@ -1,5 +1,5 @@
 /**
- * Receive — generate a BOLT11 invoice the user can pay from any
+ * Deposit — generate a BOLT11 invoice the user can pay from any
  * Lightning wallet. Shows the QR + raw invoice. While the invoice is
  * displayed the dialog subscribes to the SDK's event stream and
  * dismisses itself once the matching `paymentSucceeded` event lands —
@@ -7,7 +7,7 @@
  * closes immediately so the moment of receipt feels responsive.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Copy, Loader2 } from "lucide-react";
 
 import {
@@ -66,9 +66,9 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
     toast({ title: "Invoice copied" });
   }
 
-  function reset() {
+  const reset = useCallback(() => {
     setInvoice(null);
-  }
+  }, []);
 
   // Subscribe to SDK events while an invoice is on screen. When a
   // `paymentSucceeded` event fires for the BOLT11 string we generated,
@@ -123,7 +123,7 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
         void handle.removeEventListener(listenerId).catch(() => undefined);
       }
     };
-  }, [handle, invoice, open, onOpenChange, toast, wallet]);
+  }, [handle, invoice, open, onOpenChange, reset, toast, wallet]);
 
   return (
     <Dialog
@@ -135,10 +135,10 @@ export function ReceiveDialog({ wallet, open, onOpenChange }: ReceiveDialogProps
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Receive sats</DialogTitle>
+          <DialogTitle>Deposit sats</DialogTitle>
           <DialogDescription>
             Generate a BOLT11 invoice. Pay it from any Lightning wallet to fund
-            this persona.
+            this wallet.
           </DialogDescription>
         </DialogHeader>
 
